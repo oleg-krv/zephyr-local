@@ -42,8 +42,12 @@
 #include <stm32f2xx_ll_usart.h>
 #endif
 
-#ifdef CONFIG_GPIO_STM32
-#include <stm32f2xx_ll_gpio.h>
+#ifdef CONFIG_I2C_STM32
+#include <stm32f2xx_ll_i2c.h>
+#endif
+
+#if defined(CONFIG_SPI_STM32) || defined(CONFIG_I2S_STM32)
+#include <stm32f2xx_ll_spi.h>
 #endif
 
 #ifdef CONFIG_IWDG_STM32
@@ -52,6 +56,16 @@
 
 #ifdef CONFIG_WWDG_STM32
 #include <stm32f2xx_ll_wwdg.h>
+#endif
+
+#if defined(CONFIG_COUNTER_RTC_STM32)
+#include <stm32f2xx_ll_rtc.h>
+#include <stm32f2xx_ll_exti.h>
+#include <stm32f2xx_ll_pwr.h>
+#endif
+
+#ifdef CONFIG_GPIO_STM32
+#include <stm32f2xx_ll_gpio.h>
 #endif
 
 #ifdef CONFIG_ADC_STM32

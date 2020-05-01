@@ -9,14 +9,10 @@
  * @brief System/hardware module for stm32f2 processor
  */
 
-#include <kernel.h>
 #include <device.h>
 #include <init.h>
-#include <soc.h>
 #include <arch/cpu.h>
 #include <arch/arm/aarch32/cortex_m/cmsis.h>
-#include <linker/linker-defs.h>
-#include <string.h>
 
 /**
  * @brief Perform basic hardware initialization at boot.
@@ -26,7 +22,7 @@
  *
  * @return 0
  */
-static int stm32f2_init(struct device *arg)
+static int st_stm32f2_init(struct device *arg)
 {
 	u32_t key;
 
@@ -48,4 +44,4 @@ static int stm32f2_init(struct device *arg)
 	return 0;
 }
 
-SYS_INIT(stm32f2_init, PRE_KERNEL_1, 0);
+SYS_INIT(st_stm32f2_init, PRE_KERNEL_1, 0);
