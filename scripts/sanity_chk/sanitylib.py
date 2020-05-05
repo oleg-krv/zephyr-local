@@ -345,6 +345,9 @@ class BinaryHandler(Handler):
         # so we need to use try_kill_process_by_pid.
         self.try_kill_process_by_pid()
         proc.terminate()
+        # sleep for a while before attempting to kill
+        time.sleep(0.5)
+        proc.kill()
         self.terminated = True
 
     def _output_reader(self, proc, harness):
@@ -435,6 +438,8 @@ class BinaryHandler(Handler):
             self.instance.reason = "Valgrind error"
         elif harness.state:
             self.set_state(harness.state, handler_time)
+            if harness.state == "failed":
+                self.instance.reason = "Failed"
         else:
             self.set_state("timeout", handler_time)
             self.instance.reason = "Timeout"
@@ -1849,6 +1854,8 @@ class ProjectBuilder(FilterBuilder):
         elif instance.testcase.type == "unit":
             instance.handler = BinaryHandler(instance, "unit")
             instance.handler.binary = os.path.join(instance.build_dir, "testbinary")
+            if self.coverage:
+                args.append("COVERAGE=1")
         elif instance.platform.type == "native":
             handler = BinaryHandler(instance, "native")
 
@@ -1948,6 +1955,7 @@ class ProjectBuilder(FilterBuilder):
             'handler.log',
             'build.log',
             'device.log',
+            'recording.csv',
             ]
         whitelist = [os.path.join(self.instance.build_dir, file) for file in whitelist]
 

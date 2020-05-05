@@ -221,6 +221,11 @@ static u32_t filter_remove(struct ll_filter *filter, u8_t addr_type,
 #endif
 
 #if defined(CONFIG_BT_CTLR_PRIVACY)
+bool ctrl_lrpa_used(u8_t rl_idx)
+{
+	return rl_idx < ARRAY_SIZE(rl) && rl[rl_idx].lirk;
+}
+
 bt_addr_t *ctrl_lrpa_get(u8_t rl_idx)
 {
 	if ((rl_idx >= ARRAY_SIZE(rl)) || !rl[rl_idx].lirk ||
@@ -683,13 +688,13 @@ void ll_rl_rpa_update(bool timeout)
 static void rpa_timeout(struct k_work *work)
 {
 	ll_rl_rpa_update(true);
-	k_delayed_work_submit(&rpa_work, rpa_timeout_ms);
+	k_delayed_work_submit(&rpa_work, K_MSEC(rpa_timeout_ms));
 }
 
 static void rpa_refresh_start(void)
 {
 	BT_DBG("");
-	k_delayed_work_submit(&rpa_work, rpa_timeout_ms);
+	k_delayed_work_submit(&rpa_work, K_MSEC(rpa_timeout_ms));
 }
 
 static void rpa_refresh_stop(void)

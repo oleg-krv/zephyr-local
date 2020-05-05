@@ -51,10 +51,10 @@
 #define LOG_MODULE_NAME bt_ctlr_ctrl
 #include "common/log.h"
 
-#if defined(CONFIG_BT_CTLR_CONN_RSSI)
+#if defined(CONFIG_BT_CTLR_CONN_RSSI_EVENT)
 #define RADIO_RSSI_SAMPLE_COUNT	10
 #define RADIO_RSSI_THRESHOLD	4
-#endif /* CONFIG_BT_CTLR_CONN_RSSI */
+#endif /* CONFIG_BT_CTLR_CONN_RSSI_EVENT */
 
 #define SILENT_CONNECTION	0
 
@@ -1118,9 +1118,14 @@ static inline u32_t isr_rx_adv(u8_t devmatch_ok, u8_t devmatch_id,
 		radio_le_conn_cmplt->status = 0x00;
 		radio_le_conn_cmplt->role = 0x01;
 #if defined(CONFIG_BT_CTLR_PRIVACY)
-		radio_le_conn_cmplt->own_addr_type = pdu_adv->rx_addr;
-		memcpy(&radio_le_conn_cmplt->own_addr[0],
-		       &pdu_adv->connect_ind.adv_addr[0], BDADDR_SIZE);
+		if (ctrl_lrpa_used(_radio.advertiser.rl_idx)) {
+			memcpy(&radio_le_conn_cmplt->local_rpa[0],
+			       &pdu_adv->connect_ind.adv_addr[0], BDADDR_SIZE);
+		} else {
+			memset(&radio_le_conn_cmplt->local_rpa[0], 0x0,
+			       BDADDR_SIZE);
+		}
+
 		if (irkmatch_ok && rl_idx != FILTER_IDX_NONE) {
 			/* TODO: store rl_idx instead if safe */
 			/* Store identity address */
@@ -1644,10 +1649,14 @@ static inline u32_t isr_rx_scan(u8_t devmatch_ok, u8_t devmatch_id,
 		radio_le_conn_cmplt->status = 0x00;
 		radio_le_conn_cmplt->role = 0x00;
 #if defined(CONFIG_BT_CTLR_PRIVACY)
-		radio_le_conn_cmplt->own_addr_type = pdu_adv_tx->tx_addr;
-		memcpy(&radio_le_conn_cmplt->own_addr[0],
-		       &pdu_adv_tx->connect_ind.init_addr[0],
-		       BDADDR_SIZE);
+		if (_radio.scanner.rpa_gen && lrpa) {
+			memcpy(&radio_le_conn_cmplt->local_rpa[0],
+			       &pdu_adv_tx->connect_ind.init_addr[0],
+			       BDADDR_SIZE);
+		} else {
+			memset(&radio_le_conn_cmplt->local_rpa[0], 0x0,
+			       BDADDR_SIZE);
+		}
 
 		if (irkmatch_ok && rl_idx != FILTER_IDX_NONE) {
 			/* TODO: store rl_idx instead if safe */
@@ -4222,6 +4231,7 @@ isr_rx_conn_exit:
 
 		_radio.conn_curr->rssi_latest = rssi;
 
+#if defined(CONFIG_BT_CTLR_CONN_RSSI_EVENT)
 		if (((_radio.conn_curr->rssi_reported - rssi) & 0xFF) >
 		    RADIO_RSSI_THRESHOLD) {
 			if (_radio.conn_curr->rssi_sample_count) {
@@ -4231,6 +4241,7 @@ isr_rx_conn_exit:
 			_radio.conn_curr->rssi_sample_count =
 				RADIO_RSSI_SAMPLE_COUNT;
 		}
+#endif /* CONFIG_BT_CTLR_CONN_RSSI_EVENT */
 	}
 #else /* !CONFIG_BT_CTLR_CONN_RSSI */
 	ARG_UNUSED(rssi_ready);
@@ -4883,7 +4894,7 @@ static inline void isr_close_conn(void)
 	}
 #endif /* CONFIG_BT_CTLR_LE_PING */
 
-#if defined(CONFIG_BT_CTLR_CONN_RSSI)
+#if defined(CONFIG_BT_CTLR_CONN_RSSI_EVENT)
 	/* generate RSSI event */
 	if (_radio.conn_curr->rssi_sample_count == 0) {
 		struct radio_pdu_node_rx *node_rx;
@@ -4908,7 +4919,7 @@ static inline void isr_close_conn(void)
 			packet_rx_enqueue();
 		}
 	}
-#endif /* CONFIG_BT_CTLR_CONN_RSSI */
+#endif /* CONFIG_BT_CTLR_CONN_RSSI_EVENT */
 
 	/* break latency based on ctrl procedure pending */
 	if (((_radio.conn_curr->llcp_ack != _radio.conn_curr->llcp_req) &&
@@ -11675,8 +11686,10 @@ u32_t radio_adv_enable(u16_t interval, u8_t chan_map, u8_t filter_policy,
 
 #if defined(CONFIG_BT_CTLR_CONN_RSSI)
 		conn->rssi_latest = 0x7F;
+#if defined(CONFIG_BT_CTLR_CONN_RSSI_EVENT)
 		conn->rssi_reported = 0x7F;
 		conn->rssi_sample_count = 0U;
+#endif /* CONFIG_BT_CTLR_CONN_RSSI_EVENT */
 #endif /* CONFIG_BT_CTLR_CONN_RSSI */
 
 #if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL)
@@ -12228,8 +12241,10 @@ u32_t radio_connect_enable(u8_t adv_addr_type, u8_t *adv_addr, u16_t interval,
 
 #if defined(CONFIG_BT_CTLR_CONN_RSSI)
 	conn->rssi_latest = 0x7F;
+#if defined(CONFIG_BT_CTLR_CONN_RSSI_EVENT)
 	conn->rssi_reported = 0x7F;
 	conn->rssi_sample_count = 0U;
+#endif /* CONFIG_BT_CTLR_CONN_RSSI_EVENT */
 #endif /* CONFIG_BT_CTLR_CONN_RSSI */
 
 #if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL)
@@ -13017,9 +13032,9 @@ void ll_rx_dequeue(void)
 	case NODE_RX_TYPE_PHY_UPDATE:
 #endif /* CONFIG_BT_CTLR_PHY */
 
-#if defined(CONFIG_BT_CTLR_CONN_RSSI)
+#if defined(CONFIG_BT_CTLR_CONN_RSSI_EVENT)
 	case NODE_RX_TYPE_RSSI:
-#endif /* CONFIG_BT_CTLR_CONN_RSSI */
+#endif /* CONFIG_BT_CTLR_CONN_RSSI_EVENT */
 #endif /* CONFIG_BT_CONN */
 
 #if defined(CONFIG_BT_CTLR_PROFILE_ISR)
@@ -13172,9 +13187,9 @@ void ll_rx_mem_release(void **node_rx)
 		case NODE_RX_TYPE_PHY_UPDATE:
 #endif /* CONFIG_BT_CTLR_PHY */
 
-#if defined(CONFIG_BT_CTLR_CONN_RSSI)
+#if defined(CONFIG_BT_CTLR_CONN_RSSI_EVENT)
 		case NODE_RX_TYPE_RSSI:
-#endif /* CONFIG_BT_CTLR_CONN_RSSI */
+#endif /* CONFIG_BT_CTLR_CONN_RSSI_EVENT */
 #endif /* CONFIG_BT_CONN */
 
 #if defined(CONFIG_BT_CTLR_PROFILE_ISR)

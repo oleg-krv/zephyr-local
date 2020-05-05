@@ -39,6 +39,21 @@ struct bt_le_conn_param {
 	u16_t timeout;
 };
 
+/** @brief Initialize connection parameters
+ *
+ *  @param int_min  Minimum Connection Interval (N * 1.25 ms)
+ *  @param int_max  Maximum Connection Interval (N * 1.25 ms)
+ *  @param lat      Connection Latency
+ *  @param to       Supervision Timeout (N * 10 ms)
+ */
+#define BT_LE_CONN_PARAM_INIT(int_min, int_max, lat, to) \
+{ \
+	.interval_min = (int_min), \
+	.interval_max = (int_max), \
+	.latency = (lat), \
+	.timeout = (to), \
+}
+
 /** Helper to declare connection parameters inline
  *
  *  @param int_min  Minimum Connection Interval (N * 1.25 ms)
@@ -47,12 +62,9 @@ struct bt_le_conn_param {
  *  @param to       Supervision Timeout (N * 10 ms)
  */
 #define BT_LE_CONN_PARAM(int_min, int_max, lat, to) \
-	((struct bt_le_conn_param[]) { { \
-		.interval_min = (int_min), \
-		.interval_max = (int_max), \
-		.latency = (lat), \
-		.timeout = (to), \
-	 } })
+	((struct bt_le_conn_param[]) { \
+		BT_LE_CONN_PARAM_INIT(int_min, int_max, lat, to) \
+	 })
 
 /** Default LE connection parameters:
  *    Connection Interval: 30-50 ms
@@ -164,24 +176,19 @@ enum {
 	BT_CONN_ROLE_SLAVE,
 };
 
-/** @brief Connection Info Structure
- *
- *  @param type Connection Type
- *  @param role Connection Role
- *  @param id Which local identity the connection was created with
- *  @param le LE Connection specific Info
- *  @param br BR/EDR Connection specific Info
- */
+/** Connection Info Structure */
 struct bt_conn_info {
+	/** Connection Type. */
 	u8_t type;
-
+	/** Connection Role. */
 	u8_t role;
-
+	/** Which local identity the connection was created with */
 	u8_t id;
-
+	/** Connection Type specific Info.*/
 	union {
+		/** LE Connection specific Info. */
 		struct bt_conn_le_info le;
-
+		/** BR/EDR Connection specific Info. */
 		struct bt_conn_br_info br;
 	};
 };
@@ -281,29 +288,21 @@ int bt_conn_disconnect(struct bt_conn *conn, u8_t reason);
 
 enum {
 	/** Convenience value when no options are specified. */
-	BT_LE_CONN_OPT_NONE = 0,
+	BT_CONN_LE_OPT_NONE = 0,
 
-	/** Enable LE Coded PHY.
+	/** @brief Enable LE Coded PHY.
 	 *
 	 *  Enable scanning on the LE Coded PHY.
-	 *  Enable connection initiation on the LE Coded PHY.
 	 */
-	BT_LE_CONN_OPT_CODED = BIT(0),
+	BT_CONN_LE_OPT_CODED = BIT(0),
 
-	/** Enable LE 2M PHY.
-	 *
-	 *  Enable connection initiaton on the LE 2M PHY.
-	 */
-	BT_LE_CONN_OPT_2M = BIT(1),
-
-	/** Disable LE 1M PHY.
+	/** @brief Disable LE 1M PHY.
 	 *
 	 *  Disable scanning on the LE 1M PHY.
-	 *  Disable connection initiation on the LE 1M PHY.
 	 *
-	 *  @note Requires @ref BT_LE_CONN_OPT_CODED.
+	 *  @note Requires @ref BT_CONN_LE_OPT_CODED.
 	 */
-	BT_LE_CONN_OPT_NO_1M = BIT(2),
+	BT_CONN_LE_OPT_NO_1M = BIT(1),
 };
 
 struct bt_conn_le_create_param {
@@ -317,19 +316,19 @@ struct bt_conn_le_create_param {
 	/** Scan window (N * 0.625 ms) */
 	u16_t window;
 
-	/** Scan interval LE Coded PHY (N * 0.625 MS)
+	/** @brief Scan interval LE Coded PHY (N * 0.625 MS)
 	 *
 	 *  Set zero to use same as LE 1M PHY scan interval
 	 */
 	u16_t interval_coded;
 
-	/** Scan window LE Coded PHY (N * 0.625 MS)
+	/** @brief Scan window LE Coded PHY (N * 0.625 MS)
 	 *
 	 *  Set zero to use same as LE 1M PHY scan window.
 	 */
 	u16_t window_coded;
 
-	/** Connection initiation timeout (N * 10 MS)
+	/** @brief Connection initiation timeout (N * 10 MS)
 	 *
 	 *  Set zero to use the default :option:`CONFIG_BT_CREATE_CONN_TIMEOUT`
 	 *  timeout.
@@ -339,6 +338,22 @@ struct bt_conn_le_create_param {
 	u16_t timeout;
 };
 
+/** @brief Initialize create connection parameters
+ *
+ *  @param _options  Create connection options.
+ *  @param _interval Create connection scan interval (N * 0.625 ms).
+ *  @param _window   Create connection scan window (N * 0.625 ms).
+ */
+#define BT_CONN_LE_CREATE_PARAM_INIT(_options, _interval, _window) \
+{ \
+	.options = (_options), \
+	.interval = (_interval), \
+	.window = (_window), \
+	.interval_coded = 0, \
+	.window_coded = 0, \
+	.timeout = 0, \
+}
+
 /** Helper to declare create connection parameters inline
  *
  *  @param _options  Create connection options.
@@ -346,20 +361,15 @@ struct bt_conn_le_create_param {
  *  @param _window   Create connection scan window (N * 0.625 ms).
  */
 #define BT_CONN_LE_CREATE_PARAM(_options, _interval, _window) \
-	((struct bt_conn_le_create_param[]) { { \
-		.options = (_options), \
-		.interval = (_interval), \
-		.window = (_window), \
-		.interval_coded = 0, \
-		.window_coded = 0, \
-		.timeout = 0, \
-	 } })
+	((struct bt_conn_le_create_param[]) { \
+		BT_CONN_LE_CREATE_PARAM_INIT(_options, _interval, _window) \
+	 })
 
 /** Default LE create connection parameters.
  *  Scan continuously by setting scan interval equal to scan window.
  */
 #define BT_CONN_LE_CREATE_CONN \
-	BT_CONN_LE_CREATE_PARAM(BT_LE_CONN_OPT_NONE, \
+	BT_CONN_LE_CREATE_PARAM(BT_CONN_LE_OPT_NONE, \
 				BT_GAP_SCAN_FAST_INTERVAL, \
 				BT_GAP_SCAN_FAST_INTERVAL)
 
@@ -368,7 +378,7 @@ struct bt_conn_le_create_param {
  *  Scan interval: 60 ms.
  */
 #define BT_CONN_LE_CREATE_CONN_AUTO \
-	BT_CONN_LE_CREATE_PARAM(BT_LE_CONN_OPT_NONE, \
+	BT_CONN_LE_CREATE_PARAM(BT_CONN_LE_OPT_NONE, \
 				BT_GAP_SCAN_FAST_INTERVAL, \
 				BT_GAP_SCAN_FAST_WINDOW)
 
@@ -398,8 +408,12 @@ struct bt_conn *bt_conn_create_le(const bt_addr_le_t *peer,
 				  const struct bt_le_conn_param *conn_param)
 {
 	struct bt_conn *conn;
+	struct bt_conn_le_create_param param = BT_CONN_LE_CREATE_PARAM_INIT(
+						BT_CONN_LE_OPT_NONE,
+						BT_GAP_SCAN_FAST_INTERVAL,
+						BT_GAP_SCAN_FAST_INTERVAL);
 
-	if (bt_conn_le_create(peer, BT_CONN_LE_CREATE_CONN, conn_param,
+	if (bt_conn_le_create(peer, &param, conn_param,
 			      &conn)) {
 		return NULL;
 	}
@@ -428,7 +442,12 @@ int bt_conn_le_create_auto(const struct bt_conn_le_create_param *create_param,
 __deprecated static inline
 int bt_conn_create_auto_le(const struct bt_le_conn_param *conn_param)
 {
-	return bt_conn_le_create_auto(BT_CONN_LE_CREATE_CONN_AUTO, conn_param);
+	struct bt_conn_le_create_param param = BT_CONN_LE_CREATE_PARAM_INIT(
+						BT_CONN_LE_OPT_NONE,
+						BT_GAP_SCAN_FAST_INTERVAL,
+						BT_GAP_SCAN_FAST_WINDOW);
+
+	return bt_conn_le_create_auto(&param, conn_param);
 }
 
 /** @brief Stop automatic connect creation.
@@ -731,7 +750,7 @@ struct bt_conn_cb {
  */
 void bt_conn_cb_register(struct bt_conn_cb *cb);
 
-/** Enable/disable bonding.
+/** @brief Enable/disable bonding.
  *
  *  Set/clear the Bonding flag in the Authentication Requirements of
  *  SMP Pairing Request/Response data.
@@ -743,7 +762,7 @@ void bt_conn_cb_register(struct bt_conn_cb *cb);
  */
 void bt_set_bondable(bool enable);
 
-/** Allow/disallow remote OOB data to be used for pairing.
+/** @brief Allow/disallow remote OOB data to be used for pairing.
  *
  *  Set/clear the OOB data flag for SMP Pairing Request/Response data.
  *  The initial value of this flag depends on BT_OOB_DATA_PRESENT Kconfig
@@ -1156,14 +1175,23 @@ struct bt_br_conn_param {
 	bool allow_role_switch;
 };
 
+/** @brief Initialize BR/EDR connection parameters
+ *
+ *  @param role_switch True if role switch is allowed
+ */
+#define BT_BR_CONN_PARAM_INIT(role_switch) \
+{ \
+	.allow_role_switch = (role_switch), \
+}
+
 /** Helper to declare BR/EDR connection parameters inline
   *
   * @param role_switch True if role switch is allowed
   */
 #define BT_BR_CONN_PARAM(role_switch) \
-	((struct bt_br_conn_param[]) { { \
-		.allow_role_switch = (role_switch), \
-	 } })
+	((struct bt_br_conn_param[]) { \
+		BT_BR_CONN_PARAM_INIT(role_switch) \
+	 })
 
 /** Default BR/EDR connection parameters:
  *    Role switch allowed

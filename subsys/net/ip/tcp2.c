@@ -539,28 +539,13 @@ static int ip_header_add(struct tcp *conn, struct net_pkt *pkt)
 	return -EINVAL;
 }
 
-static struct net_pkt *tcp_pkt_alloc(struct net_if *iface,
-				     sa_family_t family, size_t len)
-{
-	struct net_pkt *pkt;
-
-	pkt = net_pkt_alloc_with_buffer(iface, len, family,
-					IPPROTO_TCP, K_NO_WAIT);
-
-#if IS_ENABLED(CONFIG_NET_TEST_PROTOCOL)
-	tp_pkt_alloc(pkt);
-#endif
-	return pkt;
-}
-
 static void tcp_out(struct tcp *conn, u8_t flags, ...)
 {
 	struct net_pkt *pkt;
 	size_t len = 0;
 	int r;
 
-	pkt = tcp_pkt_alloc(conn->iface, net_context_get_family(conn->context),
-			    sizeof(struct tcphdr));
+	pkt = tcp_pkt_alloc(conn, sizeof(struct tcphdr));
 	if (!pkt) {
 		goto fail;
 	}
@@ -579,8 +564,6 @@ static void tcp_out(struct tcp *conn, u8_t flags, ...)
 		data_pkt->buffer = NULL;
 		tcp_pkt_unref(data_pkt);
 	}
-
-	pkt->iface = conn->iface;
 
 	r = ip_header_add(conn, pkt);
 	if (r < 0) {
@@ -931,10 +914,16 @@ next_state:
 		/* full-close */
 		if (th && FL(&fl, ==, (FIN | ACK), th_seq(th) == conn->ack)) {
 			conn_ack(conn, + 1);
+			tcp_out(conn, FIN | ACK);
+			next = TCP_LAST_ACK;
+			break;
+		} else if (th && FL(&fl, ==, FIN, th_seq(th) == conn->ack)) {
+			conn_ack(conn, + 1);
 			tcp_out(conn, ACK);
 			next = TCP_CLOSE_WAIT;
 			break;
 		}
+
 		if (len) {
 			if (th_seq(th) == conn->ack) {
 				tcp_data_get(conn, pkt);
@@ -944,13 +933,13 @@ next_state:
 				tcp_out(conn, ACK); /* peer has resent */
 			}
 		}
-		break; /* TODO: Catch all the rest here */
+		break;
 	case TCP_CLOSE_WAIT:
-		tcp_out(conn, FIN | ACK);
+		tcp_out(conn, FIN);
 		next = TCP_LAST_ACK;
 		break;
 	case TCP_LAST_ACK:
-		if (FL(&fl, ==, ACK, th_seq(th) == conn->ack)) {
+		if (th && FL(&fl, ==, ACK, th_seq(th) == conn->ack)) {
 			tcp_send_timer_cancel(conn);
 			next = TCP_CLOSED;
 		}
@@ -1494,8 +1483,7 @@ enum net_verdict tp_input(struct net_conn *net_conn,
 			{
 				struct net_pkt *data_pkt;
 
-				data_pkt = tcp_pkt_alloc(pkt->iface,
-							 pkt->family, len);
+				data_pkt = tcp_pkt_alloc(conn, len);
 				net_pkt_write(data_pkt, buf, len);
 				net_pkt_cursor_init(data_pkt);
 				net_tcp_queue_data(conn->context, data_pkt);

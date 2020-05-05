@@ -30,4 +30,13 @@
 #define ATMEL_SAM0_DT_INST_DMA_CHANNEL(n, name) \
 	ATMEL_SAM0_DT_INST_DMA_CELL(n, name, channel)
 
+/* Use to check if a sercom 'n' is enabled for a given 'compat' */
+#define ATMEL_SAM0_DT_SERCOM_CHECK(n, compat) \
+	DT_HAS_NODE(DT_NODELABEL(sercom##n)) && \
+	DT_NODE_HAS_COMPAT(DT_NODELABEL(sercom##n), compat)
+
+/* Common macro for use to set HCLK_FREQ_HZ */
+#define ATMEL_SAM0_DT_CPU_CLK_FREQ_HZ \
+	DT_PROP(DT_PATH(cpus, cpu_0), clock_frequency)
+
 #endif /* _ATMEL_SAM0_SOC_DT_H_ */

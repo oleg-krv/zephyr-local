@@ -44,8 +44,8 @@ Deprecated in this release
 
     * All timeout values are now encapsulated k_timeout_t opaque structure when
       passing them to the kernel. If you want to revert to the previous s32_t
-      type for the timeout parameter pleae enable the
-      CONFIG_LEGACY_TIMEOUT_API Kconfig option
+      type for the timeout parameter, please enable
+      :option:`CONFIG_LEGACY_TIMEOUT_API`
 
 * Bluetooth
 
@@ -73,6 +73,12 @@ Deprecated in this release
   * nrf52_pca20020 has been renamed to thingy52_nrf52832
   * nrf5340_dk_nrf5340 has been renamed to nrf5340pdk_nrf5340
 
+* Devicetree
+
+  * The C macros generated from devicetree. Use the new ``<devicetree.h>``
+    accessor API instead; see :ref:`dt-guide` for details. Use of the legacy
+    macros requires enabling :option:`CONFIG_LEGACY_DEVICETREE_MACROS`.
+
 Removed APIs in this release
 ============================
 
@@ -84,6 +90,13 @@ Stable API changes in this release
 
   * The net_idx parameter has been removed from the Health Client model
     APIs since it can be derived (by the stack) from the app_idx parameter
+
+* Networking
+
+  * The NET_DEVICE_INIT(), NET_DEVICE_INIT_INSTANCE(), NET_DEVICE_OFFLOAD_INIT()
+    and ETH_NET_DEVICE_INIT() macros changed and take a device power management
+    function pointer parameter. If networking PM is not implemented for the
+    specific network device, the device_pm_control_nop value can be used.
 
 Kernel
 ******

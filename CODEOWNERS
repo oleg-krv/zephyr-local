@@ -372,13 +372,13 @@
 /samples/bluetooth/                       @jhedberg @Vudentz @joerchan
 /samples/boards/intel_s1000_crb/          @sathishkuttan @dcpleung @nashif
 /samples/display/                         @vanwinkeljan
-/samples/drivers/CAN/                     @alexanderwachter
+/samples/drivers/can/                     @alexanderwachter
 /samples/drivers/display/                 @vanwinkeljan
 /samples/drivers/ht16k33/                 @henrikbrixandersen
 /samples/drivers/lora/                    @Mani-Sadhasivam
 /samples/net/                             @jukkar @tbursztyka @pfalcon
 /samples/net/dns_resolve/                 @jukkar @tbursztyka @pfalcon
-/samples/net/lwm2m_client/                @mike-scott
+/samples/net/lwm2m_client/                @rlubos
 /samples/net/mqtt_publisher/              @jukkar @tbursztyka
 /samples/net/sockets/coap_*/              @rveerama1
 /samples/net/sockets/                     @jukkar @tbursztyka @pfalcon
@@ -444,7 +444,7 @@
 /subsys/net/ip/                           @jukkar @tbursztyka @pfalcon
 /subsys/net/lib/                          @jukkar @tbursztyka @pfalcon
 /subsys/net/lib/dns/                      @jukkar @tbursztyka @pfalcon
-/subsys/net/lib/lwm2m/                    @mike-scott
+/subsys/net/lib/lwm2m/                    @rlubos
 /subsys/net/lib/config/                   @jukkar @tbursztyka @pfalcon
 /subsys/net/lib/mqtt/                     @jukkar @tbursztyka @rlubos
 /subsys/net/lib/openthread/               @rlubos
@@ -463,6 +463,7 @@
 /tests/                                   @nashif
 /tests/application_development/libcxx/    @pabigot
 /tests/arch/arm/                          @ioannisg @stephanosio
+/tests/benchmarks/cmsis_dsp/              @stephanosio
 /tests/boards/native_posix/               @aescolar @daor-oti
 /tests/boards/intel_s1000_crb/            @dcpleung @sathishkuttan
 /tests/bluetooth/                         @joerchan @jhedberg @Vudentz
@@ -471,6 +472,7 @@
 /tests/crypto/                            @ceolin
 /tests/crypto/mbedtls/                    @nashif @ceolin
 /tests/drivers/can/                       @alexanderwachter
+/tests/drivers/counter/                   @nordic-krch
 /tests/drivers/flash_simulator/           @nvlsianpu
 /tests/drivers/gpio/                      @mnkp @pabigot
 /tests/drivers/hwinfo/                    @alexanderwachter
@@ -478,6 +480,7 @@
 /tests/drivers/uart/uart_async_api/       @Mierunski
 /tests/kernel/                            @andrewboie @andyross @nashif
 /tests/lib/                               @nashif
+/tests/lib/cmsis_dsp/                     @stephanosio
 /tests/net/                               @jukkar @tbursztyka @pfalcon
 /tests/net/buf/                           @jukkar @jhedberg @tbursztyka @pfalcon
 /tests/net/lib/                           @jukkar @tbursztyka @pfalcon

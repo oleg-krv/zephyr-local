@@ -1103,7 +1103,7 @@ static int gmac_init(Gmac *gmac, u32_t gmac_ncfgr_val)
 	/* Setup Network Configuration Register */
 	gmac->GMAC_NCFGR = gmac_ncfgr_val | mck_divisor;
 
-	gmac->GMAC_UR = DT_ENUM_IDX(DT_NODELABEL(gmac), phy_connection_type);
+	gmac->GMAC_UR = DT_ENUM_IDX(DT_DRV_INST(0), phy_connection_type);
 
 #if defined(CONFIG_PTP_CLOCK_SAM_GMAC)
 	/* Initialize PTP Clock Registers */
@@ -1863,7 +1863,7 @@ static void monitor_work_handler(struct k_work *work)
 finally:
 	/* Submit delayed work */
 	k_delayed_work_submit(&dev_data->monitor_work,
-			      CONFIG_ETH_SAM_GMAC_MONITOR_PERIOD);
+			      K_MSEC(CONFIG_ETH_SAM_GMAC_MONITOR_PERIOD));
 }
 
 static void eth0_iface_init(struct net_if *iface)
@@ -1982,7 +1982,7 @@ static void eth0_iface_init(struct net_if *iface)
 	/* Initialise monitor */
 	k_delayed_work_init(&dev_data->monitor_work, monitor_work_handler);
 	k_delayed_work_submit(&dev_data->monitor_work,
-			      CONFIG_ETH_SAM_GMAC_MONITOR_PERIOD);
+			      K_MSEC(CONFIG_ETH_SAM_GMAC_MONITOR_PERIOD));
 
 	/* Do not start the interface until PHY link is up */
 	net_if_flag_set(iface, NET_IF_NO_AUTO_START);
@@ -2201,7 +2201,7 @@ static void eth0_irq_config(void)
 }
 
 #ifdef CONFIG_SOC_FAMILY_SAM
-static const struct soc_gpio_pin pins_eth0[] = PINS_GMAC0;
+static const struct soc_gpio_pin pins_eth0[] = ATMEL_SAM_DT_PINS(0);
 #endif
 
 static const struct eth_sam_dev_cfg eth0_config = {

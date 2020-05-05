@@ -13,10 +13,6 @@ static int hexiwear_k64_pinmux_init(struct device *dev)
 {
 	ARG_UNUSED(dev);
 
-#ifdef CONFIG_PINMUX_MCUX_PORTA
-	struct device *porta =
-		device_get_binding(CONFIG_PINMUX_MCUX_PORTA_NAME);
-#endif
 #ifdef CONFIG_PINMUX_MCUX_PORTB
 	struct device *portb =
 		device_get_binding(CONFIG_PINMUX_MCUX_PORTB_NAME);
@@ -34,7 +30,8 @@ static int hexiwear_k64_pinmux_init(struct device *dev)
 		device_get_binding(CONFIG_PINMUX_MCUX_PORTE_NAME);
 #endif
 
-#if DT_HAS_NODE(DT_NODELABEL(ftm3))
+#if DT_HAS_NODE(DT_NODELABEL(ftm3)) && \
+    DT_NODE_HAS_COMPAT(DT_NODELABEL(ftm3), nxp_kinetis_ftm_pwm)
 	/* Red, green, blue LEDs as PWM channels */
 	pinmux_pin_set(portc,  8, PORT_PCR_MUX(kPORT_MuxAlt3));
 	pinmux_pin_set(portc,  9, PORT_PCR_MUX(kPORT_MuxAlt3));
@@ -57,7 +54,7 @@ static int hexiwear_k64_pinmux_init(struct device *dev)
 	pinmux_pin_set(portb, 12, PORT_PCR_MUX(kPORT_MuxAsGpio));
 
 	struct device *gpiob =
-	       device_get_binding(DT_NXP_KINETIS_GPIO_GPIO_B_LABEL);
+	       device_get_binding(DT_LABEL(DT_NODELABEL(gpiob)));
 
 	gpio_pin_configure(gpiob, 12, GPIO_OUTPUT_LOW);
 #endif
@@ -87,12 +84,15 @@ static int hexiwear_k64_pinmux_init(struct device *dev)
 	pinmux_pin_set(porte, 25, PORT_PCR_MUX(kPORT_MuxAlt3));
 #endif
 
-#ifdef CONFIG_MAX30101
+#if defined(CONFIG_MAX30101) && DT_HAS_NODE(DT_NODELABEL(gpioa))
+	struct device *porta =
+		device_get_binding(CONFIG_PINMUX_MCUX_PORTA_NAME);
+
 	/* LDO - MAX30101 power supply */
 	pinmux_pin_set(porta, 29, PORT_PCR_MUX(kPORT_MuxAsGpio));
 
 	struct device *gpioa =
-	       device_get_binding(DT_NXP_KINETIS_GPIO_GPIO_A_LABEL);
+	       device_get_binding(DT_LABEL(DT_NODELABEL(gpioa)));
 
 	gpio_pin_configure(gpioa, 29, GPIO_OUTPUT_HIGH);
 #endif
@@ -101,7 +101,7 @@ static int hexiwear_k64_pinmux_init(struct device *dev)
 	pinmux_pin_set(portc, 14, PORT_PCR_MUX(kPORT_MuxAsGpio));
 
 	struct device *gpioc =
-	       device_get_binding(DT_NXP_KINETIS_GPIO_GPIO_C_LABEL);
+	       device_get_binding(DT_LABEL(DT_NODELABEL(gpioc)));
 
 	gpio_pin_configure(gpioc, 14, GPIO_OUTPUT_LOW);
 #endif

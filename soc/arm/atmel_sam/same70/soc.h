@@ -17,6 +17,9 @@
 
 #ifndef _ASMLANGUAGE
 
+/* Add include for DTS generated information */
+#include <devicetree.h>
+
 #define DONT_USE_CMSIS_INIT
 #define DONT_USE_PREDEFINED_CORE_HANDLERS
 #define DONT_USE_PREDEFINED_PERIPHERALS_HANDLERS
@@ -67,8 +70,12 @@
 #include "../common/soc_gpio.h"
 #include "../common/atmel_sam_dt.h"
 
-/* Add include for DTS generated information */
-#include <devicetree.h>
+/** Processor Clock (HCLK) Frequency */
+#define SOC_ATMEL_SAM_HCLK_FREQ_HZ ATMEL_SAM_DT_CPU_CLK_FREQ_HZ
+
+/** Master Clock (MCK) Frequency */
+#define SOC_ATMEL_SAM_MCK_FREQ_HZ \
+	(SOC_ATMEL_SAM_HCLK_FREQ_HZ / CONFIG_SOC_ATMEL_SAME70_MDIV)
 
 #endif /* _ASMLANGUAGE */
 
@@ -116,11 +123,5 @@
 #define DMA_PERID_TC1_RX      41
 #define DMA_PERID_TC2_RX      42
 #define DMA_PERID_TC3_RX      43
-
-/** Processor Clock (HCLK) Frequency */
-#define SOC_ATMEL_SAM_HCLK_FREQ_HZ DT_ARM_CORTEX_M7_0_CLOCK_FREQUENCY
-/** Master Clock (MCK) Frequency */
-#define SOC_ATMEL_SAM_MCK_FREQ_HZ \
-		(SOC_ATMEL_SAM_HCLK_FREQ_HZ / CONFIG_SOC_ATMEL_SAME70_MDIV)
 
 #endif /* _ATMEL_SAME70_SOC_H_ */
