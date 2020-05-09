@@ -26,7 +26,7 @@ LOG_MODULE_REGISTER(spi_ll_stm32);
 #include "spi_ll_stm32.h"
 
 #define DEV_CFG(dev)						\
-(const struct spi_stm32_config * const)(dev->config->config_info)
+(const struct spi_stm32_config * const)(dev->config_info)
 
 #define DEV_DATA(dev)					\
 (struct spi_stm32_data * const)(dev->driver_data)
@@ -423,7 +423,7 @@ static void spi_stm32_complete(struct spi_stm32_data *data, SPI_TypeDef *spi,
 
 	spi_context_cs_control(&data->ctx, false);
 
-#if DT_HAS_COMPAT(st_stm32_spi_fifo)
+#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_spi_fifo)
 	/* Flush RX buffer */
 	while (ll_func_rx_is_not_empty(spi)) {
 		(void) LL_SPI_ReceiveData8(spi);
@@ -451,7 +451,7 @@ static void spi_stm32_complete(struct spi_stm32_data *data, SPI_TypeDef *spi,
 static void spi_stm32_isr(void *arg)
 {
 	struct device * const dev = (struct device *) arg;
-	const struct spi_stm32_config *cfg = dev->config->config_info;
+	const struct spi_stm32_config *cfg = dev->config_info;
 	struct spi_stm32_data *data = dev->driver_data;
 	SPI_TypeDef *spi = cfg->spi;
 	int err;
@@ -570,7 +570,7 @@ static int spi_stm32_configure(struct device *dev,
 		LL_SPI_SetDataWidth(spi, LL_SPI_DATAWIDTH_16BIT);
 	}
 
-#if DT_HAS_COMPAT(st_stm32_spi_fifo)
+#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_spi_fifo)
 	ll_func_set_fifo_threshold_8bit(spi);
 #endif
 
@@ -645,7 +645,7 @@ static int transceive(struct device *dev,
 	/* Set buffers info */
 	spi_context_buffers_setup(&data->ctx, tx_bufs, rx_bufs, 1);
 
-#if DT_HAS_COMPAT(st_stm32_spi_fifo)
+#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_spi_fifo)
 	/* Flush RX buffer */
 	while (ll_func_rx_is_not_empty(spi)) {
 		(void) LL_SPI_ReceiveData8(spi);
@@ -778,7 +778,7 @@ static const struct spi_driver_api api_funcs = {
 static int spi_stm32_init(struct device *dev)
 {
 	struct spi_stm32_data *data __attribute__((unused)) = dev->driver_data;
-	const struct spi_stm32_config *cfg = dev->config->config_info;
+	const struct spi_stm32_config *cfg = dev->config_info;
 
 	__ASSERT_NO_MSG(device_get_binding(STM32_CLOCK_CONTROL_NAME));
 
@@ -898,26 +898,4 @@ DEVICE_AND_API_INIT(spi_stm32_##id, DT_INST_LABEL(id),	\
 									\
 STM32_SPI_IRQ_HANDLER(id)
 
-#if DT_HAS_DRV_INST(0)
-STM32_SPI_INIT(0)
-#endif /* DT_HAS_DRV_INST(0) */
-
-#if DT_HAS_DRV_INST(1)
-STM32_SPI_INIT(1)
-#endif /* DT_HAS_DRV_INST(1) */
-
-#if DT_HAS_DRV_INST(2)
-STM32_SPI_INIT(2)
-#endif /* DT_HAS_DRV_INST(2) */
-
-#if DT_HAS_DRV_INST(3)
-STM32_SPI_INIT(3)
-#endif /* DT_HAS_DRV_INST(3) */
-
-#if DT_HAS_DRV_INST(4)
-STM32_SPI_INIT(4)
-#endif /* DT_HAS_DRV_INST(4) */
-
-#if DT_HAS_DRV_INST(5)
-STM32_SPI_INIT(5)
-#endif /* DT_HAS_DRV_INST(5) */
+DT_INST_FOREACH_STATUS_OKAY(STM32_SPI_INIT)

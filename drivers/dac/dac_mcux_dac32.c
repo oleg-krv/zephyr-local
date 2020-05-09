@@ -28,7 +28,7 @@ struct mcux_dac32_data {
 static int mcux_dac32_channel_setup(struct device *dev,
 				    const struct dac_channel_cfg *channel_cfg)
 {
-	const struct mcux_dac32_config *config = dev->config->config_info;
+	const struct mcux_dac32_config *config = dev->config_info;
 	struct mcux_dac32_data *data = dev->driver_data;
 	dac32_config_t dac32_config;
 
@@ -56,7 +56,7 @@ static int mcux_dac32_channel_setup(struct device *dev,
 
 static int mcux_dac32_write_value(struct device *dev, u8_t channel, u32_t value)
 {
-	const struct mcux_dac32_config *config = dev->config->config_info;
+	const struct mcux_dac32_config *config = dev->config_info;
 	struct mcux_dac32_data *data = dev->driver_data;
 
 	if (!data->configured) {
@@ -111,6 +111,6 @@ static const struct dac_driver_api mcux_dac32_driver_api = {
 			mcux_dac32_init, &mcux_dac32_data_##n,		\
 			&mcux_dac32_config_##n,				\
 			POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,\
-			&mcux_dac32_driver_api)
+			&mcux_dac32_driver_api);
 
-DT_INST_FOREACH(MCUX_DAC32_INIT)
+DT_INST_FOREACH_STATUS_OKAY(MCUX_DAC32_INIT)

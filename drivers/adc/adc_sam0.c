@@ -59,7 +59,7 @@ struct adc_sam0_cfg {
 };
 
 #define DEV_CFG(dev) \
-	((const struct adc_sam0_cfg *const)(dev)->config->config_info)
+	((const struct adc_sam0_cfg *const)(dev)->config_info)
 #define DEV_DATA(dev) \
 	((struct adc_sam0_data *)(dev)->driver_data)
 
@@ -617,4 +617,4 @@ do {									\
 		ADC_SAM0_CONFIGURE(n);					\
 	}
 
-DT_INST_FOREACH(ADC_SAM0_DEVICE)
+DT_INST_FOREACH_STATUS_OKAY(ADC_SAM0_DEVICE)

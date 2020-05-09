@@ -55,7 +55,7 @@ struct rtc_stm32_data {
 
 #define DEV_DATA(dev) ((struct rtc_stm32_data *)(dev)->driver_data)
 #define DEV_CFG(dev)	\
-((const struct rtc_stm32_config * const)(dev)->config->config_info)
+((const struct rtc_stm32_config * const)(dev)->config_info)
 
 
 static void rtc_stm32_irq_config(struct device *dev);
@@ -203,7 +203,7 @@ static u32_t rtc_stm32_get_pending_int(struct device *dev)
 
 static u32_t rtc_stm32_get_top_value(struct device *dev)
 {
-	const struct counter_config_info *info = dev->config->config_info;
+	const struct counter_config_info *info = dev->config_info;
 
 	return info->max_top_value;
 }
@@ -212,7 +212,7 @@ static u32_t rtc_stm32_get_top_value(struct device *dev)
 static int rtc_stm32_set_top_value(struct device *dev,
 				   const struct counter_top_cfg *cfg)
 {
-	const struct counter_config_info *info = dev->config->config_info;
+	const struct counter_config_info *info = dev->config_info;
 
 	if ((cfg->ticks != info->max_top_value) ||
 		!(cfg->flags & COUNTER_TOP_CFG_DONT_RESET)) {
@@ -227,7 +227,7 @@ static int rtc_stm32_set_top_value(struct device *dev,
 
 static u32_t rtc_stm32_get_max_relative_alarm(struct device *dev)
 {
-	const struct counter_config_info *info = dev->config->config_info;
+	const struct counter_config_info *info = dev->config_info;
 
 	return info->max_top_value;
 }

@@ -29,8 +29,8 @@ struct counter_alarm_cfg alarm_cfg2;
 #define INST_DT_COMPAT_LABEL(n, compat) DT_LABEL(DT_INST(n, compat)),
 /* Generate a list of LABELs for all instances of the "compat" */
 #define LABELS_FOR_DT_COMPAT(compat) \
-	COND_CODE_1(DT_HAS_COMPAT(compat), \
-		   (UTIL_LISTIFY(DT_NUM_INST(compat), \
+	COND_CODE_1(DT_HAS_COMPAT_STATUS_OKAY(compat), \
+		   (UTIL_LISTIFY(DT_NUM_INST_STATUS_OKAY(compat), \
 				 INST_DT_COMPAT_LABEL, compat)), ())
 
 static const char * const devices[] = {
@@ -152,7 +152,7 @@ static bool set_top_value_capable(const char *dev_name)
 static void top_handler(struct device *dev, void *user_data)
 {
 	zassert_true(user_data == exp_user_data,
-			"%s: Unexpected callback", dev->config->name);
+			"%s: Unexpected callback", dev->name);
 	k_sem_give(&top_cnt_sem);
 }
 
@@ -265,7 +265,7 @@ static void alarm_handler(struct device *dev, u8_t chan_id, u32_t counter,
 
 	err = counter_get_value(dev, &now);
 	zassert_true(err == 0, "%s: Counter read failed (err: %d)",
-		     dev->config->name, err);
+		     dev->name, err);
 
 	top = counter_get_top_value(dev);
 	if (counter_is_counting_up(dev)) {
@@ -284,11 +284,11 @@ static void alarm_handler(struct device *dev, u8_t chan_id, u32_t counter,
 
 	if (user_data) {
 		zassert_true(&alarm_cfg == user_data,
-			"%s: Unexpected callback", dev->config->name);
+			"%s: Unexpected callback", dev->name);
 	}
 
 	zassert_true(k_is_in_isr(), "%s: Expected interrupt context",
-			dev->config->name);
+			dev->name);
 	k_sem_give(&alarm_cnt_sem);
 }
 

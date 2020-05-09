@@ -6,6 +6,7 @@
 
 #include <arm/armv8-m.dtsi>
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/i2c/i2c.h>
 #include <mem.h>
 
 / {
@@ -98,7 +99,7 @@
 	gpio0: gpio@0 {
 		compatible = "nxp,lpc-gpio";
 		reg = <0x8c000 0x2488>;
-		interrupts = <2 2>;
+		interrupts = <4 2>,<5 2>,<6 2>,<7 2>;
 		label = "GPIO_0";
 		gpio-controller;
 		#gpio-cells = <2>;
@@ -107,7 +108,7 @@
 	gpio1: gpio@1 {
 		compatible = "nxp,lpc-gpio";
 		reg = <0x8c000 0x2488>;
-		interrupts = <3 2>;
+		interrupts = <32 2>,<33 2>,<34 2>,<35 2>;
 		label = "GPIO_1";
 		gpio-controller;
 		#gpio-cells = <2>;
@@ -175,6 +176,23 @@
 		interrupts = <21 0>;
 		label = "FLEXCOMM_7";
 		status = "disabled";
+	};
+
+	hs_lspi: spi@9f000 {
+		compatible = "nxp,lpc-spi";
+		reg = <0x9f000 0x1000>;
+		interrupts = <59 0>;
+		label = "HS_LSPI";
+		status = "disabled";
+		#address-cells = <1>;
+		#size-cells = <0>;
+	};
+
+	rng: rng@3a000 {
+		compatible = "nxp,lpc-rng";
+		reg = <0x3a000 0x1000>;
+		status = "okay";
+		label = "RNG";
 	};
 };
 

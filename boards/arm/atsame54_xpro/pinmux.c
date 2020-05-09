@@ -25,7 +25,10 @@ static int board_pinmux_init(struct device *dev)
 #warning Pin mapping may not be configured
 #endif
 #if ATMEL_SAM0_DT_SERCOM_CHECK(1, atmel_sam0_uart)
-#warning Pin mapping may not be configured
+	/* NOTE: SERCOM1 UART is used by the UART driver tests */
+	/* SERCOM1 ON RX=PC22, TX=PC23 */
+	pinmux_pin_set(muxc, 22, PINMUX_FUNC_C);
+	pinmux_pin_set(muxc, 23, PINMUX_FUNC_C);
 #endif
 #if ATMEL_SAM0_DT_SERCOM_CHECK(2, atmel_sam0_uart)
 	/* SERCOM2 ON RX=PB24, TX=PB25 */
@@ -108,7 +111,7 @@ static int board_pinmux_init(struct device *dev)
 	pinmux_pin_set(muxa, 24, PINMUX_FUNC_H);
 #endif
 
-#if DT_HAS_NODE(DT_NODELABEL(gmac))
+#if DT_HAS_NODE_STATUS_OKAY(DT_NODELABEL(gmac))
 	pinmux_pin_set(muxa, 14, PINMUX_FUNC_L);	/* PA14 = GTXCK */
 	pinmux_pin_set(muxa, 17, PINMUX_FUNC_L);	/* PA17 = GTXEN */
 	pinmux_pin_set(muxa, 18, PINMUX_FUNC_L);	/* PA18 = GTX0 */

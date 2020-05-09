@@ -1263,11 +1263,15 @@ class Platform:
         return "<%s on %s>" % (self.name, self.arch)
 
 
-class TestCase(object):
+class DisablePyTestCollectionMixin(object):
+    __test__ = False
+
+
+class TestCase(DisablePyTestCollectionMixin):
     """Class representing a test application
     """
 
-    def __init__(self):
+    def __init__(self, testcase_root, workdir, name):
         """TestCase constructor.
 
         This gets called by TestSuite as it finds and reads test yaml files.
@@ -1286,23 +1290,22 @@ class TestCase(object):
             define one test, can be anything and is usually "test". This is
             really only used to distinguish between different cases when
             the testcase.yaml defines multiple tests
-        @param tc_dict Dictionary with test values for this test case
-            from the testcase.yaml file
         """
 
-        self.id = ""
+
         self.source_dir = ""
         self.yamlfile = ""
         self.cases = []
-        self.name = ""
+        self.name = self.get_unique(testcase_root, workdir, name)
+        self.id = name
 
         self.type = None
-        self.tags = None
+        self.tags = set()
         self.extra_args = None
         self.extra_configs = None
         self.arch_whitelist = None
         self.arch_exclude = None
-        self.skip = None
+        self.skip = False
         self.platform_exclude = None
         self.platform_whitelist = None
         self.toolchain_exclude = None
@@ -1314,9 +1317,9 @@ class TestCase(object):
         self.build_only = True
         self.build_on_all = False
         self.slow = False
-        self.min_ram = None
+        self.min_ram = -1
         self.depends_on = None
-        self.min_flash = None
+        self.min_flash = -1
         self.extra_sections = None
 
     @staticmethod
@@ -1333,6 +1336,12 @@ class TestCase(object):
 
         # workdir can be "."
         unique = os.path.normpath(os.path.join(relative_tc_root, workdir, name))
+        check = name.split(".")
+        if len(check) < 2:
+            raise SanityCheckException(f"""bad test name '{name}' in {testcase_root}/{workdir}. \
+Tests should reference the category and subsystem with a dot as a separator.
+                    """
+                    )
         return unique
 
     @staticmethod
@@ -1407,10 +1416,12 @@ class TestCase(object):
                 _subcases, warnings = self.scan_file(filename)
                 if warnings:
                     logger.error("%s: %s" % (filename, warnings))
+                    raise SanityRuntimeError("%s: %s" % (filename, warnings))
                 if _subcases:
                     subcases += _subcases
             except ValueError as e:
                 logger.error("%s: can't find: %s" % (filename, e))
+
         for filename in glob.glob(os.path.join(path, "*.c")):
             try:
                 _subcases, warnings = self.scan_file(filename)
@@ -1435,7 +1446,7 @@ class TestCase(object):
         return self.name
 
 
-class TestInstance:
+class TestInstance(DisablePyTestCollectionMixin):
     """Class representing the execution of a particular TestCase on a platform
 
     @param test The TestCase object we want to build/execute
@@ -1466,6 +1477,7 @@ class TestInstance:
     def __lt__(self, other):
         return self.name < other.name
 
+    # Global testsuite parameters
     def check_build_or_run(self, build_only=False, enable_slow=False, device_testing=False, fixture=[]):
 
         # right now we only support building on windows. running is still work
@@ -1766,7 +1778,8 @@ class FilterBuilder(CMake):
         if self.testcase and self.testcase.tc_filter:
             try:
                 if os.path.exists(dts_path):
-                    edt = edtlib.EDT(dts_path, [os.path.join(ZEPHYR_BASE, "dts", "bindings")])
+                    edt = edtlib.EDT(dts_path, [os.path.join(ZEPHYR_BASE, "dts", "bindings")],
+                            warn_reg_unit_address_mismatch=False)
                 else:
                     edt = None
                 res = expr_parser.parse(self.testcase.tc_filter, filter_data, edt)
@@ -2113,7 +2126,7 @@ class BoundedExecutor(concurrent.futures.ThreadPoolExecutor):
             return future
 
 
-class TestSuite:
+class TestSuite(DisablePyTestCollectionMixin):
     config_re = re.compile('(CONFIG_[A-Za-z0-9_]+)[=]\"?([^\"]*)\"?$')
     dt_re = re.compile('([A-Za-z0-9_]+)[=]\"?([^\"]*)\"?$')
 
@@ -2148,7 +2161,7 @@ class TestSuite:
     RELEASE_DATA = os.path.join(ZEPHYR_BASE, "scripts", "sanity_chk",
                             "sanity_last_release.csv")
 
-    def __init__(self, board_root_list, testcase_roots, outdir):
+    def __init__(self, board_root_list=[], testcase_roots=[], outdir=None):
 
         self.roots = testcase_roots
         if not isinstance(board_root_list, list):
@@ -2182,7 +2195,7 @@ class TestSuite:
         self.selected_platforms = []
         self.default_platforms = []
         self.outdir = os.path.abspath(outdir)
-        self.discards = None
+        self.discards = {}
         self.load_errors = 0
         self.instances = dict()
 
@@ -2429,15 +2442,13 @@ class TestSuite:
                     workdir = os.path.relpath(tc_path, root)
 
                     for name in parsed_data.tests.keys():
-                        tc = TestCase()
-                        tc.name = tc.get_unique(root, workdir, name)
+                        tc = TestCase(root, workdir, name)
 
                         tc_dict = parsed_data.get_test(name, self.testcase_valid_keys)
 
                         tc.source_dir = tc_path
                         tc.yamlfile = tc_path
 
-                        tc.id = name
                         tc.type = tc_dict["type"]
                         tc.tags = tc_dict["tags"]
                         tc.extra_args = tc_dict["extra_args"]
@@ -2453,6 +2464,8 @@ class TestSuite:
                         tc.timeout = tc_dict["timeout"]
                         tc.harness = tc_dict["harness"]
                         tc.harness_config = tc_dict["harness_config"]
+                        if tc.harness == 'console' and not tc.harness_config:
+                            raise Exception('Harness config error: console harness defined without a configuration.')
                         tc.build_only = tc_dict["build_only"]
                         tc.build_on_all = tc_dict["build_on_all"]
                         tc.slow = tc_dict["slow"]
@@ -2518,8 +2531,8 @@ class TestSuite:
 
         discards = {}
         platform_filter = kwargs.get('platform')
-        exclude_platform = kwargs.get('exclude_platform')
-        testcase_filter = kwargs.get('run_individual_tests')
+        exclude_platform = kwargs.get('exclude_platform', [])
+        testcase_filter = kwargs.get('run_individual_tests', [])
         arch_filter = kwargs.get('arch')
         tag_filter = kwargs.get('tag')
         exclude_tag = kwargs.get('exclude_tag')
@@ -2675,7 +2688,7 @@ class TestSuite:
                     instances = list(filter(lambda tc: tc.platform.default, instance_list))
                     self.add_instances(instances)
 
-                for instance in list(filter(lambda tc: not tc.platform.default, instance_list)):
+                for instance in list(filter(lambda inst: not inst.platform.default, instance_list)):
                     discards[instance] = "Not a default test platform"
 
             else:

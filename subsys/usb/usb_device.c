@@ -1047,7 +1047,8 @@ static void forward_status_cb(enum usb_dc_status_code status, const u8_t *param)
 static int usb_vbus_set(bool on)
 {
 #define USB_DEV_NODE DT_CHOSEN(zephyr_usb_device)
-#if DT_HAS_NODE(USB_DEV_NODE) && DT_NODE_HAS_PROP(USB_DEV_NODE, vbus_gpios)
+#if DT_HAS_NODE_STATUS_OKAY(USB_DEV_NODE) && \
+    DT_NODE_HAS_PROP(USB_DEV_NODE, vbus_gpios)
 	int ret = 0;
 	struct device *gpio_dev;
 
@@ -1243,9 +1244,13 @@ static int custom_handler(struct usb_setup_packet *pSetup,
 			continue;
 		}
 
-		if ((iface->custom_handler) &&
+		/* An exception for AUDIO_CLASS is temporary and shall not be
+		 * considered as valid solution for other classes.
+		 */
+		if (iface->custom_handler &&
 		    (if_descr->bInterfaceNumber ==
-		     sys_le16_to_cpu(pSetup->wIndex))) {
+		    sys_le16_to_cpu(pSetup->wIndex) ||
+		    if_descr->bInterfaceClass == AUDIO_CLASS)) {
 			return iface->custom_handler(pSetup, len, data);
 		}
 	}

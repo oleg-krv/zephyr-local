@@ -25,7 +25,7 @@
 		interrupt-parent = <&test_intc>;
 
 		test_arrays: array-holder {
-			/* vnd,undefined-compat is for DT_NODE_HAS_COMPAT() */
+			/* vnd,undefined-compat is for DT_NODE_HAS_COMPAT_STATUS(..,okay) */
 			compatible = "vnd,array-holder", "vnd,undefined-compat";
 			a = <1000 2000 3000>;
 			b = [aa bb cc dd];
@@ -73,6 +73,13 @@
 			#gpio-cells = < 0x2 >;
 			label = "TEST_GPIO_0";
 			status = "disabled";
+		};
+
+		test_no_status: intc_no_status@0 {
+			compatible = "vnd,intc";
+			reg = <0x0 0x1000>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
 		};
 
 		test_nodelabel: TEST_NODELABEL_ALLCAPS: test_gpio_1: gpio@deadbeef {
@@ -128,6 +135,21 @@
 				compatible = "vnd,gpio-expander";
 				reg = <0x11>;
 				label = "TEST_EXPANDER_I2C";
+			};
+		};
+
+		test_i2c_no_reg: i2c {
+			#address-cells = < 1 >;
+			#size-cells = < 0 >;
+			compatible = "vnd,i2c";
+			label = "TEST_I2C_NO_REG_CTLR";
+			status = "okay";
+			clock-frequency = < 100000 >;
+
+			test-i2c-dev@12 {
+				compatible = "vnd,i2c-device";
+				label = "TEST_I2C_DEV_12";
+				reg = < 0x12 >;
 			};
 		};
 
@@ -295,6 +317,21 @@
 			reg = < 0x55552222 0x1000 >;
 			label = "TEST_PWM_CTRL_2";
 			status = "okay";
+		};
+
+		test_children: test-children {
+			test_child_alpha: child-alpha {
+				compatible = "vnd,enum-holder";
+				val = "zero";
+			};
+			test_child_beta: child-beta {
+				compatible = "vnd,enum-holder";
+				val = "one";
+			};
+			test_child_charlie: child-charlie {
+				compatible = "vnd,enum-holder";
+				val = "two";
+			};
 		};
 	};
 };

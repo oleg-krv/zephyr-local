@@ -89,7 +89,7 @@ static inline void can_set_lladdr(struct net_pkt *pkt, struct zcan_frame *frame)
 }
 
 static int net_can_send(struct device *dev, const struct zcan_frame *frame,
-			can_tx_callback_t cb, void *cb_arg, s32_t timeout)
+			can_tx_callback_t cb, void *cb_arg, k_timeout_t timeout)
 {
 	struct net_can_context *ctx = dev->driver_data;
 
@@ -390,7 +390,7 @@ static int net_can_init(struct device *dev)
 	}
 
 	NET_DBG("Init net CAN device %p (%s) for dev %p (%s)",
-		dev, dev->config->name, can_dev, can_dev->config->name);
+		dev, dev->name, can_dev, can_dev->name);
 
 	ctx->can_dev = can_dev;
 
