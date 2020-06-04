@@ -9,7 +9,19 @@ We are pleased to announce the release of Zephyr RTOS version 2.3.0.
 
 Major enhancements with this release include:
 
-* <TBD>
+* A new Zephyr CMake package has been introduced, reducing the need for
+  environment variables
+* A new Devicetree API, based on hierarchical macros, has been introduced. This
+  new API allows the C code to access virtually all nodes and properties in a
+  clean, organized fashion
+* The kernel timeout API has been overhauled to be flexible and configurable,
+  with future support for features like 64-bit and absolute timeouts in mind
+* A new k_heap/sys_heap heap allocator has been introduced, with much better
+  performance than the existing k_mem_pool/sys_mem_pool
+* Zephyr now integrates with the TF-M (Trusted Firmware M) PSA-compliant
+  framework
+* The Bluetooth Low Energy Host now supports LE Advertising Extensions
+* The CMSIS-DSP library is now included and integrated
 
 The following sections provide detailed lists of changes by component.
 
@@ -82,6 +94,7 @@ Deprecated in this release
   * nrf52840_pca10090 has been renamed to nrf9160dk_nrf52840
   * nrf52_pca20020 has been renamed to thingy52_nrf52832
   * nrf5340_dk_nrf5340 has been renamed to nrf5340pdk_nrf5340
+  * efr32_slwstk6061a has been renamed to efr32_radio_brd4250b
 
 * Devicetree
 
@@ -125,7 +138,22 @@ Stable API changes in this release
 Kernel
 ******
 
-* <TBD>
+* A new general purpose memory allocator, sys_heap/k_heap, was added
+  to Zephyr with more conventional API/behavior, better space
+  efficiency and higher performance than the pre-existing mem_pool.
+  The older mem_pool APIs are, by default, wrappers around this new
+  heap backend and will be deprecated in an upcoming release.  The
+  original implementation remains available for this release via
+  disabling CONFIG_MEM_POOL_HEAP_BACKEND.
+
+
+* The timeout arguments to all kernel calls are now a "k_timeout_t"
+  type instead of a 32 bit millisecond count.  These can be
+  initialized in arbitrary time units (ns/us/ms, ticks), be
+  interpreted relative to either current time or system start, and be
+  expressed in 64 bit quantities.  This involves a minor change to the
+  API, so the original API is still available in a completely
+  source-compatible way via CONFIG_LEGACY_TIMEOUT_API.
 
 Architectures
 *************
@@ -155,7 +183,7 @@ Architectures
 
 * POSIX:
 
-  * <TBD>
+  * Added support for building on ARM hosts
 
 * RISC-V:
 
@@ -174,6 +202,14 @@ Boards & SoC Support
 
 .. rst-class:: rst-columns
 
+<<<<<<< HEAD
+=======
+   * Broadcom Viper BCM58402
+   * Infineon XMC4500 SoC
+   * Nordic nRF52820 SoC
+   * NXP LPC55S16 SoC
+   * SiLabs EFR32BG13P SoC
+>>>>>>> origin/master
    * STM32L5 series of Ultra-low-power MCUs
 
 * Added support for these ARM boards:
@@ -181,9 +217,24 @@ Boards & SoC Support
   .. rst-class:: rst-columns
 
      * 96Boards AeroCore 2
+<<<<<<< HEAD
      * Adafruit Feather STM32F405 Express
      * Black STM32 F407VE Development Board
      * Black STM32 F407ZG Pro Development Board
+=======
+     * Adafruit Feather nRF52840 Express
+     * Adafruit Feather STM32F405 Express
+     * Black STM32 F407VE Development Board
+     * Black STM32 F407ZG Pro Development Board
+     * Broadcom BCM958402M2
+     * EFR32 BRD4104A (SLWRB4104A)
+     * Infineon XMC45-RELAX-KIT
+     * nRF52820 emulation on nRF52833 DK
+     * nrf9160 INNBLUE21
+     * nrf9160 INNBLUE22
+     * NXP LPCXpresso55S16
+     * SEGGER IP Switch Board
+>>>>>>> origin/master
      * ST Nucleo H743ZI
      * ST Nucleo F303RE
      * ST Nucleo L552ZE-Q
@@ -278,7 +329,10 @@ Drivers and Sensors
 
 * GPIO
 
-  * <TBD>
+  * Add mcp23s17 driver
+  * Add STM32L5 support to stm32 driver
+  * Add interrupt support to sx1509b driver
+  * Fix interrupt handling in sifive, intel_apl, mchp_xec, mcux_igpio driver
 
 * Hardware Info
 
@@ -314,10 +368,6 @@ Drivers and Sensors
   * <TBD>
 
 * Keyboard Scan
-
-  * <TBD>
-
-* LED
 
   * <TBD>
 
@@ -430,20 +480,52 @@ Bluetooth
 
 * Host:
 
-  * <TBD>
+  * Support for LE Advertising Extensions has been added.
+  * The Host is now 5.2 compliant, with support for EATT, L2CAP ECRED mode and
+    all new GATT PDUs.
+  * New application-controlled data length and PHY update APIs.
+  * Legacy OOB pairing support has been added.
+  * Multiple improvements to OOB data access and pairing.
+  * The Host now uses the new thread analyzer functionality.
+  * Multiple bug fixes and improvements
 
 * BLE split software Controller:
 
-  * <TBD>
+  * The Controller is now 5.2 compliant.
+  * A new HCI USB H4 driver has been added, which can interact with BlueZ's
+    counterpart Host driver.
+  * PHY support is now configurable.
+  * Only control procedures supported by the peer are now used.
+  * The Nordic nRF52820 IC is now supported
+  * OpenISA/RV32M1:
+    * 2Mbps PHY support.
+    * Radio deep sleep mode support.
+    * Controller-based privacy support.
 
 * BLE legacy software Controller:
 
-  * <TBD>
+  * The legacy Controller has been removed from the tree.
 
 Build and Infrastructure
 ************************
 
-* <TBD>
+* Zephyr CMake package
+
+  * The Zephyr main repository now includes a Zephyr CMake package.
+    This allows for registering Zephyr in the CMake user package registry and
+    allows for easier integration into Zephyr applications, by using the CMake
+    function, ``find_package(Zephyr ...)``.
+    Registering the Zephyr CMake package in the CMake user package registry
+    removes the need for setting of ``ZEPHYR_BASE``, sourcing ``zephyr-env.sh``,
+    or running ``zephyr-env.cmd``.
+  * A new ``west`` extension command, ``west zephyr-export`` is introduced for easy
+    registration of Zephyr CMake package in the CMake user package registry.
+  * Zephyr Build Configuration CMake package hook.
+    Zephyr offers the possibility of configuring the Zephyr build system through
+    a Zephyr Build Configuration package. A single Zephyr workspace
+    ``ZephyrBuildConfig.cmake`` will be loaded if present in the Zephyr
+    workspace. This allows users to configure the Zephyr build system on a per
+    workspace setup, as an alternative to using a ``.zephyrrc`` system wide file.
 
 * Devicetree
 
@@ -482,7 +564,12 @@ HALs
 Documentation
 *************
 
-* <TBD>
+* New API overview page added.
+* Reference pages have been cleaned up and organized.
+* The Devicetree documentation has been expanded significally.
+* The project roles have been overhauled in the Contribution Guidelines pages.
+* The documentation on driver-specific APIs has been simplified.
+* Documentation for new APIs, boards and samples.
 
 Tests and Samples
 *****************

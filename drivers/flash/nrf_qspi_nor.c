@@ -248,8 +248,6 @@ static inline void qspi_wait_for_completion(struct device *dev,
 
 	if (res == NRFX_SUCCESS) {
 		k_sem_take(&dev_data->sync, K_FOREVER);
-	} else {
-		qspi_unlock(dev);
 	}
 }
 
@@ -273,7 +271,6 @@ static void qspi_handler(nrfx_qspi_evt_t event, void *p_context)
 
 	if (event == NRFX_QSPI_EVENT_DONE) {
 		qspi_complete(dev);
-		qspi_unlock(dev);
 	}
 }
 
@@ -319,14 +316,14 @@ static int qspi_erase(struct device *dev, u32_t addr, u32_t size)
 		return -EINVAL;
 	}
 
-	int rv = -EIO;
+	int rv = 0;
 	const struct qspi_nor_config *params = dev->config_info;
 
-	while (size) {
+	qspi_lock(dev);
+	while ((rv == 0) && (size > 0)) {
 		nrfx_err_t res = !NRFX_SUCCESS;
 		u32_t adj = 0;
 
-		qspi_lock(dev);
 		if (size == params->size) {
 			/* chip erase */
 			res = nrfx_qspi_chip_erase();
@@ -353,11 +350,13 @@ static int qspi_erase(struct device *dev, u32_t addr, u32_t size)
 			size -= adj;
 		} else {
 			LOG_ERR("erase error at 0x%lx size %zu", (long)addr, size);
-			return rv;
+			rv = qspi_get_zephyr_ret_code(res);
 		}
 	}
 
-	return 0;
+	qspi_unlock(dev);
+
+	return rv;
 }
 
 /**
@@ -493,14 +492,22 @@ static int qspi_nor_read(struct device *dev, off_t addr, void *dest,
 {
 	void *dptr = dest;
 	size_t dlen = size;
+<<<<<<< HEAD
 	u8_t buf[4];
+=======
+	u8_t __aligned(4) buf[4];
+>>>>>>> origin/master
 
 	if (!dest) {
 		return -EINVAL;
 	}
 
 	/* read size must be non-zero multiple of 4 bytes */
+<<<<<<< HEAD
 	if (size < 4U) {
+=======
+	if ((size > 0) && (size < 4U)) {
+>>>>>>> origin/master
 		dest = buf;
 		size = sizeof(buf);
 	} else if (((size % 4U) != 0) || (size == 0)) {
@@ -530,6 +537,11 @@ static int qspi_nor_read(struct device *dev, off_t addr, void *dest,
 
 	qspi_wait_for_completion(dev, res);
 
+<<<<<<< HEAD
+=======
+	qspi_unlock(dev);
+
+>>>>>>> origin/master
 	int rc = qspi_get_zephyr_ret_code(res);
 
 	if ((rc == 0) && (dest != dptr)) {
@@ -578,6 +590,8 @@ static int qspi_nor_write(struct device *dev, off_t addr, const void *src,
 	nrfx_err_t res = nrfx_qspi_write(src, size, addr);
 
 	qspi_wait_for_completion(dev, res);
+
+	qspi_unlock(dev);
 
 	return qspi_get_zephyr_ret_code(res);
 }

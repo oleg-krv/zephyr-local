@@ -77,25 +77,34 @@ from collections import OrderedDict
 #
 #  - The second item is a boolean indicating whether it is permissible for
 #    the object to be located in user-accessible memory.
+#
+#  - The third items is a boolean indicating whether this item can be
+#    dynamically allocated with k_object_alloc(). Keep this in sync with
+#    the switch statement in z_impl_k_object_alloc().
+#
+# Key names in all caps do not correspond to a specific data type but instead
+# indicate that objects of its type are of a family of compatible data
+# structures
 
 # Regular dictionaries are ordered only with Python 3.6 and
 # above. Good summary and pointers to official documents at:
 # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
 kobjects = OrderedDict([
-    ("k_mem_slab", (None, False)),
-    ("k_msgq", (None, False)),
-    ("k_mutex", (None, False)),
-    ("k_pipe", (None, False)),
-    ("k_queue", (None, False)),
-    ("k_poll_signal", (None, False)),
-    ("k_sem", (None, False)),
-    ("k_stack", (None, False)),
-    ("k_thread", (None, False)),
-    ("k_timer", (None, False)),
-    ("z_thread_stack_element", (None, False)),
-    ("device", (None, False)),
-    ("sys_mutex", (None, True)),
-    ("k_futex", (None, True))
+    ("k_mem_slab", (None, False, True)),
+    ("k_msgq", (None, False, True)),
+    ("k_mutex", (None, False, True)),
+    ("k_pipe", (None, False, True)),
+    ("k_queue", (None, False, True)),
+    ("k_poll_signal", (None, False, True)),
+    ("k_sem", (None, False, True)),
+    ("k_stack", (None, False, True)),
+    ("k_thread", (None, False, True)), # But see #
+    ("k_timer", (None, False, True)),
+    ("z_thread_stack_element", (None, False, False)),
+    ("device", (None, False, False)),
+    ("NET_SOCKET", (None, False, False)),
+    ("sys_mutex", (None, True, False)),
+    ("k_futex", (None, True, False))
 ])
 
 def kobject_to_enum(kobj):
@@ -114,6 +123,9 @@ subsystems = [
     #    ....
     #};
 ]
+
+# Names of all structs tagged with __net_socket, found by parse_syscalls.py
+net_sockets = [ ]
 
 def subsystem_to_enum(subsys):
     return "K_OBJ_DRIVER_" + subsys[:-11].upper()
@@ -399,6 +411,8 @@ def analyze_die_struct(die):
         type_env[offset] = KobjectType(offset, name, size)
     elif name in subsystems:
         type_env[offset] = KobjectType(offset, name, size, api=True)
+    elif name in net_sockets:
+        type_env[offset] = KobjectType(offset, "NET_SOCKET", size)
     else:
         at = AggregateType(offset, name, size)
         type_env[offset] = at
@@ -609,7 +623,7 @@ def find_kobjects(elf, syms):
         if ko.type_obj.api:
             continue
 
-        _, user_ram_allowed = kobjects[ko.type_obj.name]
+        _, user_ram_allowed, _ = kobjects[ko.type_obj.name]
         if not user_ram_allowed and app_smem_start <= addr < app_smem_end:
             debug("object '%s' found in invalid location %s"
                   % (ko.type_obj.name, hex(addr)))
@@ -853,7 +867,7 @@ def write_validation_output(fp):
 def write_kobj_types_output(fp):
     fp.write("/* Core kernel objects */\n")
     for kobj, obj_info in kobjects.items():
-        dep, _ = obj_info
+        dep, _, _ = obj_info
         if kobj == "device":
             continue
 
@@ -874,7 +888,7 @@ def write_kobj_types_output(fp):
 def write_kobj_otype_output(fp):
     fp.write("/* Core kernel objects */\n")
     for kobj, obj_info in kobjects.items():
-        dep, _ = obj_info
+        dep, _, _ = obj_info
         if kobj == "device":
             continue
 
@@ -898,10 +912,9 @@ def write_kobj_otype_output(fp):
 def write_kobj_size_output(fp):
     fp.write("/* Non device/stack objects */\n")
     for kobj, obj_info in kobjects.items():
-        dep, _ = obj_info
-        # device handled by default case. Stacks are not currently handled,
-        # if they eventually are it will be a special case.
-        if kobj in {"device", STACK_TYPE}:
+        dep, _, alloc = obj_info
+
+        if not alloc:
             continue
 
         if dep:
@@ -916,7 +929,8 @@ def write_kobj_size_output(fp):
 def parse_subsystems_list_file(path):
     with open(path, "r") as fp:
         subsys_list = json.load(fp)
-    subsystems.extend(subsys_list)
+    subsystems.extend(subsys_list["__subsystem"])
+    net_sockets.extend(subsys_list["__net_socket"])
 
 def parse_args():
     global args

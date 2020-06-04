@@ -48,7 +48,7 @@ enum {
  * - write operations may block if the remote @a recv_q is full
  * - each endpoint may be blocking or non-blocking
  */
-struct spair {
+__net_socket struct spair {
 	int remote; /**< the remote endpoint file descriptor */
 	u32_t flags; /**< status and option bits */
 	struct k_sem sem; /**< semaphore for exclusive structure access */
@@ -193,8 +193,11 @@ static void spair_delete(struct spair *spair)
 
 	/* ensure no private information is released to the memory pool */
 	memset(spair, 0, sizeof(*spair));
-
+#ifdef CONFIG_USERSPACE
+	k_object_free(spair);
+#else
 	k_free(spair);
+#endif
 
 	if (remote != NULL && have_remote_sem) {
 		k_sem_give(&remote->sem);
@@ -214,7 +217,18 @@ static struct spair *spair_new(void)
 {
 	struct spair *spair;
 
+#ifdef CONFIG_USERSPACE
+	struct z_object *zo = z_dynamic_object_create(sizeof(*spair));
+
+	if (zo == NULL) {
+		spair = NULL;
+	} else {
+		spair = zo->name;
+		zo->type = K_OBJ_NET_SOCKET;
+	}
+#else
 	spair = k_malloc(sizeof(*spair));
+#endif
 	if (spair == NULL) {
 		errno = ENOMEM;
 		goto out;
@@ -476,19 +490,15 @@ static ssize_t spair_write(void *obj, const void *buffer, size_t count)
 				goto out;
 			}
 
+<<<<<<< HEAD
 			res = k_sem_take(&remote->sem, K_NO_WAIT);
+=======
+			res = k_sem_take(&remote->sem, K_FOREVER);
+>>>>>>> origin/master
 			if (res < 0) {
-				if (is_nonblock) {
-					errno = -res;
-					res = -1;
-					goto out;
-				}
-				res = k_sem_take(&remote->sem, K_FOREVER);
-				if (res < 0) {
-					errno = -res;
-					res = -1;
-					goto out;
-				}
+				errno = -res;
+				res = -1;
+				goto out;
 			}
 
 			have_remote_sem = true;
@@ -1021,16 +1031,20 @@ static ssize_t spair_sendmsg(void *obj, const struct msghdr *msg,
 
 	int res;
 	size_t len = 0;
+	bool is_connected;
+	size_t avail;
+	bool is_nonblock;
 	struct spair *const spair = (struct spair *)obj;
-	const bool is_connected = sock_is_connected(spair);
-	const size_t avail = is_connected ? spair_write_avail(spair) : 0;
-	const bool is_nonblock = sock_is_nonblock(spair);
 
 	if (spair == NULL || msg == NULL) {
 		errno = EINVAL;
 		res = -1;
 		goto out;
 	}
+
+	is_connected = sock_is_connected(spair);
+	avail = is_connected ? spair_write_avail(spair) : 0;
+	is_nonblock = sock_is_nonblock(spair);
 
 	for (size_t i = 0; i < msg->msg_iovlen; ++i) {
 		/* check & msg->msg_iov[i]? */
