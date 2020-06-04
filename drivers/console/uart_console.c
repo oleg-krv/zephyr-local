@@ -601,11 +601,7 @@ static int uart_console_init(struct device *arg)
 
 	__ASSERT_NO_MSG(uart_console_dev);
 
-<<<<<<< HEAD
-#if defined(CONFIG_USB_UART_CONSOLE) && defined(CONFIG_USB_UART_DTR_WAIT)
-=======
 #if defined(CONFIG_USB_UART_CONSOLE)
->>>>>>> origin/master
 	int ret;
 
 	ret = usb_enable(NULL);

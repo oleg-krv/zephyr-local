@@ -202,14 +202,11 @@ Boards & SoC Support
 
 .. rst-class:: rst-columns
 
-<<<<<<< HEAD
-=======
    * Broadcom Viper BCM58402
    * Infineon XMC4500 SoC
    * Nordic nRF52820 SoC
    * NXP LPC55S16 SoC
    * SiLabs EFR32BG13P SoC
->>>>>>> origin/master
    * STM32L5 series of Ultra-low-power MCUs
 
 * Added support for these ARM boards:
@@ -217,11 +214,6 @@ Boards & SoC Support
   .. rst-class:: rst-columns
 
      * 96Boards AeroCore 2
-<<<<<<< HEAD
-     * Adafruit Feather STM32F405 Express
-     * Black STM32 F407VE Development Board
-     * Black STM32 F407ZG Pro Development Board
-=======
      * Adafruit Feather nRF52840 Express
      * Adafruit Feather STM32F405 Express
      * Black STM32 F407VE Development Board
@@ -234,7 +226,6 @@ Boards & SoC Support
      * nrf9160 INNBLUE22
      * NXP LPCXpresso55S16
      * SEGGER IP Switch Board
->>>>>>> origin/master
      * ST Nucleo H743ZI
      * ST Nucleo F303RE
      * ST Nucleo L552ZE-Q

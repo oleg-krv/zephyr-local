@@ -492,22 +492,14 @@ static int qspi_nor_read(struct device *dev, off_t addr, void *dest,
 {
 	void *dptr = dest;
 	size_t dlen = size;
-<<<<<<< HEAD
-	u8_t buf[4];
-=======
 	u8_t __aligned(4) buf[4];
->>>>>>> origin/master
 
 	if (!dest) {
 		return -EINVAL;
 	}
 
 	/* read size must be non-zero multiple of 4 bytes */
-<<<<<<< HEAD
-	if (size < 4U) {
-=======
 	if ((size > 0) && (size < 4U)) {
->>>>>>> origin/master
 		dest = buf;
 		size = sizeof(buf);
 	} else if (((size % 4U) != 0) || (size == 0)) {
@@ -537,11 +529,8 @@ static int qspi_nor_read(struct device *dev, off_t addr, void *dest,
 
 	qspi_wait_for_completion(dev, res);
 
-<<<<<<< HEAD
-=======
 	qspi_unlock(dev);
 
->>>>>>> origin/master
 	int rc = qspi_get_zephyr_ret_code(res);
 
 	if ((rc == 0) && (dest != dptr)) {

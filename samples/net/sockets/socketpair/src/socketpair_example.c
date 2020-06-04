@@ -24,10 +24,7 @@
 
 #endif
 
-<<<<<<< HEAD
-=======
 #include <assert.h>
->>>>>>> origin/master
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -48,12 +45,6 @@ static const char *const names[] = {
 	"Charlie",
 };
 
-<<<<<<< HEAD
-static void hello(int fd, const char *name)
-{
-	/* write(2) should be used after #25443 */
-	send(fd, name, strlen(name), 0);
-=======
 #if defined(__ZEPHYR__) && !(defined(CONFIG_BOARD_NATIVE_POSIX_32BIT) \
 	|| defined(CONFIG_BOARD_NATIVE_POSIX_64BIT) \
 	|| defined(CONFIG_SOC_SERIES_BSIM_NRFXX))
@@ -73,7 +64,6 @@ static void hello(int fd, const char *name)
 		printf("%s(): send: expected: %d actual: %d errno: %d\n",
 			__func__, (int)strlen(name), res, errno);
 	}
->>>>>>> origin/master
 }
 
 static void *fun(void *arg)
@@ -128,13 +118,6 @@ int main(int argc, char *argv[])
 	struct ctx ctx[NUM_SOCKETPAIRS] = {};
 	struct pollfd fds[NUM_SOCKETPAIRS] = {};
 	void *unused;
-<<<<<<< HEAD
-
-	for (i = 0; i < ARRAY_SIZE(ctx); ++i) {
-		ctx[i].name = (char *)names[i];
-		socketpair(AF_UNIX, SOCK_STREAM, 0, ctx[i].spair);
-		pthread_create(&ctx[i].thread, NULL, fun, &ctx[i]);
-=======
 	pthread_attr_t *attrp = NULL;
 
 	for (i = 0; i < ARRAY_SIZE(ctx); ++i) {
@@ -169,7 +152,6 @@ int main(int argc, char *argv[])
 			goto out;
 		}
 
->>>>>>> origin/master
 		printf("%s: socketpair: %d <=> %d\n",
 			ctx[i].name, ctx[i].spair[0], ctx[i].spair[1]);
 	}
@@ -199,13 +181,10 @@ int main(int argc, char *argv[])
 
 			fd = fds[i].fd;
 			idx = fd_to_idx(fd, ctx, ARRAY_SIZE(ctx));
-<<<<<<< HEAD
-=======
 			if (idx < 0) {
 				printf("failed to map fd %d to index\n", fd);
 				continue;
 			}
->>>>>>> origin/master
 
 			if ((fds[i].revents & POLLIN) != 0) {
 
@@ -223,11 +202,7 @@ int main(int argc, char *argv[])
 			if ((fds[i].revents & POLLHUP) != 0) {
 				printf("fd: %d: hung up\n", fd);
 				close(ctx[idx].spair[0]);
-<<<<<<< HEAD
-				printf("main: closed fd %d\n",
-=======
 				printf("%s: closed fd %d\n", __func__,
->>>>>>> origin/master
 					ctx[idx].spair[0]);
 				pthread_join(ctx[idx].thread, &unused);
 				printf("joined %s\n", ctx[idx].name);
@@ -238,15 +213,10 @@ int main(int argc, char *argv[])
 
 	printf("finished!\n");
 
-<<<<<<< HEAD
-#ifndef __ZEPHYR__
-	return 0;
-=======
 out:
 #ifndef __ZEPHYR__
 	return 0;
 #else
 	return;
->>>>>>> origin/master
 #endif
 }

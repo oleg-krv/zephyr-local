@@ -490,11 +490,7 @@ static ssize_t spair_write(void *obj, const void *buffer, size_t count)
 				goto out;
 			}
 
-<<<<<<< HEAD
-			res = k_sem_take(&remote->sem, K_NO_WAIT);
-=======
 			res = k_sem_take(&remote->sem, K_FOREVER);
->>>>>>> origin/master
 			if (res < 0) {
 				errno = -res;
 				res = -1;
