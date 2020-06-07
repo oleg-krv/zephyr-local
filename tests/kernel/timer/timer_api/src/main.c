@@ -28,6 +28,27 @@ struct timer_data {
  */
 #define INEXACT_MS_CONVERT ((CONFIG_SYS_CLOCK_TICKS_PER_SEC % MSEC_PER_SEC) != 0)
 
+#if CONFIG_NRF_RTC_TIMER
+/* On Nordic SOCs one or both of the tick and busy-wait clocks may
+ * derive from sources that have slews that sum to +/- 13%.
+ */
+#define BUSY_TICK_SLEW_PPM 130000U
+#else
+/* On other platforms assume the clocks are perfectly aligned. */
+#define BUSY_TICK_SLEW_PPM 0U
+#endif
+#define PPM_DIVISOR 1000000U
+
+/* If the tick clock is faster or slower than the busywait clock the
+ * remaining time for a partially elapsed timer in ticks will be
+ * larger or smaller than expected by a value that depends on the slew
+ * between the two clocks.  Produce a maximum error for a given
+ * duration in microseconds.
+ */
+#define BUSY_SLEW_THRESHOLD_TICKS(_us)				\
+	k_us_to_ticks_ceil32((_us) * BUSY_TICK_SLEW_PPM		\
+			     / PPM_DIVISOR)
+
 static void duration_expire(struct k_timer *timer);
 static void duration_stop(struct k_timer *timer);
 
@@ -174,12 +195,18 @@ void test_timer_period_0(void)
 {
 	init_timer_data();
 	/** TESTPOINT: set period 0 */
-	k_timer_start(&period0_timer, K_MSEC(DURATION), K_NO_WAIT);
+	k_timer_start(&period0_timer,
+		      K_TICKS(k_ms_to_ticks_floor32(DURATION)
+			      - BUSY_SLEW_THRESHOLD_TICKS(DURATION
+							  * USEC_PER_MSEC)),
+		      K_NO_WAIT);
 	tdata.timestamp = k_uptime_get();
 	busy_wait_ms(DURATION + 1);
 
 	/** TESTPOINT: ensure it is one-short timer */
-	TIMER_ASSERT(tdata.expire_cnt == 1, &period0_timer);
+	TIMER_ASSERT((tdata.expire_cnt == 1)
+		     || (INEXACT_MS_CONVERT
+			 && (tdata.expire_cnt == 0)), &period0_timer);
 	TIMER_ASSERT(tdata.stop_cnt == 0, &period0_timer);
 
 	/* cleanup environemtn */
@@ -541,6 +568,8 @@ void test_timer_remaining(void)
 	u32_t dur_ticks = k_ms_to_ticks_ceil32(DURATION);
 	u32_t target_rem_ticks = k_ms_to_ticks_ceil32(DURATION / 2) + 1;
 	u32_t rem_ms, rem_ticks, exp_ticks;
+	s32_t delta_ticks;
+	u32_t slew_ticks;
 	u64_t now;
 
 	k_usleep(1); /* align to tick */
@@ -566,16 +595,14 @@ void test_timer_remaining(void)
 	/* Half the value of DURATION in ticks may not be the value of
 	 * half DURATION in ticks, when DURATION/2 is not an integer
 	 * multiple of ticks, so target_rem_ticks is used rather than
-	 * dur_ticks/2.
-	 *
-	 * Also if the tick clock is faster or slower than the
-	 * busywait clock the remaining time in ticks will be larger
-	 * or smaller than expected, so relax the tolerance.  3 ticks
-	 * variance has been observed on hardware where the busywait
-	 * clock is 0.7% slow and the 32 KiHz tick clock is 60 ppm
-	 * fast relative to a stable external clock.
+	 * dur_ticks/2.  Also set a threshold based on expected clock
+	 * skew.
 	 */
-	zassert_true(abs((s32_t)(rem_ticks - target_rem_ticks)) <= 3, NULL);
+	delta_ticks = (s32_t)(rem_ticks - target_rem_ticks);
+	slew_ticks = BUSY_SLEW_THRESHOLD_TICKS(DURATION * USEC_PER_MSEC / 2U);
+	zassert_true(abs(delta_ticks) <= MAX(slew_ticks, 1U),
+		     "tick/busy slew %d larger than test threshold %u",
+		     delta_ticks, slew_ticks);
 
 	/* Note +1 tick precision: even though we're calcluating in
 	 * ticks, we're waiting in k_busy_wait(), not for a timer
@@ -632,7 +659,11 @@ void test_timeout_abs(void)
 	cap2_ticks = k_uptime_ticks();
 	k_timer_stop(&remain_timer);
 	zassert_true((cap_ticks + rem_ticks + 1 == exp_ticks)
-		     || (rem_ticks + cap2_ticks + 1 == exp_ticks),
+		     || (rem_ticks + cap2_ticks + 1 == exp_ticks)
+		     || (INEXACT_MS_CONVERT
+			 && (cap_ticks + rem_ticks == exp_ticks))
+		     || (INEXACT_MS_CONVERT
+			 && (rem_ticks + cap2_ticks == exp_ticks)),
 		     NULL);
 #endif
 }
