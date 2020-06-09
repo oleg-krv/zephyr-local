@@ -48,7 +48,7 @@ struct rtc_stm32_config {
 
 struct rtc_stm32_data {
 	counter_alarm_callback_t callback;
-	u32_t ticks;
+	uint32_t ticks;
 	void *user_data;
 };
 
@@ -81,11 +81,11 @@ static int rtc_stm32_stop(struct device *dev)
 }
 
 
-static u32_t rtc_stm32_read(struct device *dev)
+static uint32_t rtc_stm32_read(struct device *dev)
 {
 	struct tm now = { 0 };
 	time_t ts;
-	u32_t rtc_date, rtc_time, ticks;
+	uint32_t rtc_date, rtc_time, ticks;
 
 	ARG_UNUSED(dev);
 
@@ -117,13 +117,13 @@ static u32_t rtc_stm32_read(struct device *dev)
 	return ticks;
 }
 
-static int rtc_stm32_get_value(struct device *dev, u32_t *ticks)
+static int rtc_stm32_get_value(struct device *dev, uint32_t *ticks)
 {
 	*ticks = rtc_stm32_read(dev);
 	return 0;
 }
 
-static int rtc_stm32_set_alarm(struct device *dev, u8_t chan_id,
+static int rtc_stm32_set_alarm(struct device *dev, uint8_t chan_id,
 				const struct counter_alarm_cfg *alarm_cfg)
 {
 	struct tm alarm_tm;
@@ -131,8 +131,8 @@ static int rtc_stm32_set_alarm(struct device *dev, u8_t chan_id,
 	LL_RTC_AlarmTypeDef rtc_alarm;
 	struct rtc_stm32_data *data = DEV_DATA(dev);
 
-	u32_t now = rtc_stm32_read(dev);
-	u32_t ticks = alarm_cfg->ticks;
+	uint32_t now = rtc_stm32_read(dev);
+	uint32_t ticks = alarm_cfg->ticks;
 
 	if (data->callback != NULL) {
 		LOG_DBG("Alarm busy\n");
@@ -186,7 +186,7 @@ static int rtc_stm32_set_alarm(struct device *dev, u8_t chan_id,
 }
 
 
-static int rtc_stm32_cancel_alarm(struct device *dev, u8_t chan_id)
+static int rtc_stm32_cancel_alarm(struct device *dev, uint8_t chan_id)
 {
 	LL_RTC_DisableWriteProtection(RTC);
 	LL_RTC_ClearFlag_ALRA(RTC);
@@ -200,13 +200,13 @@ static int rtc_stm32_cancel_alarm(struct device *dev, u8_t chan_id)
 }
 
 
-static u32_t rtc_stm32_get_pending_int(struct device *dev)
+static uint32_t rtc_stm32_get_pending_int(struct device *dev)
 {
 	return LL_RTC_IsActiveFlag_ALRA(RTC) != 0;
 }
 
 
-static u32_t rtc_stm32_get_top_value(struct device *dev)
+static uint32_t rtc_stm32_get_top_value(struct device *dev)
 {
 	const struct counter_config_info *info = dev->config_info;
 
@@ -230,7 +230,7 @@ static int rtc_stm32_set_top_value(struct device *dev,
 }
 
 
-static u32_t rtc_stm32_get_max_relative_alarm(struct device *dev)
+static uint32_t rtc_stm32_get_max_relative_alarm(struct device *dev)
 {
 	const struct counter_config_info *info = dev->config_info;
 
@@ -244,7 +244,7 @@ void rtc_stm32_isr(void *arg)
 	struct rtc_stm32_data *data = DEV_DATA(dev);
 	counter_alarm_callback_t alarm_callback = data->callback;
 
-	u32_t now = rtc_stm32_read(dev);
+	uint32_t now = rtc_stm32_read(dev);
 
 	if (LL_RTC_IsActiveFlag_ALRA(RTC) != 0) {
 

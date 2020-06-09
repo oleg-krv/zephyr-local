@@ -102,7 +102,7 @@ k_tid_t openthread_thread_id_get(void)
 }
 
 static void ipv6_addr_event_handler(struct net_mgmt_event_callback *cb,
-				    u32_t mgmt_event, struct net_if *iface)
+				    uint32_t mgmt_event, struct net_if *iface)
 {
 	struct openthread_context *ot_context = net_if_l2_data(iface);
 
@@ -166,8 +166,8 @@ void ot_receive_handler(otMessage *aMessage, void *context)
 {
 	struct openthread_context *ot_context = context;
 
-	u16_t offset = 0U;
-	u16_t read_len;
+	uint16_t offset = 0U;
+	uint16_t read_len;
 	struct net_pkt *pkt;
 	struct net_buf *pkt_buf;
 
@@ -453,6 +453,11 @@ static int openthread_init(struct net_if *iface)
 
 void ieee802154_init(struct net_if *iface)
 {
+	if (IS_ENABLED(CONFIG_IEEE802154_NET_IF_NO_AUTO_START)) {
+		LOG_DBG("Interface auto start disabled.");
+		net_if_flag_set(iface, NET_IF_NO_AUTO_START);
+	}
+
 	openthread_init(iface);
 }
 
