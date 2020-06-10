@@ -38,7 +38,12 @@ LOG_MODULE_REGISTER(net_l2_openthread, CONFIG_OPENTHREAD_L2_LOG_LEVEL);
 #include "openthread_utils.h"
 
 #define OT_STACK_SIZE (CONFIG_OPENTHREAD_THREAD_STACK_SIZE)
+
+#if defined(CONFIG_OPENTHREAD_THREAD_PREEMPTIVE)
+#define OT_PRIORITY K_PRIO_PREEMPT(CONFIG_OPENTHREAD_THREAD_PRIORITY)
+#else
 #define OT_PRIORITY K_PRIO_COOP(CONFIG_OPENTHREAD_THREAD_PRIORITY)
+#endif
 
 #if defined(CONFIG_OPENTHREAD_NETWORK_NAME)
 #define OT_NETWORK_NAME CONFIG_OPENTHREAD_NETWORK_NAME
@@ -209,12 +214,17 @@ void ot_receive_handler(otMessage *aMessage, void *context)
 	}
 
 	if (!pkt_list_is_full(ot_context)) {
-		if (net_recv_data(ot_context->iface, pkt) < 0) {
-			NET_ERR("net_recv_data failed");
+		if (pkt_list_add(ot_context, pkt) != 0) {
+			NET_ERR("pkt_list_add failed");
 			goto out;
 		}
 
-		pkt_list_add(ot_context, pkt);
+		if (net_recv_data(ot_context->iface, pkt) < 0) {
+			NET_ERR("net_recv_data failed");
+			pkt_list_remove_first(ot_context);
+			goto out;
+		}
+
 		pkt = NULL;
 	} else {
 		NET_INFO("Packet list is full");

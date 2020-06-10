@@ -35,6 +35,7 @@ LOG_MODULE_REGISTER(net_sock, CONFIG_NET_SOCKETS_LOG_LEVEL);
 		const struct socket_op_vtable *vtable; \
 		void *ctx = get_sock_vtable(sock, &vtable); \
 		if (ctx == NULL || vtable->fn == NULL) { \
+			errno = EBADF; \
 			return -1; \
 		} \
 		return vtable->fn(ctx, __VA_ARGS__); \
@@ -248,6 +249,7 @@ int z_impl_zsock_close(int sock)
 	void *ctx = get_sock_vtable(sock, &vtable);
 
 	if (ctx == NULL) {
+		errno = EBADF;
 		return -1;
 	}
 
@@ -1088,6 +1090,7 @@ int z_impl_zsock_fcntl(int sock, int cmd, int flags)
 
 	obj = get_sock_vtable(sock, &vtable);
 	if (obj == NULL) {
+		errno = EBADF;
 		return -1;
 	}
 
@@ -1583,7 +1586,7 @@ int zsock_getsockname_ctx(struct net_context *ctx, struct sockaddr *addr,
 
 	/* If we don't have a connection handler, the socket is not bound */
 	if (ctx->conn_handler) {
-		SET_ERRNO(EINVAL);
+		SET_ERRNO(-EINVAL);
 	}
 
 	if (IS_ENABLED(CONFIG_NET_IPV4) && ctx->local.family == AF_INET) {
@@ -1608,7 +1611,7 @@ int zsock_getsockname_ctx(struct net_context *ctx, struct sockaddr *addr,
 
 		memcpy(addr, &addr6, MIN(*addrlen, newlen));
 	} else {
-		SET_ERRNO(EINVAL);
+		SET_ERRNO(-EINVAL);
 	}
 
 	*addrlen = newlen;
@@ -1623,6 +1626,7 @@ int z_impl_zsock_getsockname(int sock, struct sockaddr *addr,
 	void *ctx = get_sock_vtable(sock, &vtable);
 
 	if (ctx == NULL) {
+		errno = EBADF;
 		return -1;
 	}
 
