@@ -18,8 +18,15 @@ FUNC_NORETURN void arch_system_halt(unsigned int reason)
 
 	/* Causes QEMU to exit. We passed the following on the command line:
 	 * -device isa-debug-exit,iobase=0xf4,iosize=0x04
+	 *
+	 * For any value of the first argument X, the return value of the
+	 * QEMU process is (X * 2) + 1.
+	 *
+	 * It has been observed that if the emulator exits for a triple-fault
+	 * (often due to bad page tables or other CPU structures) it will
+	 * terminate with 0 error code.
 	 */
-	sys_out32(0, 0xf4);
+	sys_out32(reason, 0xf4);
 	CODE_UNREACHABLE;
 }
 #endif
@@ -47,8 +54,9 @@ bool z_x86_check_stack_bounds(uintptr_t addr, size_t size, uint16_t cs)
 {
 	uintptr_t start, end;
 
-	if (arch_is_in_isr()) {
-		/* We were servicing an interrupt */
+	if (_current == NULL || arch_is_in_isr()) {
+		/* We were servicing an interrupt or in early boot environment
+		 * and are supposed to be on the interrupt stack */
 		int cpu_id;
 
 #ifdef CONFIG_SMP
