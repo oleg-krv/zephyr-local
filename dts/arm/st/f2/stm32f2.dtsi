@@ -9,6 +9,7 @@
 #include <dt-bindings/clock/stm32_clock.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/i2c/i2c.h>
+#include <dt-bindings/pwm/pwm.h>
 
 / {
 	chosen {
@@ -317,8 +318,8 @@
 			num-bidir-endpoints = <4>;
 			ram-size = <1280>;
 			maximum-speed = "full-speed";
-			phys = <&otgfs_phy>;
 			clocks = <&rcc STM32_CLOCK_BUS_AHB2 0x00000080>;
+			phys = <&otgfs_phy>;
 			status = "disabled";
 			label = "OTGFS";
 		};
