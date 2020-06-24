@@ -555,10 +555,13 @@ static void umode_enter_func(void)
 }
 
 /**
- * @brief Test to check enter to usermode
- *
- * @ingroup kernel_memprotect_tests
- */
+* @brief Test to check supervisor thread enter one-way to usermode
+*
+* @details A thread running in supervisor mode must have one-way operation
+* ability to drop privileges to user mode.
+*
+* @ingroup kernel_memprotect_tests
+*/
 static void test_user_mode_enter(void)
 {
 	expect_fault = false;
@@ -709,8 +712,10 @@ static void test_domain_add_thread_drop_to_user(void)
 	k_thread_user_mode_enter(user_half, NULL, NULL, NULL);
 }
 
-/* Show that adding a partition to a domain and then dropping to user mode
- * works as expected.
+/* @brief Test adding application memory partition to memory domain
+ *
+ * @details Show that adding a partition to a domain and then dropping to user
+ * mode works as expected.
  *
  * @ingroup kernel_memprotect_tests
  */
