@@ -336,7 +336,7 @@
 				status = "disabled";
 				st,prescaler = <10000>;
 				label = "PWM_1";
-				#pwm-cells = <2>;
+				#pwm-cells = <3>;
 			};
 		};
 
@@ -352,7 +352,7 @@
 				status = "disabled";
 				st,prescaler = <0>;
 				label = "PWM_2";
-				#pwm-cells = <2>;
+				#pwm-cells = <3>;
 			};
 		};
 
@@ -368,7 +368,7 @@
 				status = "disabled";
 				st,prescaler = <10000>;
 				label = "PWM_3";
-				#pwm-cells = <2>;
+				#pwm-cells = <3>;
 			};
 		};
 
@@ -384,7 +384,7 @@
 				status = "disabled";
 				st,prescaler = <10000>;
 				label = "PWM_4";
-				#pwm-cells = <2>;
+				#pwm-cells = <3>;
 			};
 		};
 
@@ -400,7 +400,7 @@
 				status = "disabled";
 				st,prescaler = <0>;
 				label = "PWM_5";
-				#pwm-cells = <2>;
+				#pwm-cells = <3>;
 			};
 		};
 
@@ -416,7 +416,7 @@
 				status = "disabled";
 				st,prescaler = <10000>;
 				label = "PWM_9";
-				#pwm-cells = <2>;
+				#pwm-cells = <3>;
 			};
 		};
 
@@ -432,7 +432,7 @@
 				status = "disabled";
 				st,prescaler = <10000>;
 				label = "PWM_10";
-				#pwm-cells = <2>;
+				#pwm-cells = <3>;
 			};
 		};
 
@@ -448,7 +448,7 @@
 				status = "disabled";
 				st,prescaler = <10000>;
 				label = "PWM_11";
-				#pwm-cells = <2>;
+				#pwm-cells = <3>;
 			};
 		};
 
