@@ -14,7 +14,8 @@ extern "C" {
 __syscall void modem_power_on(void);
 __syscall void modem_power_off(void);
 __syscall void modem_power_reset(void);
-__syscall void modem_always_online(bool enable);
+__syscall struct k_work_q* modem_get_worker(void);
+
 
 #ifdef __cplusplus
 }
