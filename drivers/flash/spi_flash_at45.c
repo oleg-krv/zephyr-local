@@ -6,6 +6,7 @@
 
 #include <drivers/flash.h>
 #include <drivers/spi.h>
+#include <sys/byteorder.h>
 #include <logging/log.h>
 
 LOG_MODULE_REGISTER(spi_flash_at45, CONFIG_FLASH_LOG_LEVEL);
@@ -354,6 +355,7 @@ static int spi_flash_at45_write(struct device *dev, off_t offset,
 			break;
 		}
 
+		data    = (uint8_t *)data + chunk_len;
 		offset += chunk_len;
 		len    -= chunk_len;
 	}
@@ -428,7 +430,7 @@ static int perform_erase_op(struct device *dev, uint8_t opcode, off_t offset)
 static int spi_flash_at45_erase(struct device *dev, off_t offset, size_t size)
 {
 	const struct spi_flash_at45_config *cfg = get_dev_config(dev);
-	int err;
+	int err = 0;
 
 	if (!is_valid_request(offset, size, cfg->chip_size)) {
 		return -ENODEV;
@@ -650,7 +652,7 @@ static const struct flash_driver_api spi_flash_at45_api = {
 
 #define DT_DRV_COMPAT atmel_at45
 
-#define SPI_FLASH_AT45_INST(idx, _)					     \
+#define SPI_FLASH_AT45_INST(idx)					     \
 	enum {								     \
 		INST_##idx##_BYTES = (DT_INST_PROP(idx, size) / 8),	     \
 		INST_##idx##_PAGES = (INST_##idx##_BYTES /		     \
@@ -703,4 +705,4 @@ static const struct flash_driver_api spi_flash_at45_api = {
 		      POST_KERNEL, CONFIG_SPI_FLASH_AT45_INIT_PRIORITY,      \
 		      &spi_flash_at45_api);
 
-UTIL_LISTIFY(DT_NUM_INST(DT_DRV_COMPAT), SPI_FLASH_AT45_INST, _)
+DT_INST_FOREACH_STATUS_OKAY(SPI_FLASH_AT45_INST)

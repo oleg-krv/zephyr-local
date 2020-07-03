@@ -2015,6 +2015,14 @@ static void le_conn_complete_adv_timeout(void)
 
 		atomic_clear_bit(adv->flags, BT_ADV_ENABLED);
 
+		if (IS_ENABLED(CONFIG_BT_EXT_ADV) &&
+		    !BT_FEAT_LE_EXT_ADV(bt_dev.le.features)) {
+			/* No advertising set terminated event, must be a
+			 * legacy advertiser set.
+			 */
+			adv_delete_legacy();
+		}
+
 		/* There is no need to check ID address as only one
 		 * connection in slave role can be in pending state.
 		 */
@@ -3045,6 +3053,11 @@ static void link_key_notify(struct net_buf *buf)
 		(void)memset(conn->br.link_key->val, 0,
 			     sizeof(conn->br.link_key->val));
 		break;
+	}
+
+	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
+	    !atomic_test_bit(conn->flags, BT_CONN_BR_NOBOND)) {
+		bt_keys_link_key_store(conn->br.link_key);
 	}
 
 	bt_conn_unref(conn);
