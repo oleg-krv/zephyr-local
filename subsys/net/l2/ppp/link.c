@@ -100,7 +100,7 @@ void ppp_link_terminated(struct ppp_context *ctx)
 
 	/* TODO: cleanup things etc here if needed */
 
-	ppp_change_phase(ctx, PPP_DEAD);
+//	ppp_change_phase(ctx, PPP_DEAD);
 
     ppp_mgmt_raise_link_dead_event(ctx->iface);
 

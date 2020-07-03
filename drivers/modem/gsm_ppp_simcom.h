@@ -15,6 +15,7 @@ __syscall void modem_power_on(void);
 __syscall void modem_power_off(void);
 __syscall void modem_power_reset(void);
 __syscall struct k_work_q* modem_get_worker(void);
+__syscall int modem_get_rssi(void);
 
 
 #ifdef __cplusplus

@@ -23,6 +23,7 @@ LOG_MODULE_REGISTER(modem_simcom, CONFIG_MODEM_LOG_LEVEL
 #include "modem_iface_uart.h"
 #include "modem_cmd_handler.h"
 #include "../console/gsm_mux.h"
+#include "../../subsys/net/l2/ppp/ppp_internal.h"
 
 #define GSM_CMD_READ_BUF       128
 #define GSM_CMD_AT_TIMEOUT     K_SECONDS(2)
@@ -32,7 +33,7 @@ LOG_MODULE_REGISTER(modem_simcom, CONFIG_MODEM_LOG_LEVEL
 #define GSM_RECV_MAX_BUF       30
 #define GSM_RECV_BUF_SIZE      128
 #define GSM_BUF_ALLOC_TIMEOUT  K_SECONDS(1)
-#define GSM_RSSI_TIMEOUT       K_SECONDS(30)
+#define GSM_RSSI_TIMEOUT       K_SECONDS(10)
 #define GSM_CREG_TIMEOUT       K_SECONDS(1)
 
 /* During the modem setup, we first create DLCI control channel and then
@@ -67,8 +68,6 @@ static struct gsm_modem {
 	struct device *ppp_dev;
 	struct device *at_dev;
 	struct device *control_dev;
-
-	struct modem_iface ppp_iface;
 
 	uint8_t creg_status;
 	uint8_t network_connected;
@@ -111,6 +110,7 @@ static struct gsm_modem {
 	struct k_delayed_work modem_reset_work;
 	struct k_delayed_work modem_creg_change_status;
 	struct k_delayed_work modem_rssi_query_work;
+	struct k_delayed_work modem_ppp_ping_query_work;
 	struct k_delayed_work modem_no_carrier;
 	struct k_delayed_work modem_connect_network_query_work;
 	struct k_delayed_work modem_start_ppp_work;
@@ -223,6 +223,16 @@ static void set_ppp_carrier_on(struct gsm_modem *gsm_p) {
 	}
 
 	api = (const struct ppp_api *) ppp_dev->driver_api;
+
+	struct net_if *iface;
+
+	iface = net_if_get_by_index(1);
+
+
+	if (net_if_l2(iface) != &NET_L2_GET_NAME(PPP)) {
+		return;
+	}
+	api->iface_api.init(iface);
 	api->start(ppp_dev);
 }
 
@@ -377,7 +387,6 @@ MODEM_CMD_DEFINE(on_cmd_atcmdinfo_revision)
 	return 0;
 }
 
-
 #endif /* CONFIG_MODEM_SHELL */
 
 /* Handler: <IMEI> */
@@ -392,13 +401,12 @@ MODEM_CMD_DEFINE(on_cmd_atcmdinfo_imei) {
 	return 0;
 }
 
-
-static struct setup_cmd reset_cmds[] = {
-		/* no echo */
-		SETUP_CMD_NOHANDLE("AT+CFUN=1,1"),
-		/* hang up */
-		SETUP_CMD_NOHANDLE("AT"),
-};
+//static struct setup_cmd reset_cmds[] = {
+//		/* no echo */
+//		SETUP_CMD_NOHANDLE("AT+CFUN=1,1"),
+//		/* hang up */
+//		SETUP_CMD_NOHANDLE("AT"),
+//};
 
 static struct setup_cmd setup_cmds[] = {
 		/* no echo */
@@ -530,10 +538,7 @@ static void gsm_finalize_connection(struct gsm_modem *gsm_p) {
 	if (!IS_ENABLED(CONFIG_GSM_MUX)) {
 		k_thread_abort(&gsm_rx_thread);
 	}
-#endif
-
-//	set_ppp_carrier_on(gsm_p);
-
+#else
 	if (IS_ENABLED(CONFIG_GSM_MUX) && gsm_p->mux_enabled) {
 		/* Re-use the original iface for AT channel */
 		ret = modem_iface_uart_init_dev(&gsm_p->context.iface,
@@ -557,11 +562,11 @@ static void gsm_finalize_connection(struct gsm_modem *gsm_p) {
 			}
 		}
 	}
+#endif
 }
 
 static int mux_enable(struct gsm_modem *gsm_p) {
 	int ret;
-
 	/* Turn on muxing */
 	ret = modem_cmd_send(
 			&gsm_p->context.iface,
@@ -704,9 +709,6 @@ static void mux_setup(struct k_work *work) {
 				goto fail;
 			}
 
-			memcpy(&gsm_p->ppp_iface, &gsm_p->context.iface,
-				   sizeof(struct modem_iface));
-
 			LOG_INF("PPP channel %d connected to %s", DLCI_PPP,
 					gsm_p->ppp_dev->name);
 
@@ -808,15 +810,19 @@ static void modem_connect_network_query_work(struct k_work *work) {
 
 		(void) k_delayed_work_cancel(&gsm_p->modem_rssi_query_work);
 
-//		ret = modem_iface_uart_init_dev(&gsm_p->context.iface,
-//										gsm_p->ppp_dev->name);
+		(void) modem_iface_uart_init_dev(&gsm_p->context.iface,
+										 gsm_p->ppp_dev->name);
 
-		ret = modem_cmd_handler_setup_cmds(&gsm_p->ppp_iface,
+		ret = modem_cmd_handler_setup_cmds(&gsm_p->context.iface,
 										   &gsm_p->context.cmd_handler,
 										   connect_cmds,
 										   ARRAY_SIZE(connect_cmds),
 										   &gsm_p->sem_response,
 										   GSM_CMD_SETUP_TIMEOUT);
+
+		(void) modem_iface_uart_init_dev(&gsm_p->context.iface,
+										 gsm_p->at_dev->name);
+
 		if (ret < 0) {
 			LOG_DBG("modem setup returned %d, %s", ret, "retrying...");
 			(void) k_delayed_work_submit_to_queue(&modem_work_q,
@@ -827,36 +833,9 @@ static void modem_connect_network_query_work(struct k_work *work) {
 												  K_SECONDS(5));
 			return;
 		}
-
-#ifdef CONFIG_GSM_MUX
-		//		if (gsm_p->mux_enabled) {
-		//			/* Re-use the original iface for AT channel */
-		//			ret = modem_iface_uart_init_dev(&gsm_p->context.iface,
-		//											gsm_p->at_dev->name);
-		//			if (ret < 0) {
-		//				LOG_DBG("iface %suart error %d", "AT ", ret);
-		//			} else {
-		//				/* Do a test and try to send AT command to modem */
-		//				ret = modem_cmd_send(&gsm_p->context.iface,
-		//									 &gsm_p->context.cmd_handler,
-		//									 &response_cmds[0],
-		//									 ARRAY_SIZE(response_cmds),
-		//									 "AT", &gsm_p->sem_response,
-		//									 GSM_CMD_AT_TIMEOUT);
-		//				if (ret < 0) {
-		//					LOG_DBG("modem setup returned %d, %s",
-		//							ret, "AT cmds failed");
-		//				} else {
-		//					LOG_INF("AT channel %d connected to %s",
-		//							DLCI_AT, gsm_p->at_dev->name);
-		//				}
-		//			}
-		//		}
-#endif
 		(void) k_delayed_work_submit_to_queue(&modem_work_q,
 											  &gsm_p->modem_rssi_query_work,
 											  K_MSEC(1));
-
 	}
 }
 
@@ -882,6 +861,7 @@ static void modem_power_on_work(struct k_work *work) {
 	gsm.state = STATE_INIT;
 	gsm.mux_enabled = false;
 	gsm.setup_done = false;
+	ppp_mgmt_raise_modem_power_on_event(NULL);
 	k_delayed_work_init(&gsm.gsm_configure_work, gsm_configure);
 	(void) k_delayed_work_submit_to_queue(&modem_work_q,
 										  &gsm.gsm_configure_work, K_NO_WAIT);
@@ -913,6 +893,7 @@ static void modem_power_off_work(struct k_work *work) {
 	gsm.state = STATE_INIT;
 	gsm.mux_enabled = false;
 	gsm.setup_done = false;
+	ppp_mgmt_raise_modem_power_off_event(NULL);
 }
 
 static void modem_reset_work(struct k_work *work) {
@@ -924,7 +905,7 @@ static void modem_reset_work(struct k_work *work) {
 #else
 
 #endif
-
+	ppp_mgmt_raise_modem_reset_event(NULL);
 }
 
 static void modem_no_carrier(struct k_work *work) {
@@ -934,13 +915,63 @@ static void modem_no_carrier(struct k_work *work) {
 //								   K_MSEC(1));
 }
 
-static void modem_rssi_query_work(struct k_work *work) {
-	struct modem_cmd cmd = MODEM_CMD("+CSQ: ", on_cmd_atcmdinfo_rssi_csq, 2U,
-									 ",");
-//	static char *send_cmd = "AT+CSQ";
-	int ret;
-//	struct net_if *iface;
+static void modem_ppp_ping_query_work(struct k_work *work) {
 
+
+	if (gsm.network_connected) {
+		int ret;
+
+		struct ppp_context *ctx;
+		struct net_if *iface;
+
+		iface = net_if_get_by_index(1);
+
+		if (!iface) {
+			return;// -ENOENT;
+		}
+
+		if (net_if_l2(iface) != &NET_L2_GET_NAME(PPP)) {
+			return;// -ENODEV;
+		}
+
+		ctx = net_if_l2_data(iface);
+
+		uint32_t echo_req_data = k_cycle_get_32();
+		ret = ppp_send_pkt(&ctx->lcp.fsm, iface, PPP_ECHO_REQ, 0,
+						   UINT_TO_POINTER(echo_req_data),
+						   sizeof(echo_req_data));
+
+//		if (ret < 0) {
+//			if (ret == -EAGAIN) {
+//				LOG_ERR("PPP Echo-Req timeout.");
+//			} else if (ret == -ENODEV || ret == -ENOENT) {
+//				LOG_ERR("Not a PPP interface");
+//			} else {
+//				LOG_ERR("PPP Echo-Req failed");
+//			}
+//		} else {
+//			if (ret > 1000) {
+//				LOG_INF("%s%d msec\n",
+//						"Received PPP Echo-Reply in ",
+//						ret / 1000);
+//			} else {
+//				LOG_INF("%s%d usec\n",
+//						"Received PPP Echo-Reply in ", ret);
+//			}
+//		}
+
+		k_delayed_work_submit_to_queue(&modem_work_q,
+									   &gsm.modem_ppp_ping_query_work,
+									   GSM_RSSI_TIMEOUT);
+		return;// 0;
+	}
+}
+
+static void modem_rssi_query_work(struct k_work *work) {
+	struct modem_cmd cmd = MODEM_CMD("+CSQ: ",
+									 on_cmd_atcmdinfo_rssi_csq, 2U,
+									 ",");
+	int ret;
 	ret = modem_cmd_send(&gsm.context.iface,
 						 &gsm.context.cmd_handler,
 						 &cmd,
@@ -959,44 +990,24 @@ static void modem_rssi_query_work(struct k_work *work) {
 	}
 }
 
-/*
-static void modem_creg_query_work(struct k_work *work) {
-	struct modem_cmd cmd = MODEM_CMD("+CREG: ", NULL, 2U, ",");
-//    struct modem_cmd cmd = SETUP_CMD_NOHANDLE("AT+CREG?");
-//	static char *send_cmd = "AT+CSQ";
-	int ret;
-//	struct net_if *iface;
-
-	ret = modem_cmd_send(&gsm.context.iface,
-						 &gsm.context.cmd_handler,
-						 &cmd,
-						 1U,
-						 "AT+CREG?", &gsm.sem_response,
-						 GSM_CMD_AT_TIMEOUT);
-	if (ret < 0) {
-		LOG_ERR("AT+CREG ret:%d", ret);
-	}
-
-	/ * re-start CREG query work * /
-//    k_delayed_work_submit_to_queue(&modem_work_q, &gsm.modem_creg_query_work, GSM_CREG_TIMEOUT);
-}
-*/
-
 static void modem_creg_change_status(struct k_work *work) {
 	if (!(gsm.creg_status == 1 || gsm.creg_status == 5)) {
 		if (gsm.operator_connected) {
 			LOG_INF("Operator disconnect");
 			k_delayed_work_cancel(&gsm.modem_rssi_query_work);
+			gsm.context.data_rssi = -999;
 			//Disconnect operator network
 			if (gsm.network_connected) {
 				modem_disable_ppp();
 			}
 			gsm.operator_connected = false;
+			ppp_mgmt_raise_modem_operator_disconnect_event(NULL);
 		}
 	} else {
 		if (!gsm.operator_connected) {
 			LOG_INF("Operator connect");
 			gsm.operator_connected = true;
+			ppp_mgmt_raise_modem_operator_connect_event(NULL);
 			k_delayed_work_submit_to_queue(&modem_work_q,
 										   &gsm.modem_rssi_query_work,
 										   K_MSEC(1));
@@ -1037,6 +1048,7 @@ static void interrupt_gsm_status(struct device *dev, struct gpio_callback *cb,
 										 GSM_STATUS_HW_PIN);
 	if (!gsm.input_pins.status && gsm.power_ok) {
 		modem_disable_ppp();
+		ppp_mgmt_raise_modem_reset_event(NULL);
 		(void) k_delayed_work_submit_to_queue(&modem_work_q,
 											  &gsm.modem_power_on_work,
 											  K_NO_WAIT);
@@ -1054,9 +1066,8 @@ static void modem_ppp_event_handler_connect(struct net_mgmt_event_callback *cb,
 											uint32_t mgmt_event,
 											struct net_if *iface) {
 
-	if ((mgmt_event & (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED
-					   | NET_EVENT_PPP_CARRIER_ON | NET_EVENT_PPP_CARRIER_OFF
-					   | NET_EVENT_IF_UP | NET_EVENT_IF_DOWN)) != mgmt_event) {
+	if ((mgmt_event & (NET_EVENT_L4_CONNECTED
+					   | NET_EVENT_L4_DISCONNECTED)) != mgmt_event) {
 		return;
 	}
 
@@ -1073,6 +1084,9 @@ static void modem_ppp_event_handler_connect(struct net_mgmt_event_callback *cb,
 				log_strdup(net_addr_ntop(AF_INET,
 										 &iface->config.ip.ipv4->unicast[0].address.in_addr,
 										 buf, sizeof(buf))));
+		k_delayed_work_submit_to_queue(&modem_work_q,
+									   &gsm.modem_ppp_ping_query_work,
+									   GSM_RSSI_TIMEOUT);
 		return;
 	}
 
@@ -1101,7 +1115,10 @@ static void modem_ppp_event_handler_ppp(struct net_mgmt_event_callback *cb,
 		LOG_INF("EVT PPP carrier off");
 	}
 	if (mgmt_event == NET_EVENT_PPP_LINK_DEAD) {
-		LOG_INF("EVT PPP link terminated");
+		LOG_ERR("EVT PPP link terminated");
+		gsm.network_connected = false;
+		k_delayed_work_cancel(&gsm.modem_ppp_ping_query_work);
+
 		k_delayed_work_submit_to_queue(&modem_work_q,
 									   &gsm.modem_connect_network_query_work,
 									   K_MSEC(1));
@@ -1109,21 +1126,21 @@ static void modem_ppp_event_handler_ppp(struct net_mgmt_event_callback *cb,
 }
 
 
-static void modem_ppp_event_handler_if(struct net_mgmt_event_callback *cb,
-									   uint32_t mgmt_event,
-									   struct net_if *iface) {
-
-	if ((mgmt_event & (NET_EVENT_IF_UP | NET_EVENT_IF_DOWN)) != mgmt_event) {
-		return;
-	}
-
-	if (mgmt_event == NET_EVENT_IF_UP) {
-		LOG_INF("EVT IF UP");
-	}
-	if (mgmt_event == NET_EVENT_IF_DOWN) {
-		LOG_INF("EVT IF DOWN");
-	}
-}
+//static void modem_ppp_event_handler_if(struct net_mgmt_event_callback *cb,
+//									   uint32_t mgmt_event,
+//									   struct net_if *iface) {
+//
+//	if ((mgmt_event & (NET_EVENT_IF_UP | NET_EVENT_IF_DOWN)) != mgmt_event) {
+//		return;
+//	}
+//
+//	if (mgmt_event == NET_EVENT_IF_UP) {
+//		LOG_INF("EVT IF UP");
+//	}
+//	if (mgmt_event == NET_EVENT_IF_DOWN) {
+//		LOG_INF("EVT IF DOWN");
+//	}
+//}
 
 static int gsm_init(struct device *device) {
 	struct gsm_modem *gsm_p = device->driver_data;
@@ -1218,11 +1235,6 @@ static int gsm_init(struct device *device) {
 		return r;
 	}
 
-	/* copy params to command interface */
-	memcpy(&gsm_p->ppp_iface, &gsm_p->context.iface,
-		   sizeof(struct modem_iface));
-
-
 	r = modem_context_register(&gsm_p->context);
 	if (r < 0) {
 		LOG_DBG("context error %d", r);
@@ -1240,6 +1252,8 @@ static int gsm_init(struct device *device) {
 	k_thread_name_set(&gsm_rx_thread, "gsm_rx");
 
 	k_delayed_work_init(&gsm_p->gsm_configure_work, gsm_configure);
+	k_delayed_work_init(&gsm_p->modem_no_carrier, modem_no_carrier);
+
 	k_delayed_work_init(&gsm_p->modem_power_on_work,
 						modem_power_on_work);
 	k_delayed_work_init(&gsm_p->modem_power_off_work,
@@ -1249,15 +1263,12 @@ static int gsm_init(struct device *device) {
 						modem_creg_change_status);
 	k_delayed_work_init(&gsm_p->modem_rssi_query_work,
 						modem_rssi_query_work);
-	k_delayed_work_init(&gsm_p->modem_no_carrier, modem_no_carrier);
-
-//    k_delayed_work_init(&gsm.modem_creg_query_work, modem_creg_query_work);
+	k_delayed_work_init(&gsm_p->modem_ppp_ping_query_work,
+						modem_ppp_ping_query_work);
 	k_delayed_work_init(&gsm_p->modem_connect_network_query_work,
 						modem_connect_network_query_work);
-
 	k_delayed_work_init(&gsm_p->modem_start_ppp_work,
 						modem_start_ppp_work);
-
 
 	net_mgmt_init_event_callback(&modem_mgmt_cb_connect,
 								 modem_ppp_event_handler_connect,
@@ -1268,9 +1279,9 @@ static int gsm_init(struct device *device) {
 								 NET_EVENT_PPP_CARRIER_ON
 								 | NET_EVENT_PPP_CARRIER_OFF
 								 | NET_EVENT_PPP_LINK_DEAD);
-	net_mgmt_init_event_callback(&modem_mgmt_cb_if, modem_ppp_event_handler_if,
-								 NET_EVENT_IF_UP
-								 | NET_EVENT_IF_DOWN);
+//	net_mgmt_init_event_callback(&modem_mgmt_cb_if, modem_ppp_event_handler_if,
+//								 NET_EVENT_IF_UP
+//								 | NET_EVENT_IF_DOWN);
 
 	//(void) k_delayed_work_submit_to_queue(&modem_work_q,&gsm_p->gsm_configure_work, K_NO_WAIT);
 	return 0;
@@ -1306,4 +1317,8 @@ void z_impl_modem_power_reset(void) {
 
 struct k_work_q *z_impl_modem_get_worker(void) {
 	return &modem_work_q;
+}
+
+int z_impl_modem_get_rssi(void) {
+	return gsm.context.data_rssi;
 }
