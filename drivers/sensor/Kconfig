@@ -113,6 +113,8 @@ source "drivers/sensor/lsm303dlhc_magn/Kconfig"
 
 source "drivers/sensor/lsm6ds0/Kconfig"
 
+source "drivers/sensor/lsm6ds3/Kconfig"
+
 source "drivers/sensor/lsm6dsl/Kconfig"
 
 source "drivers/sensor/lsm6dso/Kconfig"
