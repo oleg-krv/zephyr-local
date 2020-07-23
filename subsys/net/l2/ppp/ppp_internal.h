@@ -44,12 +44,6 @@ struct ppp_packet {
 /** Max number of IPV6CP options */
 #define MAX_IPV6CP_OPTIONS 1
 
-/*
- * Special alignment is needed for ppp_protocol_handler. This is the
- * same issue as in net_if. See net_if.h __net_if_align for explanation.
- */
-#define __ppp_proto_align __aligned(32)
-
 /** Protocol handler information. */
 struct ppp_protocol_handler {
 	/** Protocol init function */
@@ -74,7 +68,7 @@ struct ppp_protocol_handler {
 
 	/** PPP protocol number */
 	uint16_t protocol;
-} __ppp_proto_align;
+};
 
 #define PPP_PROTO_GET_NAME(proto_name)		\
 	(ppp_protocol_handler_##proto_name)
@@ -82,9 +76,8 @@ struct ppp_protocol_handler {
 #define PPP_PROTOCOL_REGISTER(name, proto, init_func, proto_handler,	\
 			      proto_lower_up, proto_lower_down,		\
 			      proto_open, proto_close)			\
-	static const struct ppp_protocol_handler			\
-	(PPP_PROTO_GET_NAME(name)) __used				\
-	__attribute__((__section__(".net_ppp_proto.data"))) = {		\
+	static const Z_STRUCT_SECTION_ITERABLE(ppp_protocol_handler,	\
+					PPP_PROTO_GET_NAME(name)) = {	\
 		.protocol = proto,					\
 		.init = init_func,					\
 		.handler = proto_handler,				\
@@ -93,9 +86,6 @@ struct ppp_protocol_handler {
 		.open = proto_open,					\
 		.close = proto_close,					\
 	}
-
-extern struct ppp_protocol_handler __net_ppp_proto_start[];
-extern struct ppp_protocol_handler __net_ppp_proto_end[];
 
 const char *ppp_phase_str(enum ppp_phase phase);
 const char *ppp_state_str(enum ppp_state state);

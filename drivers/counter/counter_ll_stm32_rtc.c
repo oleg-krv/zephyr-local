@@ -22,6 +22,8 @@
 
 #include <logging/log.h>
 
+#include "stm32_hsem.h"
+
 LOG_MODULE_REGISTER(counter_rtc_stm32, CONFIG_COUNTER_LOG_LEVEL);
 
 #define T_TIME_OFFSET 946684800
@@ -66,7 +68,9 @@ static int rtc_stm32_start(struct device *dev)
 {
 	ARG_UNUSED(dev);
 
+	z_stm32_hsem_lock(CFG_HW_RCC_SEMID, HSEM_LOCK_DEFAULT_RETRY);
 	LL_RCC_EnableRTC();
+	z_stm32_hsem_unlock(CFG_HW_RCC_SEMID);
 
 	return 0;
 }
@@ -76,7 +80,9 @@ static int rtc_stm32_stop(struct device *dev)
 {
 	ARG_UNUSED(dev);
 
+	z_stm32_hsem_lock(CFG_HW_RCC_SEMID, HSEM_LOCK_DEFAULT_RETRY);
 	LL_RCC_DisableRTC();
+	z_stm32_hsem_unlock(CFG_HW_RCC_SEMID);
 
 	return 0;
 }
@@ -280,6 +286,8 @@ static int rtc_stm32_init(struct device *dev)
 
 	clock_control_on(clk, (clock_control_subsys_t *) &cfg->pclken);
 
+	z_stm32_hsem_lock(CFG_HW_RCC_SEMID, HSEM_LOCK_DEFAULT_RETRY);
+
 	LL_PWR_EnableBkUpAccess();
 	LL_RCC_ForceBackupDomainReset();
 	LL_RCC_ReleaseBackupDomainReset();
@@ -328,6 +336,8 @@ static int rtc_stm32_init(struct device *dev)
 #endif /* CONFIG_COUNTER_RTC_STM32_CLOCK_SRC */
 
 	LL_RCC_EnableRTC();
+
+	z_stm32_hsem_unlock(CFG_HW_RCC_SEMID);
 
 	if (LL_RTC_DeInit(RTC) != SUCCESS) {
 		return -EIO;

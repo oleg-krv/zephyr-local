@@ -21,31 +21,19 @@
 LOG_MODULE_REGISTER(sx1276);
 
 #define GPIO_RESET_PIN		DT_INST_GPIO_PIN(0, reset_gpios)
-#define GPIO_RESET_FLAGS	DT_INST_GPIO_FLAGS(0, reset_gpios)
 #define GPIO_CS_PIN		DT_INST_SPI_DEV_CS_GPIOS_PIN(0)
+#define GPIO_CS_FLAGS		DT_INST_SPI_DEV_CS_GPIOS_FLAGS(0)
 
 #define GPIO_ANTENNA_ENABLE_PIN				\
 	DT_INST_GPIO_PIN(0, antenna_enable_gpios)
-#define GPIO_ANTENNA_ENABLE_FLAGS			\
-	DT_INST_GPIO_FLAGS(0, antenna_enable_gpios)
-
 #define GPIO_RFI_ENABLE_PIN			\
 	DT_INST_GPIO_PIN(0, rfi_enable_gpios)
-#define GPIO_RFI_ENABLE_FLAGS			\
-	DT_INST_GPIO_FLAGS(0, rfi_enable_gpios)
-
 #define GPIO_RFO_ENABLE_PIN			\
 	DT_INST_GPIO_PIN(0, rfo_enable_gpios)
-#define GPIO_RFO_ENABLE_FLAGS			\
-	DT_INST_GPIO_FLAGS(0, rfo_enable_gpios)
-
 #define GPIO_PA_BOOST_ENABLE_PIN			\
 	DT_INST_GPIO_PIN(0, pa_boost_enable_gpios)
-#define GPIO_PA_BOOST_ENABLE_FLAGS			\
-	DT_INST_GPIO_FLAGS(0, pa_boost_enable_gpios)
 
 #define GPIO_TCXO_POWER_PIN	DT_INST_GPIO_PIN(0, tcxo_power_gpios)
-#define GPIO_TCXO_POWER_FLAGS	DT_INST_GPIO_FLAGS(0, tcxo_power_gpios)
 
 #if DT_INST_NODE_HAS_PROP(0, tcxo_power_startup_delay_ms)
 #define TCXO_POWER_STARTUP_DELAY_MS			\
@@ -245,8 +233,7 @@ void SX1276Reset(void)
 {
 	SX1276SetBoardTcxo(true);
 
-	gpio_pin_configure(dev_data.reset, GPIO_RESET_PIN,
-			   GPIO_OUTPUT_ACTIVE | GPIO_RESET_FLAGS);
+	gpio_pin_set(dev_data.reset, GPIO_RESET_PIN, 1);
 
 	k_sleep(K_MSEC(1));
 
@@ -460,65 +447,29 @@ const struct Radio_s Radio = {
 
 static int sx1276_antenna_configure(void)
 {
-	int ret = 0;
+	int ret;
 
-#if DT_INST_NODE_HAS_PROP(0, antenna_enable_gpios)
-	dev_data.antenna_enable = device_get_binding(
-			DT_INST_GPIO_LABEL(0, antenna_enable_gpios));
-	if (!dev_data.antenna_enable) {
-		LOG_ERR("Cannot get pointer to %s device",
-		       DT_INST_GPIO_LABEL(0, antenna_enable_gpios));
-		return -EIO;
+	ret = sx12xx_configure_pin(antenna_enable, GPIO_OUTPUT_INACTIVE);
+	if (ret) {
+		return ret;
 	}
 
-	ret = gpio_pin_configure(dev_data.antenna_enable,
-				 GPIO_ANTENNA_ENABLE_PIN,
-				 GPIO_OUTPUT_INACTIVE |
-					GPIO_ANTENNA_ENABLE_FLAGS);
-#endif
-
-#if DT_INST_NODE_HAS_PROP(0, rfi_enable_gpios)
-	dev_data.rfi_enable = device_get_binding(
-			DT_INST_GPIO_LABEL(0, rfi_enable_gpios));
-	if (!dev_data.rfi_enable) {
-		LOG_ERR("Cannot get pointer to %s device",
-		       DT_INST_GPIO_LABEL(0, rfi_enable_gpios));
-		return -EIO;
+	ret = sx12xx_configure_pin(rfi_enable, GPIO_OUTPUT_INACTIVE);
+	if (ret) {
+		return ret;
 	}
 
-	ret = gpio_pin_configure(dev_data.rfi_enable, GPIO_RFI_ENABLE_PIN,
-				 GPIO_OUTPUT_INACTIVE | GPIO_RFI_ENABLE_FLAGS);
-#endif
-
-#if DT_INST_NODE_HAS_PROP(0, rfo_enable_gpios)
-	dev_data.rfo_enable = device_get_binding(
-			DT_INST_GPIO_LABEL(0, rfo_enable_gpios));
-	if (!dev_data.rfo_enable) {
-		LOG_ERR("Cannot get pointer to %s device",
-		       DT_INST_GPIO_LABEL(0, rfo_enable_gpios));
-		return -EIO;
+	ret = sx12xx_configure_pin(rfo_enable, GPIO_OUTPUT_INACTIVE);
+	if (ret) {
+		return ret;
 	}
 
-	ret = gpio_pin_configure(dev_data.rfo_enable, GPIO_RFO_ENABLE_PIN,
-				 GPIO_OUTPUT_INACTIVE | GPIO_RFO_ENABLE_FLAGS);
-#endif
-
-#if DT_INST_NODE_HAS_PROP(0, pa_boost_enable_gpios)
-	dev_data.pa_boost_enable = device_get_binding(
-			DT_INST_GPIO_LABEL(0, pa_boost_enable_gpios));
-	if (!dev_data.pa_boost_enable) {
-		LOG_ERR("Cannot get pointer to %s device",
-		       DT_INST_GPIO_LABEL(0, pa_boost_enable_gpios));
-		return -EIO;
+	ret = sx12xx_configure_pin(pa_boost_enable, GPIO_OUTPUT_INACTIVE);
+	if (ret) {
+		return ret;
 	}
 
-	ret = gpio_pin_configure(dev_data.pa_boost_enable,
-				 GPIO_PA_BOOST_ENABLE_PIN,
-				 GPIO_OUTPUT_INACTIVE |
-					GPIO_PA_BOOST_ENABLE_FLAGS);
-#endif
-
-	return ret;
+	return 0;
 }
 
 static int sx1276_lora_init(struct device *dev)
@@ -541,7 +492,6 @@ static int sx1276_lora_init(struct device *dev)
 	dev_data.spi_cfg.slave = DT_INST_REG_ADDR(0);
 
 #if DT_INST_SPI_DEV_HAS_CS_GPIOS(0)
-	spi_cs.gpio_pin = GPIO_CS_PIN,
 	spi_cs.gpio_dev = device_get_binding(
 			DT_INST_SPI_DEV_CS_GPIOS_LABEL(0));
 	if (!spi_cs.gpio_dev) {
@@ -550,34 +500,23 @@ static int sx1276_lora_init(struct device *dev)
 		return -EIO;
 	}
 
+	spi_cs.gpio_pin = GPIO_CS_PIN;
+	spi_cs.gpio_dt_flags = GPIO_CS_FLAGS;
+	spi_cs.delay = 0U;
+
 	dev_data.spi_cfg.cs = &spi_cs;
 #endif
 
-#if DT_INST_NODE_HAS_PROP(0, tcxo_power_gpios)
-	dev_data.tcxo_power = device_get_binding(
-			DT_INST_GPIO_LABEL(0, tcxo_power_gpios));
-	if (!dev_data.tcxo_power) {
-		LOG_ERR("Cannot get pointer to %s device",
-		       DT_INST_GPIO_LABEL(0, tcxo_power_gpios));
-		return -EIO;
+	ret = sx12xx_configure_pin(tcxo_power, GPIO_OUTPUT_INACTIVE);
+	if (ret) {
+		return ret;
 	}
 
-	gpio_pin_configure(dev_data.tcxo_power, GPIO_TCXO_POWER_PIN,
-			   GPIO_OUTPUT_INACTIVE | GPIO_TCXO_POWER_FLAGS);
-#endif
-
-	/* Setup Reset gpio */
-	dev_data.reset = device_get_binding(
-			DT_INST_GPIO_LABEL(0, reset_gpios));
-	if (!dev_data.reset) {
-		LOG_ERR("Cannot get pointer to %s device",
-		       DT_INST_GPIO_LABEL(0, reset_gpios));
-		return -EIO;
+	/* Setup Reset gpio and perform soft reset */
+	ret = sx12xx_configure_pin(reset, GPIO_OUTPUT_ACTIVE);
+	if (ret) {
+		return ret;
 	}
-
-	/* Perform soft reset */
-	ret = gpio_pin_configure(dev_data.reset, GPIO_RESET_PIN,
-				 GPIO_OUTPUT_ACTIVE | GPIO_RESET_FLAGS);
 
 	k_sleep(K_MSEC(100));
 	gpio_pin_set(dev_data.reset, GPIO_RESET_PIN, 0);

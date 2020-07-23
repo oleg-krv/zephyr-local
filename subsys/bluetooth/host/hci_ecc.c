@@ -96,7 +96,11 @@ static void send_cmd_status(uint16_t opcode, uint8_t status)
 	evt->opcode = sys_cpu_to_le16(opcode);
 	evt->status = status;
 
-	bt_recv_prio(buf);
+	if (IS_ENABLED(CONFIG_BT_RECV_IS_RX_THREAD)) {
+		bt_recv_prio(buf);
+	} else {
+		bt_recv(buf);
+	}
 }
 
 static uint8_t generate_keys(void)
@@ -190,7 +194,7 @@ static void emulate_le_generate_dhkey(void)
 
 	if (ret == TC_CRYPTO_FAIL) {
 		evt->status = BT_HCI_ERR_UNSPECIFIED;
-		(void)memset(evt->dhkey, 0, sizeof(evt->dhkey));
+		(void)memset(evt->dhkey, 0xff, sizeof(evt->dhkey));
 	} else {
 		evt->status = 0U;
 		/* Convert from big-endian (provided by crypto API) to

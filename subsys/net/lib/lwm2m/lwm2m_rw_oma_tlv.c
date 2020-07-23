@@ -776,7 +776,7 @@ static size_t get_objlnk(struct lwm2m_input_context *in,
 	size = get_s32(in, &value_s32);
 
 	value->obj_id = (value_s32 >> 16) & 0xFFFF;
-	value->obj_inst = value_s32 && 0xFFFF;
+	value->obj_inst = value_s32 & 0xFFFF;
 
 	return size;
 }
@@ -919,6 +919,17 @@ int do_write_op_tlv(struct lwm2m_message *msg)
 	struct oma_tlv tlv;
 	int ret;
 
+	/* In case of Firmware object Package resource go directly to the
+	 * message processing - consecutive blocks will not carry the TLV
+	 * header.
+	 */
+	if (msg->path.obj_id == 5 && msg->path.res_id == 0) {
+		ret = do_write_op_tlv_item(msg);
+		if (ret < 0) {
+			return ret;
+		}
+	}
+
 	while (true) {
 		/*
 		 * This initial read of TLV data won't advance frag/offset.
@@ -992,6 +1003,8 @@ int do_write_op_tlv(struct lwm2m_message *msg)
 			       msg->operation == LWM2M_OP_CREATE))) {
 				return ret;
 			}
+		} else {
+			return -ENOTSUP;
 		}
 	}
 

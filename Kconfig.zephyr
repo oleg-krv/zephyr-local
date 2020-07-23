@@ -118,15 +118,15 @@ config FLASH_LOAD_SIZE
 
 endif # HAS_FLASH_LOAD_OFFSET
 
-config TEXT_SECTION_OFFSET
+config ROM_START_OFFSET
 	hex
-	prompt "TEXT section offset" if !BOOTLOADER_MCUBOOT
+	prompt "ROM start offset" if !BOOTLOADER_MCUBOOT
 	default 0x200 if BOOTLOADER_MCUBOOT
 	default 0
 	help
 	  If the application is built for chain-loading by a bootloader this
 	  variable is required to be set to value that leaves sufficient
-	  space between the beginning of the image and the start of the .text
+	  space between the beginning of the image and the start of the first
 	  section to store an image header or any other metadata.
 	  In the particular case of the MCUboot bootloader this reserves enough
 	  space to store the image header, which should also meet vector table
@@ -385,10 +385,11 @@ config BOOTLOADER_MCUBOOT
 	  order for the image generated to be bootable using the MCUboot open
 	  source bootloader. Currently this includes:
 
-	    * Setting TEXT_SECTION_OFFSET to a default value that allows space
+	    * Setting ROM_START_OFFSET to a default value that allows space
 	      for the MCUboot image header
-	    * Activating SW_VECTOR_RELAY on Cortex-M0 (or Armv8-M baseline)
-	      targets with no built-in vector relocation mechanisms
+	    * Activating SW_VECTOR_RELAY_CLIENT on Cortex-M0
+	      (or Armv8-M baseline) targets with no built-in vector relocation
+	      mechanisms
 
 config BOOTLOADER_ESP_IDF
 	bool "ESP-IDF bootloader support"
@@ -397,6 +398,41 @@ config BOOTLOADER_ESP_IDF
 	  This option will trigger the compilation of the ESP-IDF bootloader
 	  inside the build folder.
 	  At flash time, the bootloader will be flashed with the zephyr image
+
+config BOOTLOADER_BOSSA
+	bool "BOSSA bootloader support"
+	select USE_DT_CODE_PARTITION
+	depends on SOC_FAMILY_SAM0
+
+	help
+	  Signifies that the target uses a BOSSA compatible bootloader.  If CDC
+	  ACM USB support is also enabled then the board will reboot into the
+	  bootloader automatically when bossac is run.
+
+config BOOTLOADER_BOSSA_DEVICE_NAME
+	string "BOSSA CDC ACM device name"
+	depends on BOOTLOADER_BOSSA && CDC_ACM_DTE_RATE_CALLBACK_SUPPORT
+	default "CDC_ACM_0"
+	help
+	  Sets the CDC ACM port to watch for reboot commands.
+
+choice
+	prompt "BOSSA bootloader variant"
+	depends on BOOTLOADER_BOSSA
+
+config BOOTLOADER_BOSSA_ARDUINO
+	bool "Arduino"
+	help
+	  Select the Arduino variant of the BOSSA bootloader.  Uses 0x07738135
+	  as the magic value to enter the bootloader.
+
+config BOOTLOADER_BOSSA_ADAFRUIT_UF2
+	bool "Adafruit UF2"
+	help
+	  Select the Adafruit UF2 variant of the BOSSA bootloader.  Uses
+	  0xf01669ef as the magic value to enter the bootloader.
+
+endchoice
 
 config BOOTLOADER_KEXEC
 	bool "Boot using Linux kexec() system call"

@@ -1773,8 +1773,8 @@ struct k_timer {
 	{ \
 	.timeout = { \
 		.node = {},\
+		.fn = z_timer_expiration_handler, \
 		.dticks = 0, \
-		.fn = z_timer_expiration_handler \
 	}, \
 	.wait_q = Z_WAIT_Q_INIT(&obj.wait_q), \
 	.expiry_fn = expiry, \
@@ -2848,7 +2848,7 @@ struct k_lifo {
 /**
  * @brief Get an element from a LIFO queue.
  *
- * This routine removes a data item from @a lifo in a "last in, first out"
+ * This routine removes a data item from @a LIFO in a "last in, first out"
  * manner. The first word of the data item is reserved for the kernel's use.
  *
  * @note Can be called by ISRs, but @a timeout must be set to K_NO_WAIT.
@@ -4299,7 +4299,7 @@ struct k_pipe {
 	struct {
 		_wait_q_t      readers; /**< Reader wait queue */
 		_wait_q_t      writers; /**< Writer wait queue */
-	} wait_q;
+	} wait_q;			/** Wait queue */
 
 	_OBJECT_TRACING_NEXT_PTR(k_pipe)
 	_OBJECT_TRACING_LINKED_FLAG
@@ -4861,7 +4861,7 @@ enum _poll_types_bits {
 	/* semaphore availability */
 	_POLL_TYPE_SEM_AVAILABLE,
 
-	/* queue/fifo/lifo data availability */
+	/* queue/FIFO/LIFO data availability */
 	_POLL_TYPE_DATA_AVAILABLE,
 
 	_POLL_NUM_TYPES
@@ -4880,10 +4880,10 @@ enum _poll_states_bits {
 	/* semaphore is available */
 	_POLL_STATE_SEM_AVAILABLE,
 
-	/* data is available to read on queue/fifo/lifo */
+	/* data is available to read on queue/FIFO/LIFO */
 	_POLL_STATE_DATA_AVAILABLE,
 
-	/* queue/fifo/lifo wait was cancelled */
+	/* queue/FIFO/LIFO wait was cancelled */
 	_POLL_STATE_CANCELLED,
 
 	_POLL_NUM_STATES

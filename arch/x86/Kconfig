@@ -174,6 +174,7 @@ config EXCEPTION_DEBUG
 config X86_VERY_EARLY_CONSOLE
 	bool "Support very early boot printk"
 	depends on PRINTK
+	default y
 	help
 	  Non-emulated X86 devices often require special hardware to attach
 	  a debugger, which may not be easily available. This option adds a
@@ -185,6 +186,7 @@ config X86_VERY_EARLY_CONSOLE
 config X86_MMU
 	bool "Enable Memory Management Unit"
 	select MEMORY_PROTECTION
+	select MMU
 	help
 	  This options enables the memory management unit present in x86
 	  and creates a set of page tables at boot time that is runtime-
