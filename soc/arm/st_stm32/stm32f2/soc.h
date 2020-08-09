@@ -43,6 +43,14 @@
 #include <stm32f2xx_ll_gpio.h>
 #endif
 
+#ifdef CONFIG_I2C_STM32
+#include <stm32f2xx_ll_i2c.h>
+#endif
+
+#if defined(CONFIG_SPI_STM32) || defined(CONFIG_I2S_STM32)
+#include <stm32f2xx_ll_spi.h>
+#endif
+
 #ifdef CONFIG_IWDG_STM32
 #include <stm32f2xx_ll_iwdg.h>
 #endif
