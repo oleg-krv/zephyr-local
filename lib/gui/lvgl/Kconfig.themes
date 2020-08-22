@@ -46,6 +46,9 @@ endif # LVGL_THEME_MATERIAL
 
 if LVGL_THEME_CUSTOM
 
+config LVGL_THEME_DEFAULT_INCLUDE
+	string "Include a header for the init function"
+
 config LVGL_THEME_CUSTOM_INIT_FUNCTION
 	string "Custom theme initialization function"
 

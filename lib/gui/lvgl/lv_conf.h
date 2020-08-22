@@ -302,25 +302,25 @@ typedef void *lv_indev_drv_user_data_t;
 /* THEME USAGE */
 
 /* Empty theme */
-#ifdef CONFIG_LVGL_THEME_EMPTY
+#if defined(CONFIG_LVGL_THEME_EMPTY) && CONFIG_LVGL_THEME_EMPTY == 1
 #define LV_USE_THEME_EMPTY 1
 #else
 #define LV_USE_THEME_EMPTY 0
 #endif
 
-#if LV_USE_THEME_EMPTY
+#if defined(LV_USE_THEME_EMPTY) & LV_USE_THEME_EMPTY == 1
 #define LV_THEME_DEFAULT_FLAG 0
 #define LV_THEME_DEFAULT_INIT lv_theme_empty_init
 #endif
 
 /* Material theme */
-#ifdef CONFIG_LVGL_THEME_MATERIAL
+#if defined(CONFIG_LVGL_THEME_MATERIAL) && CONFIG_LVGL_THEME_MATERIAL == 1
 #define LV_USE_THEME_MATERIAL 1
 #else
 #define LV_USE_THEME_MATERIAL 0
 #endif
 
-#if LV_USE_THEME_MATERIAL
+#if defined(LV_USE_THEME_MATERIAL) && LV_USE_THEME_MATERIAL == 1
 #define LV_THEME_DEFAULT_INIT lv_theme_material_init
 
 #if defined(CONFIG_LVGL_THEME_MATERIAL_LIGHT)
@@ -346,12 +346,13 @@ typedef void *lv_indev_drv_user_data_t;
 /* Custom theme */
 #if CONFIG_LVGL_THEME_CUSTOM
 
-lv_theme_t *LVGL_THEME_CUSTOM_INIT_FUNCTION(
-	lv_color_t color_primary, lv_color_t color_secondary, uint32_t flags,
-	const lv_font_t *font_small, const lv_font_t *font_normal,
-	const lv_font_t *font_subtitle, const lv_font_t *font_title);
+//lv_theme_t *LVGL_THEME_CUSTOM_INIT_FUNCTION(
+//	lv_color_t color_primary, lv_color_t color_secondary, uint32_t flags,
+//	const lv_font_t *font_small, const lv_font_t *font_normal,
+//	const lv_font_t *font_subtitle, const lv_font_t *font_title);
 
-#define LV_THEME_DEFAULT_INIT LVGL_THEME_CUSTOM_INIT_FUNCTION
+//#define LV_THEME_DEFAULT_INCLUDE CONFIG_LVGL_THEME_DEFAULT_INCLUDE
+//#define LV_THEME_DEFAULT_INIT CONFIG_LVGL_THEME_CUSTOM_INIT_FUNCTION
 
 #endif
 
@@ -815,8 +816,7 @@ extern void *lv_theme_default_font_title_custom_ptr;
 #define LV_FONT_SUBPX_BGR 0
 #endif
 
-#define LV_FONT_CUSTOM_DECLARE
-
+//#define 	LV_FONT_CUSTOM_DECLARE
 typedef void *lv_font_user_data_t;
 
 /* Text settings */
@@ -1187,5 +1187,10 @@ typedef void *lv_obj_user_data_t;
 #else
 #define LV_USE_WIN 0
 #endif
+
+#ifdef CONFIG_LVGL_USE_EXT_CONFIG
+#include CONFIG_LVGL_USE_EXT_CONFIG_INCLUDE
+#endif
+#include <lv_extend.h>
 
 #endif /* ZEPHYR_LIB_GUI_LVGL_LV_CONF_H_ */

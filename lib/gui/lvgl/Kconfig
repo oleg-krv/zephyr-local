@@ -18,6 +18,16 @@ config LVGL_DISPLAY_DEV_NAME
 	help
 	  Name of the display device to use for rendering.
 
+config LVGL_USE_EXT_CONFIG
+	bool "Use extended config"
+
+if LVGL_USE_EXT_CONFIG
+
+config LVGL_USE_EXT_CONFIG_INCLUDE
+	string "Include a header for the init function extended config"
+
+endif #LVGL_USE_EXT_CONFIG
+
 config LVGL_POINTER_KSCAN
 	bool "Keyboard scan pointer input"
 	depends on KSCAN
