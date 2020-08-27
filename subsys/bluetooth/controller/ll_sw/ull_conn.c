@@ -265,7 +265,7 @@ uint8_t ll_conn_update(uint16_t handle, uint8_t cmd, uint8_t status, uint16_t in
 
 	conn = ll_connected_get(handle);
 	if (!conn) {
-		return BT_HCI_ERR_CMD_DISALLOWED;
+		return BT_HCI_ERR_UNKNOWN_CONN_ID;
 	}
 
 	if (!cmd) {
@@ -345,7 +345,7 @@ uint8_t ll_chm_get(uint16_t handle, uint8_t *chm)
 
 	conn = ll_connected_get(handle);
 	if (!conn) {
-		return BT_HCI_ERR_CMD_DISALLOWED;
+		return BT_HCI_ERR_UNKNOWN_CONN_ID;
 	}
 
 	/* Iterate until we are sure the ISR did not modify the value while
@@ -366,7 +366,7 @@ uint8_t ll_terminate_ind_send(uint16_t handle, uint8_t reason)
 
 	conn = ll_connected_get(handle);
 	if (!conn) {
-		return BT_HCI_ERR_CMD_DISALLOWED;
+		return BT_HCI_ERR_UNKNOWN_CONN_ID;
 	}
 
 	conn->llcp_terminate.reason_own = reason;
@@ -382,7 +382,7 @@ uint8_t ll_feature_req_send(uint16_t handle)
 
 	conn = ll_connected_get(handle);
 	if (!conn) {
-		return BT_HCI_ERR_CMD_DISALLOWED;
+		return BT_HCI_ERR_UNKNOWN_CONN_ID;
 	}
 
 	if (conn->llcp_feature.req != conn->llcp_feature.ack) {
@@ -400,7 +400,7 @@ uint8_t ll_version_ind_send(uint16_t handle)
 
 	conn = ll_connected_get(handle);
 	if (!conn) {
-		return BT_HCI_ERR_CMD_DISALLOWED;
+		return BT_HCI_ERR_UNKNOWN_CONN_ID;
 	}
 
 	if (conn->llcp_version.req != conn->llcp_version.ack) {
@@ -441,7 +441,7 @@ uint32_t ll_length_req_send(uint16_t handle, uint16_t tx_octets, uint16_t tx_tim
 #endif /* CONFIG_BT_CTLR_PHY */
 				return 0;
 			}
-			/* pass through */
+			__fallthrough;
 		default:
 			return BT_HCI_ERR_CMD_DISALLOWED;
 		}
@@ -560,7 +560,7 @@ uint8_t ll_rssi_get(uint16_t handle, uint8_t *rssi)
 
 	conn = ll_connected_get(handle);
 	if (!conn) {
-		return BT_HCI_ERR_CMD_DISALLOWED;
+		return BT_HCI_ERR_UNKNOWN_CONN_ID;
 	}
 
 	*rssi = conn->lll.rssi_latest;
@@ -4923,7 +4923,7 @@ static inline void ctrl_tx_pre_ack(struct ll_conn *conn,
 		if (!conn->lll.role) {
 			break;
 		}
-		/* fallthrough */
+		__fallthrough;
 
 	case PDU_DATA_LLCTRL_TYPE_ENC_REQ:
 	case PDU_DATA_LLCTRL_TYPE_ENC_RSP:
@@ -5027,7 +5027,7 @@ static inline void ctrl_tx_ack(struct ll_conn *conn, struct node_tx **tx,
 		    PDU_DATA_LLCTRL_TYPE_ENC_REQ) {
 			break;
 		}
-		/* Pass through */
+		__fallthrough;
 
 	case PDU_DATA_LLCTRL_TYPE_REJECT_IND:
 		/* resume data packet rx and tx */
@@ -5100,7 +5100,7 @@ static inline void ctrl_tx_ack(struct ll_conn *conn, struct node_tx **tx,
 #if defined(CONFIG_BT_CTLR_PHY)
 	case PDU_DATA_LLCTRL_TYPE_PHY_REQ:
 		conn->llcp_phy.state = LLCP_PHY_STATE_RSP_WAIT;
-		/* fall through */
+		__fallthrough;
 
 	case PDU_DATA_LLCTRL_TYPE_PHY_RSP:
 		if (conn->lll.role) {

@@ -67,13 +67,13 @@ pairs:
     Length of time to run test in emulator before automatically killing it.
     Default to 60 seconds.
 
-  arch_whitelist: <list of arches, such as x86, arm, arc>
+  arch_allow: <list of arches, such as x86, arm, arc>
     Set of architectures that this test case should only be run for.
 
   arch_exclude: <list of arches, such as x86, arm, arc>
     Set of architectures that this test case should not run on.
 
-  platform_whitelist: <list of platforms>
+  platform_allow: <list of platforms>
     Set of platforms that this test case should only be run for.
 
   platform_exclude: <list of platforms>
@@ -131,7 +131,7 @@ pairs:
         not (right associative)
         all comparison operators (non-associative)
 
-    arch_whitelist, arch_exclude, platform_whitelist, platform_exclude
+    arch_allow, arch_exclude, platform_allow, platform_exclude
     are all syntactic sugar for these expressions. For instance
 
         arch_exclude = x86 arc
@@ -978,6 +978,7 @@ def main():
         suite.selected_platforms = set(p.platform.name for p in suite.instances.values())
     elif options.test_only:
         suite.load_from_file(last_run, filter_status=['skipped'])
+        suite.selected_platforms = set(p.platform.name for p in suite.instances.values())
     else:
         discards = suite.apply_filters(
             build_only=options.build_only,
@@ -1078,7 +1079,7 @@ def main():
         return
 
     logger.info("%d test configurations selected, %d configurations discarded due to filters." %
-                (len(suite.instances), len(discards) - suite.total_skipped))
+                (len(suite.instances), len(discards)))
 
     if options.device_testing:
         print("\nDevice testing on:")
@@ -1093,7 +1094,7 @@ def main():
     retries = options.retry_failed + 1
     completed = 0
 
-    suite.update()
+    suite.update_counting()
     suite.start_time = start_time
 
     while True:
@@ -1116,6 +1117,7 @@ def main():
                        options.all_deltas, options.footprint_threshold, options.last_metrics)
 
     suite.duration = time.time() - start_time
+    suite.update_counting()
     suite.summary(options.disable_unrecognized_section_test)
 
     if options.coverage:

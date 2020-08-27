@@ -232,7 +232,7 @@ static inline struct net_buf *process_node(struct node_rx_pdu *node_rx)
 		case HCI_CLASS_EVT_LLCP:
 			/* for conn-related events, only pend is relevant */
 			hbuf_count = 1;
-			/* fallthrough */
+			__fallthrough;
 		case HCI_CLASS_ACL_DATA:
 			if (pend || !hbuf_count) {
 				sys_slist_append(&hbuf_pend, (void *)node_rx);
@@ -518,6 +518,7 @@ static int hci_driver_open(void)
 static const struct bt_hci_driver drv = {
 	.name	= "Controller",
 	.bus	= BT_HCI_DRIVER_BUS_VIRTUAL,
+	.quirks = BT_QUIRK_NO_AUTO_DLE,
 	.open	= hci_driver_open,
 	.send	= hci_driver_send,
 };

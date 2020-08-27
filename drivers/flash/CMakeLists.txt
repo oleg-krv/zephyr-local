@@ -37,3 +37,4 @@ zephyr_include_directories_ifdef(
 	)
 
 zephyr_library_sources_ifdef(CONFIG_FLASH_SHELL flash_shell.c)
+zephyr_library_sources_ifdef(CONFIG_FLASH_JESD216 jesd216.c)

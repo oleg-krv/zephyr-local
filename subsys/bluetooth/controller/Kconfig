@@ -94,6 +94,17 @@ config BT_CTLR_HCI_VS_BUILD_INFO
 	  character is required at the beginning to separate it from the
 	  already included information.
 
+config BT_CTLR_HCI_ADV_HANDLE_MAPPING
+	bool "Enable advertising set handle mapping between HCI and LL"
+	depends on BT_CTLR_ADV_EXT
+	default y if BT_HCI_RAW
+	help
+	  Enable mapping of advertising set handles between HCI and LL when
+	  using external host since it can use arbitrary numbers as set handles
+	  (as defined by Core specification) as opposed to LL which always uses
+	  zero-based numbering. When using with Zephyr host this option can be
+	  disabled to remove extra mapping logic.
+
 config BT_CTLR_DUP_FILTER_LEN
 	int "Number of addresses in the scan duplicate filter"
 	depends on BT_OBSERVER
@@ -354,7 +365,7 @@ config BT_CTLR_CHAN_SEL_2
 config BT_CTLR_ADV_EXT
 	bool "LE Advertising Extensions" if !BT_LL_SW_SPLIT
 	depends on BT_CTLR_ADV_EXT_SUPPORT
-	select BT_CTLR_SCAN_REQ_NOTIFY if BT_LL_SW_SPLIT
+	select BT_CTLR_SCAN_REQ_NOTIFY if BT_LL_SW_SPLIT && BT_BROADCASTER
 	# Enable by default for BT_LL_SW_SPLIT when "LE Advertising Set Terminated event" is implemented
 	default y if BT_EXT_ADV && !BT_LL_SW_SPLIT
 	help

@@ -41,9 +41,9 @@ struct counter_gecko_data {
 
 #define DEV_NAME(dev) ((dev)->name)
 #define DEV_CFG(dev) \
-	((const struct counter_gecko_config * const)(dev)->config_info)
+	((const struct counter_gecko_config * const)(dev)->config)
 #define DEV_DATA(dev) \
-	((struct counter_gecko_data *const)(dev)->driver_data)
+	((struct counter_gecko_data *const)(dev)->data)
 
 #ifdef CONFIG_SOC_GECKO_HAS_ERRATA_RTCC_E201
 #define ERRATA_RTCC_E201_MESSAGE \

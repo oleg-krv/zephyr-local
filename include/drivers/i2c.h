@@ -30,19 +30,19 @@ extern "C" {
  * The following #defines are used to configure the I2C controller.
  */
 
-/** I2C Standard Speed */
+/** I2C Standard Speed: 100 kHz */
 #define I2C_SPEED_STANDARD		(0x1U)
 
-/** I2C Fast Speed */
+/** I2C Fast Speed: 400 kHz */
 #define I2C_SPEED_FAST			(0x2U)
 
-/** I2C Fast Plus Speed */
+/** I2C Fast Plus Speed: 1 MHz */
 #define I2C_SPEED_FAST_PLUS		(0x3U)
 
-/** I2C High Speed */
+/** I2C High Speed: 3.4 MHz */
 #define I2C_SPEED_HIGH			(0x4U)
 
-/** I2C Ultra Fast Speed */
+/** I2C Ultra Fast Speed: 5 MHz */
 #define I2C_SPEED_ULTRA			(0x5U)
 
 #define I2C_SPEED_SHIFT			(1U)
@@ -210,7 +210,7 @@ __syscall int i2c_configure(struct device *dev, uint32_t dev_config);
 static inline int z_impl_i2c_configure(struct device *dev, uint32_t dev_config)
 {
 	const struct i2c_driver_api *api =
-		(const struct i2c_driver_api *)dev->driver_api;
+		(const struct i2c_driver_api *)dev->api;
 
 	return api->configure(dev, dev_config);
 }
@@ -250,7 +250,7 @@ static inline int z_impl_i2c_transfer(struct device *dev,
 				     uint16_t addr)
 {
 	const struct i2c_driver_api *api =
-		(const struct i2c_driver_api *)dev->driver_api;
+		(const struct i2c_driver_api *)dev->api;
 
 	return api->transfer(dev, msgs, num_msgs, addr);
 }
@@ -271,7 +271,7 @@ __syscall int i2c_recover_bus(struct device *dev);
 static inline int z_impl_i2c_recover_bus(struct device *dev)
 {
 	const struct i2c_driver_api *api =
-		(const struct i2c_driver_api *)dev->driver_api;
+		(const struct i2c_driver_api *)dev->api;
 
 	if (api->recover_bus == NULL) {
 		return -ENOTSUP;
@@ -307,7 +307,7 @@ static inline int i2c_slave_register(struct device *dev,
 				     struct i2c_slave_config *cfg)
 {
 	const struct i2c_driver_api *api =
-		(const struct i2c_driver_api *)dev->driver_api;
+		(const struct i2c_driver_api *)dev->api;
 
 	if (api->slave_register == NULL) {
 		return -ENOTSUP;
@@ -335,7 +335,7 @@ static inline int i2c_slave_unregister(struct device *dev,
 				       struct i2c_slave_config *cfg)
 {
 	const struct i2c_driver_api *api =
-		(const struct i2c_driver_api *)dev->driver_api;
+		(const struct i2c_driver_api *)dev->api;
 
 	if (api->slave_unregister == NULL) {
 		return -ENOTSUP;
@@ -361,7 +361,7 @@ __syscall int i2c_slave_driver_register(struct device *dev);
 static inline int z_impl_i2c_slave_driver_register(struct device *dev)
 {
 	const struct i2c_slave_driver_api *api =
-		(const struct i2c_slave_driver_api *)dev->driver_api;
+		(const struct i2c_slave_driver_api *)dev->api;
 
 	return api->driver_register(dev);
 }
@@ -383,7 +383,7 @@ __syscall int i2c_slave_driver_unregister(struct device *dev);
 static inline int z_impl_i2c_slave_driver_unregister(struct device *dev)
 {
 	const struct i2c_slave_driver_api *api =
-		(const struct i2c_slave_driver_api *)dev->driver_api;
+		(const struct i2c_slave_driver_api *)dev->api;
 
 	return api->driver_unregister(dev);
 }

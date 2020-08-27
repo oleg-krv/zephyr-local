@@ -146,7 +146,7 @@ static void ethernet_update_rx_stats(struct net_if *iface,
 static inline bool eth_is_vlan_tag_stripped(struct net_if *iface)
 {
 	struct device *dev = net_if_get_device(iface);
-	const struct ethernet_api *api = dev->driver_api;
+	const struct ethernet_api *api = dev->api;
 
 	return (api->get_capabilities(dev) & ETHERNET_HW_VLAN_TAG_STRIP);
 }
@@ -557,7 +557,7 @@ static void ethernet_remove_l2_header(struct net_pkt *pkt)
 
 static int ethernet_send(struct net_if *iface, struct net_pkt *pkt)
 {
-	const struct ethernet_api *api = net_if_get_device(iface)->driver_api;
+	const struct ethernet_api *api = net_if_get_device(iface)->api;
 	struct ethernet_context *ctx = net_if_l2_data(iface);
 	uint16_t ptype;
 	int ret;
@@ -594,7 +594,28 @@ static int ethernet_send(struct net_if *iface, struct net_pkt *pkt)
 		ptype = htons(NET_ETH_PTYPE_IPV6);
 	} else if (IS_ENABLED(CONFIG_NET_SOCKETS_PACKET) &&
 		   net_pkt_family(pkt) == AF_PACKET) {
-		goto send;
+		struct net_context *context = net_pkt_context(pkt);
+
+		if (context && net_context_get_type(context) == SOCK_DGRAM) {
+			struct sockaddr_ll *dst_addr;
+			struct sockaddr_ll_ptr *src_addr;
+
+			/* The destination address is set in remote for this
+			 * socket type.
+			 */
+			dst_addr = (struct sockaddr_ll *)&context->remote;
+			src_addr = (struct sockaddr_ll_ptr *)&context->local;
+
+			net_pkt_lladdr_dst(pkt)->addr = dst_addr->sll_addr;
+			net_pkt_lladdr_dst(pkt)->len =
+						sizeof(struct net_eth_addr);
+			net_pkt_lladdr_src(pkt)->addr = src_addr->sll_addr;
+			net_pkt_lladdr_src(pkt)->len =
+						sizeof(struct net_eth_addr);
+			ptype = dst_addr->sll_protocol;
+		} else {
+			goto send;
+		}
 	} else if (IS_ENABLED(CONFIG_NET_GPTP) && net_pkt_is_gptp(pkt)) {
 		ptype = htons(NET_ETH_PTYPE_PTP);
 	} else if (IS_ENABLED(CONFIG_NET_LLDP) && net_pkt_is_lldp(pkt)) {
@@ -658,7 +679,7 @@ error:
 static inline int ethernet_enable(struct net_if *iface, bool state)
 {
 	const struct ethernet_api *eth =
-		net_if_get_device(iface)->driver_api;
+		net_if_get_device(iface)->api;
 
 	if (!eth) {
 		return -ENOENT;
@@ -853,7 +874,7 @@ int net_eth_vlan_enable(struct net_if *iface, uint16_t tag)
 {
 	struct ethernet_context *ctx = net_if_l2_data(iface);
 	const struct ethernet_api *eth =
-		net_if_get_device(iface)->driver_api;
+		net_if_get_device(iface)->api;
 	struct ethernet_vlan *vlan;
 	int i;
 
@@ -926,7 +947,7 @@ int net_eth_vlan_disable(struct net_if *iface, uint16_t tag)
 {
 	struct ethernet_context *ctx = net_if_l2_data(iface);
 	const struct ethernet_api *eth =
-		net_if_get_device(iface)->driver_api;
+		net_if_get_device(iface)->api;
 	struct ethernet_vlan *vlan;
 
 	if (!eth) {
@@ -1025,7 +1046,7 @@ void net_eth_carrier_off(struct net_if *iface)
 struct device *net_eth_get_ptp_clock(struct net_if *iface)
 {
 	struct device *dev = net_if_get_device(iface);
-	const struct ethernet_api *api = dev->driver_api;
+	const struct ethernet_api *api = dev->api;
 
 	if (!api) {
 		return NULL;
