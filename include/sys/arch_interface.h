@@ -520,6 +520,27 @@ static inline bool arch_is_user_context(void);
  */
 int arch_mem_domain_max_partitions_get(void);
 
+#ifdef CONFIG_ARCH_MEM_DOMAIN_DATA
+/**
+ *
+ * @brief Architecture-specific hook for memory domain initialization
+ *
+ * Perform any tasks needed to initialize architecture-specific data within
+ * the memory domain, such as reserving memory for page tables. All members
+ * of the provided memory domain aside from `arch` will be initialized when
+ * this is called, but no threads will be a assigned yet.
+ *
+ * This function may fail if initializing the memory domain requires allocation,
+ * such as for page tables.
+ *
+ * @param domain The memory domain to initialize
+ * @retval 0 Success
+ * @retval -ENOMEM Insufficient memory
+ */
+int arch_mem_domain_init(struct k_mem_domain *domain);
+#endif /* CONFIG_ARCH_MEM_DOMAIN_DATA */
+
+#ifdef CONFIG_ARCH_MEM_DOMAIN_SYNCHRONOUS_API
 /**
  * @brief Add a thread to a memory domain (arch-specific)
  *
@@ -586,6 +607,7 @@ void arch_mem_domain_partition_add(struct k_mem_domain *domain,
  * @param domain The memory domain structure which needs to be deleted.
  */
 void arch_mem_domain_destroy(struct k_mem_domain *domain);
+#endif /* CONFIG_ARCH_MEM_DOMAIN_SYNCHRONOUS_API */
 
 /**
  * @brief Check memory region permissions

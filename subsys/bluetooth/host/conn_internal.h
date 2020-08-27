@@ -37,7 +37,10 @@ enum {
 	BT_CONN_AUTO_PHY_COMPLETE,      /* Auto-initiated PHY procedure done */
 	BT_CONN_AUTO_FEATURE_EXCH,	/* Auto-initiated LE Feat done */
 	BT_CONN_AUTO_VERSION_INFO,      /* Auto-initiated LE version done */
-	BT_CONN_AUTO_DATA_LEN_COMPLETE, /* Auto-initiated Data Length done */
+
+	/* Auto-initiated Data Length done. Auto-initiated Data Length Update
+	 * is only needed for controllers with BT_QUIRK_NO_AUTO_DLE. */
+	BT_CONN_AUTO_DATA_LEN_COMPLETE,
 
 	/* Total number of flags - must be at the end of the enum */
 	BT_CONN_NUM_FLAGS,
@@ -201,12 +204,6 @@ struct bt_conn *bt_conn_lookup_addr_sco(const bt_addr_t *peer);
 
 /* Look up an existing connection by BT address */
 struct bt_conn *bt_conn_lookup_addr_br(const bt_addr_t *peer);
-
-void bt_conn_pin_code_req(struct bt_conn *conn);
-uint8_t bt_conn_get_io_capa(void);
-uint8_t bt_conn_ssp_get_auth(const struct bt_conn *conn);
-void bt_conn_ssp_auth(struct bt_conn *conn, uint32_t passkey);
-void bt_conn_ssp_auth_complete(struct bt_conn *conn, uint8_t status);
 
 void bt_conn_disconnect_all(uint8_t id);
 

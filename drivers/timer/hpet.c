@@ -12,7 +12,7 @@
 
 #include <dt-bindings/interrupt-controller/intel-ioapic.h>
 
-DEVICE_MMIO_TOPLEVEL_STATIC(hpet_regs, 0);
+DEVICE_MMIO_TOPLEVEL_STATIC(hpet_regs, DT_DRV_INST(0));
 
 #define HPET_REG32(off) (*(volatile uint32_t *)(long)			\
 			 (DEVICE_MMIO_TOPLEVEL_GET(hpet_regs) + (off)))
@@ -120,6 +120,8 @@ int z_clock_driver_init(struct device *device)
 {
 	extern int z_clock_hw_cycles_per_sec;
 	uint32_t hz;
+
+	ARG_UNUSED(device);
 
 	DEVICE_MMIO_TOPLEVEL_MAP(hpet_regs, K_MEM_CACHE_NONE);
 

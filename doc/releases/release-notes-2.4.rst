@@ -72,6 +72,11 @@ API Changes
   To maintain original behaviour within user code, two argument invocations
   should be converted to pass a third argument ``FS_O_CREATE | FS_O_RDWR``.
 
+* The struct device got 3 attributes renamed: ``config_info`` to ``config``,
+  ``driver_api`` to ``api`` and finally ``driver_data`` to ``data``.
+  This renaming was done to get rid of legacy names, for which the reasons
+  do no longer apply.
+
 Deprecated in this release
 ==========================
 
@@ -262,6 +267,18 @@ Drivers and Sensors
 
 * USB
 
+  * The usb_enable() function, which, for some samples, was invoked
+    automatically on system boot up, now needs to be explicitly called
+    by the application in order to enable the USB subsystem. If your
+    application relies on any of the following Kconfig options, then
+    it shall also enable the USB subsystem:
+
+    * :option:`CONFIG_OPENTHREAD_NCP_SPINEL_ON_UART_ACM`
+    * :option:`CONFIG_USB_DEVICE_NETWORK_ECM`
+    * :option:`CONFIG_USB_DEVICE_NETWORK_EEM`
+    * :option:`CONFIG_USB_DEVICE_NETWORK_RNDIS`
+    * :option:`CONFIG_TRACING_BACKEND_USB`
+    * :option:`CONFIG_USB_UART_CONSOLE`
 
 * Video
 
@@ -296,6 +313,18 @@ Build and Infrastructure
 
 * Devicetree
 
+* Support for multiple SOC and ARCH roots.
+  The :ref:`SOC_ROOT <application>` and ``ARCH_ROOT`` variables used to specify
+  support files for out of tree SoCs and architectures now accept multiple
+  paths, separated by semicolons. As a result, the ``SOC_DIR`` Kconfig variable
+  is no longer supported.
+
+  Uses like ``source $(SOC_DIR)/<path>`` must be changed to
+  ``rsource <relative>/<path>`` or similar.
+
+* BOARD, SOC, DTS, and ARCH roots can now be specified in each module's
+  :file:`zephyr/module.yml` file; see :ref:`modules_build_settings`.
+
 Libraries / Subsystems
 **********************
 
@@ -320,24 +349,31 @@ Libraries / Subsystems
     will likely require some porting work. Refer to `LVGL 7 Release notes
     <https://github.com/lvgl/lvgl/releases/tag/v7.0.0>`_ for more information.
 
+  * LVGL Kconfig option names have been aligned with LVGL. All LVGL
+    configuration options ``LV_[A-Z0-9_]`` have a matching Zephyr Kconfig
+    option named as ``CONFIG_LVGL_[A-Z0-9_]``.
+
   * LVGL Kconfig constants have been aligned with upstream suggested defaults.
     If your application relies on any of the following Kconfig defaults consider
     checking if the new values are good or they need to be adjusted:
 
-    * :option:`CONFIG_LVGL_HOR_RES`
-    * :option:`CONFIG_LVGL_VER_RES`
+    * :option:`CONFIG_LVGL_HOR_RES_MAX`
+    * :option:`CONFIG_LVGL_VER_RES_MAX`
     * :option:`CONFIG_LVGL_DPI`
-    * :option:`CONFIG_LVGL_SCREEN_REFRESH_PERIOD`
-    * :option:`CONFIG_LVGL_INPUT_REFRESH_PERIOD`
-    * :option:`CONFIG_LVGL_INPUT_DRAG_THROW_SLOW_DOWN`
-    * :option:`CONFIG_LVGL_TEXT_LINE_BREAK_LONG_LEN`
-    * :option:`CONFIG_LVGL_OBJ_CHART_AXIS_TICK_LABEL_MAX_LEN`
+    * :option:`CONFIG_LVGL_DISP_DEF_REFR_PERIOD`
+    * :option:`CONFIG_LVGL_INDEV_DEF_READ_PERIOD`
+    * :option:`CONFIG_LVGL_INDEV_DEF_DRAG_THROW`
+    * :option:`CONFIG_LVGL_TXT_LINE_BREAK_LONG_LEN`
+    * :option:`CONFIG_LVGL_CHART_AXIS_TICK_LABEL_MAX_LEN`
 
   * Note that ROM usage is significantly higher on v7 for minimal
     configurations. This is in part due to new features such as the new drawing
     system. LVGL maintainers are currently investigating ways for reducing the
     library footprint when some options are not enabled, so you should wait for
     future releases if higher ROM usage is a concern for your application.
+
+* Tracing:
+  * Tracing backed API now checks if init function exists prio to calling it.
 
 HALs
 ****

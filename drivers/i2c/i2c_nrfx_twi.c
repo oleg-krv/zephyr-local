@@ -12,7 +12,7 @@
 #include <logging/log.h>
 LOG_MODULE_REGISTER(i2c_nrfx_twi, CONFIG_I2C_LOG_LEVEL);
 
-#define I2C_TRANSFER_TIMEOUT_MSEC		K_MSEC(100)
+#define I2C_TRANSFER_TIMEOUT_MSEC		K_MSEC(500)
 
 struct i2c_nrfx_twi_data {
 	struct k_sem transfer_sync;
@@ -31,13 +31,13 @@ struct i2c_nrfx_twi_config {
 
 static inline struct i2c_nrfx_twi_data *get_dev_data(struct device *dev)
 {
-	return dev->driver_data;
+	return dev->data;
 }
 
 static inline
 const struct i2c_nrfx_twi_config *get_dev_config(struct device *dev)
 {
-	return dev->config_info;
+	return dev->config;
 }
 
 static int i2c_nrfx_twi_transfer(struct device *dev, struct i2c_msg *msgs,

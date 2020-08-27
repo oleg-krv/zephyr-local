@@ -1205,8 +1205,9 @@ static int offload_socket(int family, int type, int proto)
 	return ret;
 }
 
-static int offload_close(struct modem_socket *sock)
+static int offload_close(void *obj)
 {
+	struct modem_socket *sock = (struct modem_socket *)obj;
 	char buf[sizeof("AT+USOCL=#\r")];
 	int ret;
 
@@ -1456,10 +1457,6 @@ static ssize_t offload_sendto(void *obj, const void *buf, size_t len,
 static int offload_ioctl(void *obj, unsigned int request, va_list args)
 {
 	switch (request) {
-	/* Handle close specifically. */
-	case ZFD_IOCTL_CLOSE:
-		return offload_close((struct modem_socket *)obj);
-
 	case ZFD_IOCTL_POLL_PREPARE:
 		return -EXDEV;
 
@@ -1532,6 +1529,7 @@ static const struct socket_op_vtable offload_socket_fd_op_vtable = {
 	.fd_vtable = {
 		.read = offload_read,
 		.write = offload_write,
+		.close = offload_close,
 		.ioctl = offload_ioctl,
 	},
 	.bind = offload_bind,
@@ -1667,7 +1665,7 @@ static uint32_t hash32(char *str, int len)
 
 static inline uint8_t *modem_get_mac(struct device *dev)
 {
-	struct modem_data *data = dev->driver_data;
+	struct modem_data *data = dev->data;
 	uint32_t hash_value;
 
 	data->mac_addr[0] = 0x00;
@@ -1684,7 +1682,7 @@ static inline uint8_t *modem_get_mac(struct device *dev)
 static void modem_net_iface_init(struct net_if *iface)
 {
 	struct device *dev = net_if_get_device(iface);
-	struct modem_data *data = dev->driver_data;
+	struct modem_data *data = dev->data;
 
 	/* Direct socket offload used instead of net offload: */
 	iface->if_dev->offload = &modem_net_offload;
