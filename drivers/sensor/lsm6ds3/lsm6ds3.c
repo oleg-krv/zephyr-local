@@ -90,7 +90,7 @@ static int lsm6ds3_gyro_range_to_fs_val(int32_t range)
 
 static inline int lsm6ds3_reboot(struct device *dev)
 {
-	struct lsm6ds3_data *data = dev->driver_data;
+	struct lsm6ds3_data *data = dev->data;
 
 	if (lsm6ds3_boot_set(data->ctx, 1) < 0) {
 		return -EIO;
@@ -104,7 +104,7 @@ static inline int lsm6ds3_reboot(struct device *dev)
 
 static int lsm6ds3_accel_set_fs_raw(struct device *dev, uint8_t fs)
 {
-	struct lsm6ds3_data *data = dev->driver_data;
+	struct lsm6ds3_data *data = dev->data;
 
 	if (lsm6ds3_xl_full_scale_set(data->ctx, fs) < 0) {
 		return -EIO;
@@ -117,7 +117,7 @@ static int lsm6ds3_accel_set_fs_raw(struct device *dev, uint8_t fs)
 
 static int lsm6ds3_accel_set_odr_raw(struct device *dev, uint8_t odr)
 {
-	struct lsm6ds3_data *data = dev->driver_data;
+	struct lsm6ds3_data *data = dev->data;
 
 	if (lsm6ds3_xl_data_rate_set(data->ctx, odr) < 0) {
 		return -EIO;
@@ -130,7 +130,7 @@ static int lsm6ds3_accel_set_odr_raw(struct device *dev, uint8_t odr)
 
 static int lsm6ds3_gyro_set_fs_raw(struct device *dev, uint8_t fs)
 {
-	struct lsm6ds3_data *data = dev->driver_data;
+	struct lsm6ds3_data *data = dev->data;
 
 	if (lsm6ds3_gy_full_scale_set(data->ctx, fs) < 0) {
 		return -EIO;
@@ -141,7 +141,7 @@ static int lsm6ds3_gyro_set_fs_raw(struct device *dev, uint8_t fs)
 
 static int lsm6ds3_gyro_set_odr_raw(struct device *dev, uint8_t odr)
 {
-	struct lsm6ds3_data *data = dev->driver_data;
+	struct lsm6ds3_data *data = dev->data;
 
 	if (lsm6ds3_gy_data_rate_set(data->ctx, odr) < 0) {
 		return -EIO;
@@ -173,7 +173,7 @@ static int lsm6ds3_accel_odr_set(struct device *dev, uint16_t freq)
 static int lsm6ds3_accel_range_set(struct device *dev, int32_t range)
 {
 	int fs;
-	struct lsm6ds3_data *data = dev->driver_data;
+	struct lsm6ds3_data *data = dev->data;
 
 	fs = lsm6ds3_accel_range_to_fs_val(range);
 	if (fs < 0) {
@@ -234,7 +234,7 @@ static int lsm6ds3_gyro_odr_set(struct device *dev, uint16_t freq)
 static int lsm6ds3_gyro_range_set(struct device *dev, int32_t range)
 {
 	int fs;
-	struct lsm6ds3_data *data = dev->driver_data;
+	struct lsm6ds3_data *data = dev->data;
 
 	fs = lsm6ds3_gyro_range_to_fs_val(range);
 	if (fs < 0) {
@@ -297,7 +297,7 @@ static int lsm6ds3_attr_set(struct device *dev, enum sensor_channel chan,
 
 static int lsm6ds3_sample_fetch_accel(struct device *dev)
 {
-	struct lsm6ds3_data *data = dev->driver_data;
+	struct lsm6ds3_data *data = dev->data;
 	union axis3bit16_t buf;
 
 	if (lsm6ds3_acceleration_raw_get(data->ctx, buf.u8bit) < 0) {
@@ -314,7 +314,7 @@ static int lsm6ds3_sample_fetch_accel(struct device *dev)
 
 static int lsm6ds3_sample_fetch_gyro(struct device *dev)
 {
-	struct lsm6ds3_data *data = dev->driver_data;
+	struct lsm6ds3_data *data = dev->data;
 	union axis3bit16_t buf;
 
 	if (lsm6ds3_angular_rate_raw_get(data->ctx, buf.u8bit) < 0) {
@@ -332,7 +332,7 @@ static int lsm6ds3_sample_fetch_gyro(struct device *dev)
 #if defined(CONFIG_LSM6DS3_ENABLE_TEMP)
 static int lsm6ds3_sample_fetch_temp(struct device *dev)
 {
-	struct lsm6ds3_data *data = dev->driver_data;
+	struct lsm6ds3_data *data = dev->data;
 	union axis1bit16_t buf;
 
 	if (lsm6ds3_temperature_raw_get(data->ctx, buf.u8bit) < 0) {
@@ -629,7 +629,7 @@ static int lsm6ds3_channel_get(struct device *dev,
 			       enum sensor_channel chan,
 			       struct sensor_value *val)
 {
-	struct lsm6ds3_data *data = dev->driver_data;
+	struct lsm6ds3_data *data = dev->data;
 
 	switch (chan) {
 	case SENSOR_CHAN_ACCEL_X:
@@ -687,7 +687,7 @@ static const struct sensor_driver_api lsm6ds3_api_funcs = {
 
 static int lsm6ds3_init_chip(struct device *dev)
 {
-	struct lsm6ds3_data *lsm6ds3 = dev->driver_data;
+	struct lsm6ds3_data *lsm6ds3 = dev->data;
 	uint8_t chip_id;
 
 	if (lsm6ds3_device_id_get(lsm6ds3->ctx, &chip_id) < 0) {
@@ -789,8 +789,8 @@ static const struct lsm6ds3_config lsm6ds3_config = {
 
 static int lsm6ds3_init(struct device *dev)
 {
-	const struct lsm6ds3_config * const config = dev->config_info;
-	struct lsm6ds3_data *data = dev->driver_data;
+	const struct lsm6ds3_config * const config = dev->config;
+	struct lsm6ds3_data *data = dev->data;
 
 	data->bus = device_get_binding(config->bus_name);
 	if (!data->bus) {
