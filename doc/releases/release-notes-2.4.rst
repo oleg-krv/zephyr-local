@@ -77,6 +77,14 @@ API Changes
   This renaming was done to get rid of legacy names, for which the reasons
   do no longer apply.
 
+* All device instances got a const qualifier. So this applies to all APIs
+  manipulating ``struct device *`` (ADC, GPIO, I2C, ...). In order to avoid
+  const qualifier loss on ISRs, all ISRs now take a ``const *void`` as a
+  paremeter as well.
+
+* The ``_gatt_`` and ``_GATT_`` infixes have been removed for the HRS, DIS
+  and BAS APIs and the Kconfig options.
+
 Deprecated in this release
 ==========================
 
@@ -98,6 +106,10 @@ Removed APIs in this release
 Stable API changes in this release
 ==================================
 
+* USB
+
+  * HID class callbacks now takes a parameter ``const struct device*`` which
+    is the HID device for which callback was called.
 
 Kernel
 ******
@@ -196,6 +208,11 @@ Drivers and Sensors
 
 
 * Flash
+
+  * The driver selected by ``CONFIG_SPI_FLASH_W25QXXDV`` has been
+    removed as it is unmaintained and all its functionality is available
+    through ``CONFIG_SPI_NOR``.  Out of tree uses should convert to the
+    supported driver using the ``jedec,spi-nor`` compatible.
 
 
 * GPIO

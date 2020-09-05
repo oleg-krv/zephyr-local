@@ -36,7 +36,7 @@ static struct eth_fake_context eth_fake_data2 = {
 	.mac_address = lladdr2
 };
 
-static int eth_fake_send(struct device *dev, struct net_pkt *pkt)
+static int eth_fake_send(const struct device *dev, struct net_pkt *pkt)
 {
 	struct net_pkt *recv_pkt;
 	int ret;
@@ -59,7 +59,7 @@ static int eth_fake_send(struct device *dev, struct net_pkt *pkt)
 
 static void eth_fake_iface_init(struct net_if *iface)
 {
-	struct device *dev = net_if_get_device(iface);
+	const struct device *dev = net_if_get_device(iface);
 	struct eth_fake_context *ctx = dev->data;
 
 	ctx->iface = iface;
@@ -74,7 +74,7 @@ static struct ethernet_api eth_fake_api_funcs = {
 	.send = eth_fake_send,
 };
 
-static int eth_fake_init(struct device *dev)
+static int eth_fake_init(const struct device *dev)
 {
 	ARG_UNUSED(dev);
 
@@ -220,8 +220,14 @@ static void test_packet_sockets_dgram(void)
 	setblocking(sock2, false);
 	memset(&src, 0, sizeof(src));
 
-	ret = recvfrom(sock2, data_to_receive, sizeof(data_to_receive), 0,
-		       (struct sockaddr *)&src, &addrlen);
+	errno = 0;
+
+	do {
+		ret = recvfrom(sock2, data_to_receive, sizeof(data_to_receive),
+			       0, (struct sockaddr *)&src, &addrlen);
+		k_msleep(10);
+	} while (ret < 0 && errno == EAGAIN);
+
 	zassert_equal(ret, sizeof(data_to_send),
 		      "Cannot receive all data (%d vs %zd) (%d)",
 		      ret, sizeof(data_to_send), -errno);
@@ -244,8 +250,15 @@ static void test_packet_sockets_dgram(void)
 	zassert_equal(errno, EAGAIN, "Wrong errno (%d)", errno);
 
 	memset(&src, 0, sizeof(src));
-	ret = recvfrom(sock2, data_to_receive, sizeof(data_to_receive), 0,
-		       (struct sockaddr *)&src, &addrlen);
+
+	errno = 0;
+
+	do {
+		ret = recvfrom(sock2, data_to_receive, sizeof(data_to_receive),
+			       0, (struct sockaddr *)&src, &addrlen);
+		k_msleep(10);
+	} while (ret < 0 && errno == EAGAIN);
+
 	zassert_equal(ret, sizeof(data_to_send), "Cannot receive all data (%d)",
 		      -errno);
 }

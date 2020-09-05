@@ -6,8 +6,10 @@
  */
 
 #include <zephyr.h>
+#include <soc.h>
 #include <bluetooth/hci.h>
 
+#include "hal/cpu.h"
 #include "hal/ccm.h"
 #include "hal/radio.h"
 #include "hal/ticker.h"
@@ -41,7 +43,6 @@
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
 #define LOG_MODULE_NAME bt_ctlr_ull_scan
 #include "common/log.h"
-#include <soc.h>
 #include "hal/debug.h"
 
 static int init_reset(void);
@@ -274,10 +275,6 @@ uint8_t ull_scan_enable(struct ll_scan_set *scan)
 	lll->init_addr_type = scan->own_addr_type;
 	ll_addr_get(lll->init_addr_type, lll->init_addr);
 
-#if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL)
-	lll->tx_pwr_lvl = RADIO_TXP_DEFAULT;
-#endif /* CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL */
-
 	ull_hdr_init(&scan->ull);
 	lll_hdr_init(lll, scan);
 
@@ -470,6 +467,11 @@ uint32_t ull_scan_filter_pol_get(uint8_t handle)
 
 static int init_reset(void)
 {
+#if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL) && \
+	!defined(CONFIG_BT_CTLR_ADV_EXT)
+	ll_scan[0].lll.tx_pwr_lvl = RADIO_TXP_DEFAULT;
+#endif /* CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL && !CONFIG_BT_CTLR_ADV_EXT */
+
 	return 0;
 }
 

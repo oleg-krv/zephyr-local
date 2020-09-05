@@ -2489,48 +2489,68 @@ static void gatt_sub_remove(struct bt_conn *conn, struct gatt_sub *sub,
 }
 
 #if defined(CONFIG_BT_GATT_CLIENT)
-static struct gatt_sub *gatt_sub_find_free(struct bt_conn *conn,
-					   struct gatt_sub **free_sub)
+static struct gatt_sub *gatt_sub_find(struct bt_conn *conn)
 {
-	int i;
-
-	if (free_sub) {
-		*free_sub = NULL;
-	}
-
-	for (i = 0; i < ARRAY_SIZE(subscriptions); i++) {
+	for (int i = 0; i < ARRAY_SIZE(subscriptions); i++) {
 		struct gatt_sub *sub = &subscriptions[i];
 
-		if (bt_conn_is_peer_addr_le(conn, sub->id, &sub->peer)) {
+		if (!conn) {
+			if (!bt_addr_le_cmp(&sub->peer, BT_ADDR_LE_ANY)) {
+				return sub;
+			}
+		} else if (bt_conn_is_peer_addr_le(conn, sub->id, &sub->peer)) {
 			return sub;
-		} else if (free_sub &&
-			   !bt_addr_le_cmp(BT_ADDR_LE_ANY, &sub->peer)) {
-			*free_sub = sub;
 		}
 	}
 
 	return NULL;
 }
 
-#define gatt_sub_find(_conn) \
-	gatt_sub_find_free(_conn, NULL)
-
 static struct gatt_sub *gatt_sub_add(struct bt_conn *conn)
 {
-	struct gatt_sub *sub, *free_sub;
+	struct gatt_sub *sub;
 
-	sub = gatt_sub_find_free(conn, &free_sub);
-	if (sub) {
-		return sub;
+	sub = gatt_sub_find(conn);
+	if (!sub) {
+		sub = gatt_sub_find(NULL);
+		if (sub) {
+			bt_addr_le_copy(&sub->peer, &conn->le.dst);
+			sub->id = conn->id;
+		}
 	}
 
-	if (free_sub) {
-		bt_addr_le_copy(&free_sub->peer, &conn->le.dst);
-		free_sub->id = conn->id;
-		return free_sub;
+	return sub;
+}
+
+static struct gatt_sub *gatt_sub_find_by_addr(uint8_t id,
+					      const bt_addr_le_t *addr)
+{
+	for (int i = 0; i < ARRAY_SIZE(subscriptions); i++) {
+		struct gatt_sub *sub = &subscriptions[i];
+
+		if (id == sub->id && !bt_addr_le_cmp(&sub->peer, addr)) {
+			return sub;
+		}
 	}
 
 	return NULL;
+}
+
+static struct gatt_sub *gatt_sub_add_by_addr(uint8_t id,
+					     const bt_addr_le_t *addr)
+{
+	struct gatt_sub *sub;
+
+	sub = gatt_sub_find_by_addr(id, addr);
+	if (!sub) {
+		sub = gatt_sub_find(NULL);
+		if (sub) {
+			bt_addr_le_copy(&sub->peer, addr);
+			sub->id = id;
+		}
+	}
+
+	return sub;
 }
 
 void bt_gatt_notification(struct bt_conn *conn, uint16_t handle,
@@ -3929,6 +3949,10 @@ static void gatt_write_ccc_rsp(struct bt_conn *conn, uint8_t err,
 		/* Notify with NULL data to complete unsubscribe */
 		params->notify(conn, params, NULL, 0);
 	}
+
+	if (params->write) {
+		params->write(conn, err, NULL);
+	}
 }
 
 static int gatt_write_ccc(struct bt_conn *conn, uint16_t handle, uint16_t value,
@@ -4079,6 +4103,34 @@ int bt_gatt_subscribe(struct bt_conn *conn,
 	 */
 	sys_slist_prepend(&sub->list, &params->node);
 
+	return 0;
+}
+
+int bt_gatt_resubscribe(uint8_t id, const bt_addr_le_t *peer,
+			     struct bt_gatt_subscribe_params *params)
+{
+	struct gatt_sub *sub;
+	struct bt_gatt_subscribe_params *tmp;
+
+	__ASSERT(params && params->notify,  "invalid parameters\n");
+	__ASSERT(params->value, "invalid parameters\n");
+	__ASSERT(params->ccc_handle, "invalid parameters\n");
+
+	sub = gatt_sub_add_by_addr(id, peer);
+	if (!sub) {
+		return -ENOMEM;
+	}
+
+	/* Lookup existing subscriptions */
+	SYS_SLIST_FOR_EACH_CONTAINER(&sub->list, tmp, node) {
+		/* Fail if entry already exists */
+		if (tmp == params) {
+			gatt_sub_remove(NULL, sub, NULL, NULL);
+			return -EALREADY;
+		}
+	}
+
+	sys_slist_prepend(&sub->list, &params->node);
 	return 0;
 }
 
@@ -4273,6 +4325,11 @@ next:
 static int ccc_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 		   void *cb_arg)
 {
+	if (IS_ENABLED(CONFIG_BT_SETTINGS_CCC_LAZY_LOADING)) {
+		/* Only load CCCs on demand */
+		return 0;
+	}
+
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
 		struct ccc_store ccc_store[CCC_STORE_MAX];
 		struct ccc_load load;
@@ -4330,10 +4387,7 @@ static int ccc_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 	return 0;
 }
 
-#if !IS_ENABLED(CONFIG_BT_SETTINGS_CCC_LAZY_LOADING)
-/* Only register the ccc_set settings handler when not loading on-demand */
 SETTINGS_STATIC_HANDLER_DEFINE(bt_ccc, "bt/ccc", NULL, ccc_set, NULL, NULL);
-#endif /* CONFIG_BT_SETTINGS_CCC_LAZY_LOADING */
 
 static int ccc_set_direct(const char *key, size_t len, settings_read_cb read_cb,
 			  void *cb_arg, void *param)

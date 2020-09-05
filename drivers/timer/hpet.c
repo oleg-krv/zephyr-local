@@ -46,7 +46,7 @@ static unsigned int max_ticks;
 static unsigned int cyc_per_tick;
 static unsigned int last_count;
 
-static void hpet_isr(void *arg)
+static void hpet_isr(const void *arg)
 {
 	ARG_UNUSED(arg);
 
@@ -116,7 +116,7 @@ static void set_timer0_irq(unsigned int irq)
 	TIMER0_CONF_REG = val;
 }
 
-int z_clock_driver_init(struct device *device)
+int z_clock_driver_init(const struct device *device)
 {
 	extern int z_clock_hw_cycles_per_sec;
 	uint32_t hz;

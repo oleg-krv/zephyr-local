@@ -320,7 +320,7 @@ static int queue_put(struct ring_buf *rb, void *mem_block, size_t size)
 	return 0;
 }
 
-static int i2s_litex_initialize(struct device *dev)
+static int i2s_litex_initialize(const struct device *dev)
 {
 	struct i2s_litex_cfg *cfg = DEV_CFG(dev);
 	struct i2s_litex_data *const dev_data = DEV_DATA(dev);
@@ -333,7 +333,7 @@ static int i2s_litex_initialize(struct device *dev)
 	return 0;
 }
 
-static int i2s_litex_configure(struct device *dev, enum i2s_dir dir,
+static int i2s_litex_configure(const struct device *dev, enum i2s_dir dir,
 			       struct i2s_config *i2s_cfg)
 {
 	struct i2s_litex_data *const dev_data = DEV_DATA(dev);
@@ -436,7 +436,8 @@ static int i2s_litex_configure(struct device *dev, enum i2s_dir dir,
 	return 0;
 }
 
-static int i2s_litex_read(struct device *dev, void **mem_block, size_t *size)
+static int i2s_litex_read(const struct device *dev, void **mem_block,
+			  size_t *size)
 {
 	struct i2s_litex_data *const dev_data = DEV_DATA(dev);
 	int ret;
@@ -455,7 +456,8 @@ static int i2s_litex_read(struct device *dev, void **mem_block, size_t *size)
 	return queue_get(&dev_data->rx.mem_block_queue, mem_block, size);
 }
 
-static int i2s_litex_write(struct device *dev, void *mem_block, size_t size)
+static int i2s_litex_write(const struct device *dev, void *mem_block,
+			   size_t size)
 {
 	struct i2s_litex_data *const dev_data = DEV_DATA(dev);
 	const struct i2s_litex_cfg *cfg = DEV_CFG(dev);
@@ -485,7 +487,7 @@ static int i2s_litex_write(struct device *dev, void *mem_block, size_t size)
 	return ret;
 }
 
-static int i2s_litex_trigger(struct device *dev, enum i2s_dir dir,
+static int i2s_litex_trigger(const struct device *dev, enum i2s_dir dir,
 			     enum i2s_trigger_cmd cmd)
 {
 	struct i2s_litex_data *const dev_data = DEV_DATA(dev);
@@ -543,7 +545,7 @@ static inline void clear_rx_fifo(const struct i2s_litex_cfg *cfg)
 
 static void i2s_litex_isr_rx(void *arg)
 {
-	struct device *const dev = (struct device *)arg;
+	const struct device *dev = (const struct device *)arg;
 	const struct i2s_litex_cfg *cfg = DEV_CFG(dev);
 	struct stream *stream = &DEV_DATA(dev)->rx;
 	int ret;
@@ -574,7 +576,7 @@ static void i2s_litex_isr_rx(void *arg)
 
 static void i2s_litex_isr_tx(void *arg)
 {
-	struct device *const dev = (struct device *)arg;
+	const struct device *dev = (const struct device *)arg;
 	const struct i2s_litex_cfg *cfg = DEV_CFG(dev);
 	size_t mem_block_size;
 	struct stream *stream = &DEV_DATA(dev)->tx;
@@ -613,7 +615,7 @@ static const struct i2s_driver_api i2s_litex_driver_api = {
 			sizeof(dir##_ring_buf) / sizeof(struct queue_item),    \
 	};                                                                     \
 									       \
-	static void i2s_litex_irq_config_func_##dir(struct device *dev);       \
+	static void i2s_litex_irq_config_func_##dir(const struct device *dev); \
 									       \
 	static struct i2s_litex_cfg i2s_litex_cfg_##dir = {                    \
 		.base = DT_REG_ADDR_BY_NAME(DT_NODELABEL(i2s_##dir), control), \
@@ -628,7 +630,7 @@ static const struct i2s_driver_api i2s_litex_driver_api = {
 				CONFIG_I2S_INIT_PRIORITY,		       \
 				&i2s_litex_driver_api);			       \
 									       \
-	static void i2s_litex_irq_config_func_##dir(struct device *dev)        \
+	static void i2s_litex_irq_config_func_##dir(const struct device *dev)  \
 	{                                                                      \
 		IRQ_CONNECT(DT_IRQN(DT_NODELABEL(i2s_##dir)),                  \
 					DT_IRQ(DT_NODELABEL(i2s_##dir),	       \

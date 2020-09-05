@@ -19,7 +19,7 @@ static uint32_t accumulated_cycle_count;
 
 static int32_t _sys_idle_elapsed_ticks = 1;
 
-static void timer_irq_handler(void *unused)
+static void timer_irq_handler(const void *unused)
 {
 	ARG_UNUSED(unused);
 
@@ -41,7 +41,7 @@ static void timer_irq_handler(void *unused)
 #endif
 }
 
-int z_clock_driver_init(struct device *device)
+int z_clock_driver_init(const struct device *device)
 {
 	ARG_UNUSED(device);
 
