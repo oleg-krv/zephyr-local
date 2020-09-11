@@ -93,7 +93,7 @@ union axis1bit16_t {
 
 struct lsm6ds3_config {
 	char *bus_name;
-	int (*bus_init)(struct device *dev);
+	int (*bus_init)(const struct device *dev);
 #ifdef CONFIG_LSM6DS3_TRIGGER
 	const char *int_gpio_port;
 	uint8_t int_gpio_pin;
@@ -138,7 +138,7 @@ struct lsm6ds3_tf {
 #define LSM6DS3_SHUB_MAX_NUM_SLVS			2
 
 struct lsm6ds3_data {
-	struct device *bus;
+	const struct device *bus;
 	int16_t acc[3];
 	uint32_t acc_gain;
 	int16_t gyro[3];
@@ -193,8 +193,8 @@ struct lsm6ds3_data {
 #endif
 };
 
-int lsm6ds3_spi_init(struct device *dev);
-int lsm6ds3_i2c_init(struct device *dev);
+int lsm6ds3_spi_init(const struct device *dev);
+int lsm6ds3_i2c_init(const struct device *dev);
 #if defined(CONFIG_LSM6DS3_SENSORHUB)
 int lsm6ds3_shub_init(struct device *dev);
 int lsm6ds3_shub_fetch_external_devs(struct device *dev);

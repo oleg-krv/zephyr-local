@@ -120,9 +120,7 @@ void ppp_link_terminated(struct ppp_context *ctx)
 
 	/* TODO: cleanup things etc here if needed */
 
-//	ppp_change_phase(ctx, PPP_DEAD);
-
-    ppp_mgmt_raise_link_dead_event(ctx->iface);
+	ppp_change_phase(ctx, PPP_DEAD);
 
 	NET_DBG("[%p] Link terminated", ctx);
 }
@@ -136,8 +134,6 @@ void ppp_link_down(struct ppp_context *ctx)
 	ppp_network_all_down(ctx);
 
 	ppp_change_phase(ctx, PPP_DEAD);
-
-    ppp_mgmt_raise_link_down_event(ctx->iface);
 }
 
 void ppp_link_needed(struct ppp_context *ctx)

@@ -88,7 +88,7 @@ static int lsm6ds3_gyro_range_to_fs_val(int32_t range)
 }
 #endif
 
-static inline int lsm6ds3_reboot(struct device *dev)
+static inline int lsm6ds3_reboot(const struct device *dev)
 {
 	struct lsm6ds3_data *data = dev->data;
 
@@ -102,7 +102,7 @@ static inline int lsm6ds3_reboot(struct device *dev)
 	return 0;
 }
 
-static int lsm6ds3_accel_set_fs_raw(struct device *dev, uint8_t fs)
+static int lsm6ds3_accel_set_fs_raw(const struct device *dev, uint8_t fs)
 {
 	struct lsm6ds3_data *data = dev->data;
 
@@ -115,7 +115,7 @@ static int lsm6ds3_accel_set_fs_raw(struct device *dev, uint8_t fs)
 	return 0;
 }
 
-static int lsm6ds3_accel_set_odr_raw(struct device *dev, uint8_t odr)
+static int lsm6ds3_accel_set_odr_raw(const struct device *dev, uint8_t odr)
 {
 	struct lsm6ds3_data *data = dev->data;
 
@@ -128,7 +128,7 @@ static int lsm6ds3_accel_set_odr_raw(struct device *dev, uint8_t odr)
 	return 0;
 }
 
-static int lsm6ds3_gyro_set_fs_raw(struct device *dev, uint8_t fs)
+static int lsm6ds3_gyro_set_fs_raw(const struct device *dev, uint8_t fs)
 {
 	struct lsm6ds3_data *data = dev->data;
 
@@ -139,7 +139,7 @@ static int lsm6ds3_gyro_set_fs_raw(struct device *dev, uint8_t fs)
 	return 0;
 }
 
-static int lsm6ds3_gyro_set_odr_raw(struct device *dev, uint8_t odr)
+static int lsm6ds3_gyro_set_odr_raw(const struct device *dev, uint8_t odr)
 {
 	struct lsm6ds3_data *data = dev->data;
 
@@ -151,7 +151,7 @@ static int lsm6ds3_gyro_set_odr_raw(struct device *dev, uint8_t odr)
 }
 
 #ifdef LSM6DS3_ACCEL_ODR_RUNTIME
-static int lsm6ds3_accel_odr_set(struct device *dev, uint16_t freq)
+static int lsm6ds3_accel_odr_set(const struct device *dev, uint16_t freq)
 {
 	int odr;
 
@@ -170,7 +170,7 @@ static int lsm6ds3_accel_odr_set(struct device *dev, uint16_t freq)
 #endif
 
 #ifdef LSM6DS3_ACCEL_FS_RUNTIME
-static int lsm6ds3_accel_range_set(struct device *dev, int32_t range)
+static int lsm6ds3_accel_range_set(const struct device *dev, int32_t range)
 {
 	int fs;
 	struct lsm6ds3_data *data = dev->data;
@@ -190,7 +190,7 @@ static int lsm6ds3_accel_range_set(struct device *dev, int32_t range)
 }
 #endif
 
-static int lsm6ds3_accel_config(struct device *dev, enum sensor_channel chan,
+static int lsm6ds3_accel_config(const struct device *dev, enum sensor_channel chan,
 			    enum sensor_attribute attr,
 			    const struct sensor_value *val)
 {
@@ -212,7 +212,7 @@ static int lsm6ds3_accel_config(struct device *dev, enum sensor_channel chan,
 }
 
 #ifdef LSM6DS3_GYRO_ODR_RUNTIME
-static int lsm6ds3_gyro_odr_set(struct device *dev, uint16_t freq)
+static int lsm6ds3_gyro_odr_set(const struct device *dev, uint16_t freq)
 {
 	int odr;
 
@@ -231,7 +231,7 @@ static int lsm6ds3_gyro_odr_set(struct device *dev, uint16_t freq)
 #endif
 
 #ifdef LSM6DS3_GYRO_FS_RUNTIME
-static int lsm6ds3_gyro_range_set(struct device *dev, int32_t range)
+static int lsm6ds3_gyro_range_set(const struct device *dev, int32_t range)
 {
 	int fs;
 	struct lsm6ds3_data *data = dev->data;
@@ -251,7 +251,7 @@ static int lsm6ds3_gyro_range_set(struct device *dev, int32_t range)
 }
 #endif
 
-static int lsm6ds3_gyro_config(struct device *dev, enum sensor_channel chan,
+static int lsm6ds3_gyro_config(const struct device *dev, enum sensor_channel chan,
 			    enum sensor_attribute attr,
 			    const struct sensor_value *val)
 {
@@ -272,7 +272,7 @@ static int lsm6ds3_gyro_config(struct device *dev, enum sensor_channel chan,
 	return 0;
 }
 
-static int lsm6ds3_attr_set(struct device *dev, enum sensor_channel chan,
+static int lsm6ds3_attr_set(const struct device *dev, enum sensor_channel chan,
 			   enum sensor_attribute attr,
 			   const struct sensor_value *val)
 {
@@ -295,7 +295,7 @@ static int lsm6ds3_attr_set(struct device *dev, enum sensor_channel chan,
 	return 0;
 }
 
-static int lsm6ds3_sample_fetch_accel(struct device *dev)
+static int lsm6ds3_sample_fetch_accel(const struct device *dev)
 {
 	struct lsm6ds3_data *data = dev->data;
 	union axis3bit16_t buf;
@@ -312,7 +312,7 @@ static int lsm6ds3_sample_fetch_accel(struct device *dev)
 	return 0;
 }
 
-static int lsm6ds3_sample_fetch_gyro(struct device *dev)
+static int lsm6ds3_sample_fetch_gyro(const struct device *dev)
 {
 	struct lsm6ds3_data *data = dev->data;
 	union axis3bit16_t buf;
@@ -330,7 +330,7 @@ static int lsm6ds3_sample_fetch_gyro(struct device *dev)
 }
 
 #if defined(CONFIG_LSM6DS3_ENABLE_TEMP)
-static int lsm6ds3_sample_fetch_temp(struct device *dev)
+static int lsm6ds3_sample_fetch_temp(const struct device *dev)
 {
 	struct lsm6ds3_data *data = dev->data;
 	union axis1bit16_t buf;
@@ -358,7 +358,7 @@ static int lsm6ds3_sample_fetch_shub(struct device *dev)
 }
 #endif /* CONFIG_LSM6DS3_SENSORHUB */
 
-static int lsm6ds3_sample_fetch(struct device *dev, enum sensor_channel chan)
+static int lsm6ds3_sample_fetch(const struct device *dev, enum sensor_channel chan)
 {
 	switch (chan) {
 	case SENSOR_CHAN_ACCEL_XYZ:
@@ -625,7 +625,7 @@ static inline void lsm6ds3_temp_convert(struct sensor_value *val,
 }
 #endif
 
-static int lsm6ds3_channel_get(struct device *dev,
+static int lsm6ds3_channel_get(const struct device *dev,
 			       enum sensor_channel chan,
 			       struct sensor_value *val)
 {
@@ -685,7 +685,7 @@ static const struct sensor_driver_api lsm6ds3_api_funcs = {
 	.channel_get = lsm6ds3_channel_get,
 };
 
-static int lsm6ds3_init_chip(struct device *dev)
+static int lsm6ds3_init_chip(const struct device *dev)
 {
 	struct lsm6ds3_data *lsm6ds3 = dev->data;
 	uint8_t chip_id;
@@ -787,7 +787,7 @@ static const struct lsm6ds3_config lsm6ds3_config = {
 #endif /* CONFIG_LSM6DS3_TRIGGER */
 };
 
-static int lsm6ds3_init(struct device *dev)
+static int lsm6ds3_init(const struct device *dev)
 {
 	const struct lsm6ds3_config * const config = dev->config;
 	struct lsm6ds3_data *data = dev->data;

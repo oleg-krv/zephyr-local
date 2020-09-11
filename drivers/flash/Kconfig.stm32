@@ -31,3 +31,10 @@ config SOC_FLASH_STM32
 	help
 	  Enable STM32F0x, STM32F2x, STM32F3x, STM32F4x, STM32F7x, STM32L4x,
 	  STM32WBx, STM32G0x or STM32G4x series flash driver.
+
+config SOC_FLASH_STM32_V1
+	bool
+	select FLASH_PAGE_LAYOUT
+	select FLASH_HAS_PAGE_LAYOUT
+	help
+	  Enable the generic backend for the STM32 flash driver.

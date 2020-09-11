@@ -11,11 +11,6 @@ config MODEM_GSM_PPP
 
 if MODEM_GSM_PPP
 
-config MODEM_GSM_SIMCOM_EXT
-	bool "SIMCOM modem width pins"
-	help
-	  Use this if you have SIMCOM based modem like SIM800 etc.
-
 choice
 	prompt "Modem type"
 	default MODEM_GSM_GENERIC

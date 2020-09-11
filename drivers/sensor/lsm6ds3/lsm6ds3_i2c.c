@@ -40,7 +40,7 @@ static int lsm6ds3_i2c_write(struct device *dev, uint8_t reg_addr,
 			       reg_addr, value, len);
 }
 
-int lsm6ds3_i2c_init(struct device *dev)
+int lsm6ds3_i2c_init(const struct device *dev)
 {
 	struct lsm6ds3_data *data = dev->data;
 
@@ -48,7 +48,7 @@ int lsm6ds3_i2c_init(struct device *dev)
 	data->ctx_i2c.write_reg = (stmdev_write_ptr) lsm6ds3_i2c_write,
 
 	data->ctx = &data->ctx_i2c;
-	data->ctx->handle = dev;
+	data->ctx->handle = (void *)dev;
 
 	return 0;
 }
