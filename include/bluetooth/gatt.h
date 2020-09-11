@@ -339,12 +339,14 @@ enum {
  *  @brief Attribute iterator callback.
  *
  *  @param attr Attribute found.
+ *  @param handle Attribute handle found.
  *  @param user_data Data given.
  *
  *  @return BT_GATT_ITER_CONTINUE if should continue to the next attribute.
  *  @return BT_GATT_ITER_STOP to stop.
  */
 typedef uint8_t (*bt_gatt_attr_func_t)(const struct bt_gatt_attr *attr,
+				       uint16_t handle,
 				       void *user_data);
 
 /** @brief Attribute iterator by type.
@@ -391,6 +393,15 @@ static inline void bt_gatt_foreach_attr(uint16_t start_handle, uint16_t end_hand
  *  @return The next attribute or NULL if it cannot be found.
  */
 struct bt_gatt_attr *bt_gatt_attr_next(const struct bt_gatt_attr *attr);
+
+/** @brief Get Attribute handle.
+ *
+ *  @param attr Attribute object.
+ *
+ *  @return Handle of the corresponding attribute or zero if the attribute
+ *          could not be found.
+ */
+uint16_t bt_gatt_attr_get_handle(const struct bt_gatt_attr *attr);
 
 /** @brief Get the handle of the characteristic value descriptor.
  *

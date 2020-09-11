@@ -35,6 +35,8 @@ if(DEFINED DTS_COMMON_OVERLAYS)
   message(FATAL_ERROR "DTS_COMMON_OVERLAYS is no longer supported. Use DTC_OVERLAY_FILE instead.")
 endif()
 
+zephyr_file(APPLICATION_ROOT DTS_ROOT)
+
 # 'DTS_ROOT' is a list of directories where a directory tree with DT
 # files may be found. It always includes the application directory,
 # the board directory, and ${ZEPHYR_BASE}.
@@ -126,6 +128,10 @@ if(SUPPORTS_DTS)
   set(CACHED_DTS_ROOT_BINDINGS ${DTS_ROOT_BINDINGS} CACHE INTERNAL
     "DT bindings root directories")
 
+  if(NOT DEFINED CMAKE_DTS_PREPROCESSOR)
+    set(CMAKE_DTS_PREPROCESSOR ${CMAKE_C_COMPILER})
+  endif()
+
   # TODO: Cut down on CMake configuration time by avoiding
   # regeneration of devicetree_unfixed.h on every configure. How
   # challenging is this? What are the dts dependencies? We run the
@@ -137,7 +143,7 @@ if(SUPPORTS_DTS)
   # intermediary file *.dts.pre.tmp. Also, generate a dependency file
   # so that changes to DT sources are detected.
   execute_process(
-    COMMAND ${CMAKE_C_COMPILER}
+    COMMAND ${CMAKE_DTS_PREPROCESSOR}
     -x assembler-with-cpp
     -nostdinc
     ${DTS_ROOT_SYSTEM_INCLUDE_DIRS}
