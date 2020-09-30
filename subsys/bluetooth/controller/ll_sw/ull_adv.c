@@ -896,6 +896,7 @@ uint8_t ll_adv_enable(uint8_t enable)
 			return BT_HCI_ERR_HW_FAILURE;
 		}
 	}
+#endif /* CONFIG_BT_PERIPHERAL */
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 	if (ll_adv_cmds_is_ext()) {
@@ -932,10 +933,7 @@ uint8_t ll_adv_enable(uint8_t enable)
 		node_rx_adv_term->hdr.link = (void *)link_adv_term;
 		adv->lll.node_rx_adv_term = (void *)node_rx_adv_term;
 	}
-#endif  /* CONFIG_BT_CTLR_ADV_EXT */
-#endif /* CONFIG_BT_PERIPHERAL */
 
-#if defined(CONFIG_BT_CTLR_ADV_EXT)
 	const uint8_t phy = lll->phy_p;
 
 	adv->event_counter = 0;
@@ -1642,21 +1640,6 @@ static void ticker_stop_cb(uint32_t ticks_at_expire, uint32_t remainder,
 	uint8_t handle;
 	uint32_t ret;
 
-#if 0
-	/* NOTE: abort the event, so as to permit ticker_job execution, if
-	 *       disabled inside events.
-	 */
-	if (adv->ull.ref) {
-		static memq_link_t _link;
-		static struct mayfly _mfy = {0, 0, &_link, NULL, lll_disable};
-
-		_mfy.param = &adv->lll;
-		ret = mayfly_enqueue(TICKER_USER_ID_ULL_HIGH,
-				     TICKER_USER_ID_LLL, 0, &_mfy);
-		LL_ASSERT(!ret);
-	}
-#endif
-
 	handle = ull_adv_handle_get(adv);
 	LL_ASSERT(handle < BT_CTLR_ADV_SET);
 
@@ -1692,7 +1675,7 @@ static void ticker_op_stop_cb(uint32_t status, void *param)
 	adv = param;
 	hdr = &adv->ull;
 	mfy.param = &adv->lll;
-	if (hdr->ref) {
+	if (ull_ref_get(hdr)) {
 		LL_ASSERT(!hdr->disabled_cb);
 		hdr->disabled_param = mfy.param;
 		hdr->disabled_cb = disabled_cb;
@@ -1841,7 +1824,7 @@ static inline uint8_t disable(uint8_t handle)
 				  ull_ticker_status_give, (void *)&ret_cb);
 		ret = ull_ticker_status_take(ret, &ret_cb);
 		if (ret) {
-			mark = ull_disable_mark(adv);
+			mark = ull_disable_unmark(adv);
 			LL_ASSERT(mark == adv);
 
 			return BT_HCI_ERR_CMD_DISALLOWED;
@@ -1855,7 +1838,7 @@ static inline uint8_t disable(uint8_t handle)
 			  ull_ticker_status_give, (void *)&ret_cb);
 	ret = ull_ticker_status_take(ret, &ret_cb);
 	if (ret) {
-		mark = ull_disable_mark(adv);
+		mark = ull_disable_unmark(adv);
 		LL_ASSERT(mark == adv);
 
 		return BT_HCI_ERR_CMD_DISALLOWED;

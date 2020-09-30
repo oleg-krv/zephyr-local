@@ -64,8 +64,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define SECONDS_TO_UPDATE_EARLY	CONFIG_LWM2M_SECONDS_TO_UPDATE_EARLY
 #define STATE_MACHINE_UPDATE_INTERVAL_MS 500
 
-/* Leave room for 32 hexadeciaml digits (UUID) + NULL */
-#define CLIENT_EP_LEN		33
+#define CLIENT_EP_LEN		CONFIG_LWM2M_RD_CLIENT_ENDPOINT_NAME_MAX_LENGTH
 
 /* Up to 3 characters + NULL */
 #define CLIENT_BINDING_LEN sizeof("UQS")
@@ -549,7 +548,7 @@ static int sm_do_bootstrap_reg(void)
 
 	msg->type = COAP_TYPE_CON;
 	msg->code = COAP_METHOD_POST;
-	msg->mid = 0U;
+	msg->mid = coap_next_id();
 	msg->reply_cb = do_bootstrap_reply_cb;
 	msg->message_timeout_cb = do_bootstrap_reg_timeout_cb;
 
@@ -629,7 +628,7 @@ static int sm_send_registration(bool send_obj_support_data,
 
 	msg->type = COAP_TYPE_CON;
 	msg->code = COAP_METHOD_POST;
-	msg->mid = 0U;
+	msg->mid = coap_next_id();
 	msg->reply_cb = reply_cb;
 	msg->message_timeout_cb = timeout_cb;
 
@@ -821,7 +820,7 @@ static int sm_do_deregister(void)
 
 	msg->type = COAP_TYPE_CON;
 	msg->code = COAP_METHOD_DELETE;
-	msg->mid = 0U;
+	msg->mid = coap_next_id();
 	msg->reply_cb = do_deregister_reply_cb;
 	msg->message_timeout_cb = do_deregister_timeout_cb;
 

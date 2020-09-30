@@ -130,18 +130,12 @@ config OPENTHREAD_THREAD_PRIORITY
 
 config OPENTHREAD_THREAD_STACK_SIZE
 	int "OpenThread thread stack size"
-	default 6144 if OPENTHREAD_COMMISSIONER
+	default 6144 if OPENTHREAD_COMMISSIONER || OPENTHREAD_JOINER
 	default 3072
 
 config OPENTHREAD_PKT_LIST_SIZE
 	int "List size for IPv6 packet buffering"
 	default 10
-
-config OT_PLAT_FLASH_PAGES_COUNT
-	int "Flash pages count used by OpenThread platform"
-	default 4
-	help
-	  This option sets flash pages count used by OpenThread to store its settings. They are located at the end of flash.
 
 endmenu # "Zephyr optimizations"
 
