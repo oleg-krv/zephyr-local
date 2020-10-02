@@ -1377,6 +1377,8 @@ static int cmd_per_adv_data(const struct shell *shell, size_t argc,
 	return 0;
 }
 #endif /* CONFIG_BT_PER_ADV */
+#endif /* CONFIG_BT_EXT_ADV */
+#endif /* CONFIG_BT_BROADCASTER */
 
 #if defined(CONFIG_BT_PER_ADV_SYNC)
 static struct bt_le_per_adv_sync *per_adv_syncs[CONFIG_BT_PER_ADV_SYNC_MAX];
@@ -1498,8 +1500,9 @@ static int cmd_per_adv_sync_create(const struct shell *shell, size_t argc,
 
 	create_params.options = options;
 
-	err = bt_le_per_adv_sync_create(&create_params, &per_adv_sync_cb,
-					free_per_adv_sync);
+	bt_le_per_adv_sync_cb_register(&per_adv_sync_cb);
+
+	err = bt_le_per_adv_sync_create(&create_params, free_per_adv_sync);
 	if (err) {
 		shell_error(shell, "Per adv sync failed (%d)", err);
 	} else {
@@ -1538,8 +1541,6 @@ static int cmd_per_adv_sync_delete(const struct shell *shell, size_t argc,
 	return 0;
 }
 #endif /* CONFIG_BT_PER_ADV_SYNC */
-#endif /* CONFIG_BT_EXT_ADV */
-#endif /* CONFIG_BT_BROADCASTER */
 
 #if defined(CONFIG_BT_CONN)
 #if defined(CONFIG_BT_CENTRAL)
@@ -2781,7 +2782,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(bt_cmds,
 		      "[<interval-min> [<interval-max> [tx_power]]]",
 		      cmd_per_adv_param, 1, 3),
 	SHELL_CMD_ARG(per-adv-data, NULL, "<data>", cmd_per_adv_data, 2, 0),
-#endif
+#endif /* CONFIG_BT_PER_ADV */
+#endif /* CONFIG_BT_EXT_ADV */
+#endif /* CONFIG_BT_BROADCASTER */
 #if defined(CONFIG_BT_PER_ADV_SYNC)
 	SHELL_CMD_ARG(per-adv-sync-create, NULL,
 		      HELP_ADDR_LE " <sid> [skip <count>] [timeout <ms>] [aoa] "
@@ -2790,8 +2793,6 @@ SHELL_STATIC_SUBCMD_SET_CREATE(bt_cmds,
 	SHELL_CMD_ARG(per-adv-sync-delete, NULL, "[<index>]",
 		      cmd_per_adv_sync_delete, 1, 1),
 #endif /* defined(CONFIG_BT_PER_ADV_SYNC) */
-#endif
-#endif /* CONFIG_BT_BROADCASTER */
 #if defined(CONFIG_BT_CONN)
 #if defined(CONFIG_BT_CENTRAL)
 	SHELL_CMD_ARG(connect, NULL, HELP_ADDR_LE EXT_ADV_SCAN_OPT,

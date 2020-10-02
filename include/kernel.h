@@ -516,6 +516,12 @@ struct _thread_base {
 #endif
 
 	_wait_q_t join_waiters;
+#if __ASSERT_ON
+	/* For detecting calls to k_thread_create() on threads that are
+	 * already active
+	 */
+	atomic_t cookie;
+#endif
 };
 
 typedef struct _thread_base _thread_base_t;
@@ -1052,8 +1058,8 @@ __syscall void k_thread_abort(k_tid_t thread);
  */
 __syscall void k_thread_start(k_tid_t thread);
 
-extern k_ticks_t z_timeout_expires(struct _timeout *timeout);
-extern k_ticks_t z_timeout_remaining(struct _timeout *timeout);
+extern k_ticks_t z_timeout_expires(const struct _timeout *timeout);
+extern k_ticks_t z_timeout_remaining(const struct _timeout *timeout);
 
 #ifdef CONFIG_SYS_CLOCK_EXISTS
 
@@ -1826,7 +1832,10 @@ typedef void (*k_timer_expiry_t)(struct k_timer *timer);
  * @brief Timer stop function type.
  *
  * A timer's stop function is executed if the timer is stopped prematurely.
- * The function runs in the context of the thread that stops the timer.
+ * The function runs in the context of call that stops the timer.  As
+ * k_timer_stop() can be invoked from an ISR, the stop function must be
+ * callable from interrupt context (isr-ok).
+ *
  * The stop function is optional, and is only invoked if the timer has been
  * initialized with one.
  *
@@ -2018,9 +2027,9 @@ static inline void z_impl_k_timer_user_data_set(struct k_timer *timer,
  *
  * @return The user data.
  */
-__syscall void *k_timer_user_data_get(struct k_timer *timer);
+__syscall void *k_timer_user_data_get(const struct k_timer *timer);
 
-static inline void *z_impl_k_timer_user_data_get(struct k_timer *timer)
+static inline void *z_impl_k_timer_user_data_get(const struct k_timer *timer)
 {
 	return timer->user_data;
 }
@@ -4906,7 +4915,7 @@ enum _poll_types_bits {
 	_POLL_NUM_TYPES
 };
 
-#define Z_POLL_TYPE_BIT(type) (1 << ((type) - 1))
+#define Z_POLL_TYPE_BIT(type) (1U << ((type) - 1U))
 
 /* private - states bit positions */
 enum _poll_states_bits {
@@ -4928,7 +4937,7 @@ enum _poll_states_bits {
 	_POLL_NUM_STATES
 };
 
-#define Z_POLL_STATE_BIT(state) (1 << ((state) - 1))
+#define Z_POLL_STATE_BIT(state) (1U << ((state) - 1U))
 
 #define _POLL_EVENT_NUM_UNUSED_BITS \
 	(32 - (0 \
@@ -5214,8 +5223,14 @@ static inline void k_cpu_idle(void)
 /**
  * @brief Make the CPU idle in an atomic fashion.
  *
- * Similar to k_cpu_idle(), but called with interrupts locked if operations
- * must be done atomically before making the CPU idle.
+ * Similar to k_cpu_idle(), but must be called with interrupts locked.
+ *
+ * Enabling interrupts and entering a low-power mode will be atomic,
+ * i.e. there will be no period of time where interrupts are enabled before
+ * the processor enters a low-power mode.
+ *
+ * After waking up from the low-power mode, the interrupt lockout state will
+ * be restored as if by irq_unlock(key).
  *
  * @param key Interrupt locking key obtained from irq_lock().
  *
