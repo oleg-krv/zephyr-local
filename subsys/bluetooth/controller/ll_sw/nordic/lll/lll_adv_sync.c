@@ -37,7 +37,6 @@
 
 static int init_reset(void);
 static int prepare_cb(struct lll_prepare_param *prepare_param);
-static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
 
 int lll_adv_sync_init(void)
 {
@@ -80,7 +79,7 @@ void lll_adv_sync_prepare(void *param)
 	lll->latency_prepare += elapsed;
 
 	/* Invoke common pipeline handling of prepare */
-	err = lll_prepare(lll_is_abort_cb, abort_cb, prepare_cb, 0, p);
+	err = lll_prepare(lll_is_abort_cb, lll_abort_cb, prepare_cb, 0, p);
 	LL_ASSERT(!err || err == -EINPROGRESS);
 }
 
@@ -116,6 +115,7 @@ static int prepare_cb(struct lll_prepare_param *prepare_param)
 	/* Reset accumulated latencies */
 	lll->latency_prepare = 0;
 
+	/* Calculate the radio channel to use */
 	data_chan_use = lll_chan_sel_2(event_counter, lll->data_chan_id,
 				       &lll->data_chan_map[0],
 				       lll->data_chan_count);
@@ -186,28 +186,4 @@ static int prepare_cb(struct lll_prepare_param *prepare_param)
 	DEBUG_RADIO_START_A(1);
 
 	return 0;
-}
-
-static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
-{
-	int err;
-
-	/* NOTE: This is not a prepare being cancelled */
-	if (!prepare_param) {
-		/* Perform event abort here.
-		 * After event has been cleanly aborted, clean up resources
-		 * and dispatch event done.
-		 */
-		radio_isr_set(lll_isr_done, param);
-		radio_disable();
-		return;
-	}
-
-	/* NOTE: Else clean the top half preparations of the aborted event
-	 * currently in preparation pipeline.
-	 */
-	err = lll_hfclock_off();
-	LL_ASSERT(err >= 0);
-
-	lll_done(param);
 }

@@ -5,6 +5,7 @@
  */
 
 #include <zephyr/types.h>
+#include <bluetooth/hci.h>
 #include <sys/byteorder.h>
 #include <sys/util.h>
 
@@ -19,6 +20,7 @@
 #include "lll.h"
 #include "lll_vendor.h"
 #include "lll_clock.h"
+#include "lll_filter.h"
 #include "lll_scan.h"
 #include "lll_scan_aux.h"
 
@@ -99,6 +101,7 @@ static int prepare_cb(struct lll_prepare_param *p)
 
 	trx_cnt = 0U;
 
+	/* Start setting up Radio h/w */
 	radio_reset();
 
 #if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL)
@@ -107,7 +110,6 @@ static int prepare_cb(struct lll_prepare_param *p)
 	radio_tx_power_set(RADIO_TXP_DEFAULT);
 #endif
 
-	/* TODO: if coded we use S8? */
 	radio_phy_set(lll->phy, 1);
 	radio_pkt_configure(8, PDU_AC_PAYLOAD_SIZE_MAX, (lll->phy << 1));
 
@@ -160,6 +162,14 @@ static int prepare_cb(struct lll_prepare_param *p)
 
 	radio_tmr_hcto_configure(hcto);
 
+	/* capture end of Rx-ed PDU, extended scan to schedule auxiliary
+	 * channel chaining or to create periodic sync.
+	 */
+	radio_tmr_end_capture();
+
+	/* scanner always measures RSSI */
+	radio_rssi_measure();
+
 #if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
 	radio_gpio_lna_setup();
 
@@ -173,14 +183,6 @@ static int prepare_cb(struct lll_prepare_param *p)
 				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
 #endif /* !CONFIG_BT_CTLR_PHY */
 #endif /* CONFIG_BT_CTLR_GPIO_LNA_PIN */
-
-#if defined(CONFIG_BT_CTLR_PROFILE_ISR) || \
-	defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
-	radio_tmr_end_capture();
-#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
-
-	/* scanner always measures RSSI */
-	radio_rssi_measure();
 
 #if defined(CONFIG_BT_CTLR_XTAL_ADVANCED) && \
 	(EVENT_OVERHEAD_PREEMPT_US <= EVENT_OVERHEAD_PREEMPT_MIN_US)
@@ -321,6 +323,11 @@ static int isr_rx_pdu(struct lll_scan_aux *lll, uint8_t rssi_ready)
 			    radio_rx_chain_delay_get(lll->phy, 1);
 
 	ftr->rssi = (rssi_ready) ? (radio_rssi_get() & 0x7f) : 0x7f;
+
+#if defined(CONFIG_BT_CTLR_PRIVACY)
+	/* TODO: Use correct rl_idx value when privacy support is added */
+	ftr->rl_idx = FILTER_IDX_NONE;
+#endif /* CONFIG_BT_CTLR_PRIVACY */
 
 	ull_rx_put(node_rx->hdr.link, node_rx);
 	ull_rx_sched();

@@ -217,7 +217,8 @@ static int prepare_cb(struct lll_prepare_param *p)
 	remainder_us = radio_tmr_start(0, ticks_at_start, remainder);
 
 	/* capture end of Rx-ed PDU, for initiator to calculate first
-	 * master event.
+	 * master event or extended scan to schedule auxiliary channel
+	 * reception.
 	 */
 	radio_tmr_end_capture();
 
@@ -776,7 +777,7 @@ static inline int isr_rx_pdu(struct lll_scan *lll, uint8_t devmatch_ok,
 		       &lll_conn->data_chan_map[0],
 		       sizeof(pdu_tx->connect_ind.chan_map));
 		pdu_tx->connect_ind.hop = lll_conn->data_chan_hop;
-		pdu_tx->connect_ind.sca = lll_conn_sca_local_get();
+		pdu_tx->connect_ind.sca = lll_clock_sca_local_get();
 
 		radio_pkt_tx_set(pdu_tx);
 

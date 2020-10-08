@@ -183,7 +183,7 @@
 /drivers/espi/                            @albertofloyd @franciscomunoz @scottwcpg
 /drivers/espi/*npcx*                      @MulinChao
 /drivers/ethernet/                        @jukkar @tbursztyka @pfalcon
-/drivers/ethernet/*stm32*                 @Nukersson, @lochej
+/drivers/ethernet/*stm32*                 @Nukersson @lochej
 /drivers/ethernet/*w5500*                 @parthitce
 /drivers/flash/                           @nashif @nvlsianpu
 /drivers/flash/*nrf*                      @nvlsianpu
@@ -226,6 +226,7 @@
 /drivers/pinmux/*npcx*                    @MulinChao
 /drivers/ps2/                             @albertofloyd @franciscomunoz @scottwcpg
 /drivers/pwm/*litex*                      @mateusz-holenko @kgugala @pgielda
+/drivers/pwm/*npcx*                       @MulinChao
 /drivers/pwm/*sam0*                       @nzmichaelh
 /drivers/pwm/*stm32*                      @gmarull
 /drivers/sensor/                          @MaureenHelm
@@ -393,6 +394,7 @@
 /include/linker/app_smem*.ld              @andrewboie
 /include/linker/                          @andrewboie @andyross
 /include/logging/                         @nordic-krch
+/include/lorawan/lorawan.h                @Mani-Sadhasivam
 /include/mgmt/osdp.h                      @cbsiddharth
 /include/net/                             @jukkar @tbursztyka @pfalcon
 /include/net/buf.h                        @jukkar @jhedberg @tbursztyka @pfalcon
@@ -430,11 +432,12 @@
 /samples/drivers/ht16k33/                 @henrikbrixandersen
 /samples/drivers/lora/                    @Mani-Sadhasivam
 /samples/drivers/counter/maxim_ds3231/    @pabigot
+/samples/lorawan/                         @Mani-Sadhasivam
 /samples/net/                             @jukkar @tbursztyka @pfalcon
 /samples/net/dns_resolve/                 @jukkar @tbursztyka @pfalcon
 /samples/net/lwm2m_client/                @rlubos
 /samples/net/mqtt_publisher/              @jukkar @tbursztyka
-/samples/net/sockets/coap_*/              @rveerama1
+/samples/net/sockets/coap_*/              @rlubos
 /samples/net/sockets/                     @jukkar @tbursztyka @pfalcon
 /samples/sensor/                          @MaureenHelm
 /samples/shields/                         @avisconti
@@ -478,7 +481,7 @@
 /share/zephyr-package/                    @tejlmand
 /share/zephyrunittest-package/            @tejlmand
 /subsys/bluetooth/                        @joerchan @jhedberg @Vudentz
-/subsys/bluetooth/controller/             @carlescufi @cvinayak @thoh-ot
+/subsys/bluetooth/controller/             @carlescufi @cvinayak @thoh-ot @kruithofa
 /subsys/bluetooth/mesh/                   @jhedberg @trond-snekvik @joerchan @Vudentz
 /subsys/canbus/                           @alexanderwachter
 /subsys/cpp/                              @pabigot @vanwinkeljan
@@ -502,6 +505,7 @@
 /subsys/fs/nvs/                           @Laczen
 /subsys/logging/                          @nordic-krch
 /subsys/logging/log_backend_net.c         @nordic-krch @jukkar
+/subsys/lorawan/                          @Mani-Sadhasivam
 /subsys/mgmt/ec_host_cmd/                 @jettr
 /subsys/mgmt/mcumgr/                      @carlescufi @nvlsianpu
 /subsys/mgmt/hawkbit/                     @Navin-Sankar
@@ -515,7 +519,7 @@
 /subsys/net/lib/lwm2m/                    @rlubos
 /subsys/net/lib/config/                   @jukkar @tbursztyka @pfalcon
 /subsys/net/lib/mqtt/                     @jukkar @tbursztyka @rlubos
-/subsys/net/lib/coap/                     @rveerama1
+/subsys/net/lib/coap/                     @rlubos
 /subsys/net/lib/sockets/socketpair.c      @cfriedt
 /subsys/net/lib/sockets/                  @jukkar @tbursztyka @pfalcon
 /subsys/net/lib/tls_credentials/          @rlubos
@@ -559,7 +563,7 @@
 /tests/net/lib/                           @jukkar @tbursztyka @pfalcon
 /tests/net/lib/http_header_fields/        @jukkar @tbursztyka
 /tests/net/lib/mqtt_packet/               @jukkar @tbursztyka
-/tests/net/lib/coap/                      @rveerama1
+/tests/net/lib/coap/                      @rlubos
 /tests/net/socket/socketpair/             @cfriedt
 /tests/net/socket/                        @jukkar @tbursztyka @pfalcon
 /tests/subsys/debug/coredump/             @dcpleung

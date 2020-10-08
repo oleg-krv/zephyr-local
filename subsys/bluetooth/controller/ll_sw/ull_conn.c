@@ -23,9 +23,12 @@
 #include "ticker/ticker.h"
 
 #include "pdu.h"
+
 #include "lll.h"
-#include "lll_tim_internal.h"
+#include "lll_clock.h"
 #include "lll_conn.h"
+#include "lll_tim_internal.h"
+
 #include "ull_conn_types.h"
 #include "ull_internal.h"
 #include "ull_sched_internal.h"
@@ -51,12 +54,6 @@
 inline void ull_conn_upd_curr_reset(void);
 
 static int init_reset(void);
-
-#if defined(CONFIG_BT_PERIPHERAL)
-static void ticker_update_latency_cancel_op_cb(uint32_t ticker_status,
-					       void *params);
-static void peripheral_latency_cancel(struct ll_conn *conn, uint16_t handle);
-#endif /* CONFIG_BT_PERIPHERAL */
 
 static void ticker_update_conn_op_cb(uint32_t status, void *param);
 static void ticker_stop_conn_op_cb(uint32_t status, void *param);
@@ -276,7 +273,7 @@ int ll_tx_mem_enqueue(uint16_t handle, void *tx)
 	}
 
 	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && conn->lll.role) {
-		peripheral_latency_cancel(conn, handle);
+		ull_slave_latency_cancel(conn, handle);
 	}
 
 #if defined(CONFIG_BT_CTLR_THROUGHPUT)
@@ -379,7 +376,7 @@ uint8_t ll_conn_update(uint16_t handle, uint8_t cmd, uint8_t status, uint16_t in
 
 			if (IS_ENABLED(CONFIG_BT_PERIPHERAL) &&
 			    conn->lll.role) {
-				peripheral_latency_cancel(conn, handle);
+				ull_slave_latency_cancel(conn, handle);
 			}
 		}
 
@@ -427,7 +424,7 @@ uint8_t ll_terminate_ind_send(uint16_t handle, uint8_t reason)
 	conn->llcp_terminate.req++;
 
 	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && conn->lll.role) {
-		peripheral_latency_cancel(conn, handle);
+		ull_slave_latency_cancel(conn, handle);
 	}
 
 	return 0;
@@ -451,7 +448,7 @@ uint8_t ll_feature_req_send(uint16_t handle)
 	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) &&
 	    IS_ENABLED(CONFIG_BT_CTLR_SLAVE_FEAT_REQ) &&
 	    conn->lll.role) {
-		peripheral_latency_cancel(conn, handle);
+		ull_slave_latency_cancel(conn, handle);
 	}
 
 	return 0;
@@ -473,7 +470,7 @@ uint8_t ll_version_ind_send(uint16_t handle)
 	conn->llcp_version.req++;
 
 	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && conn->lll.role) {
-		peripheral_latency_cancel(conn, handle);
+		ull_slave_latency_cancel(conn, handle);
 	}
 
 	return 0;
@@ -526,7 +523,7 @@ uint32_t ll_length_req_send(uint16_t handle, uint16_t tx_octets, uint16_t tx_tim
 	conn->llcp_length.req++;
 
 	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && conn->lll.role) {
-		peripheral_latency_cancel(conn, handle);
+		ull_slave_latency_cancel(conn, handle);
 	}
 
 	return 0;
@@ -621,7 +618,7 @@ uint8_t ll_phy_req_send(uint16_t handle, uint8_t tx, uint8_t flags, uint8_t rx)
 	conn->llcp_phy.req++;
 
 	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && conn->lll.role) {
-		peripheral_latency_cancel(conn, handle);
+		ull_slave_latency_cancel(conn, handle);
 	}
 
 	return 0;
@@ -1099,8 +1096,8 @@ void ull_conn_done(struct node_rx_event_done *done)
 		if (0) {
 #if defined(CONFIG_BT_PERIPHERAL)
 		} else if (lll->role) {
-			ull_slave_done(done, &ticks_drift_plus,
-				       &ticks_drift_minus);
+			ull_drift_ticks_get(done, &ticks_drift_plus,
+					    &ticks_drift_minus);
 
 			if (!conn->tx_head) {
 				ull_conn_tx_demux(UINT8_MAX);
@@ -1159,7 +1156,7 @@ void ull_conn_done(struct node_rx_event_done *done)
 			conn->supervision_expire -= elapsed_event;
 
 			/* break latency */
-			lll->latency_event = 0;
+			lll->latency_event = 0U;
 
 			/* Force both master and slave when close to
 			 * supervision timeout.
@@ -1178,7 +1175,7 @@ void ull_conn_done(struct node_rx_event_done *done)
 					force = conn->slave.force & 0x01;
 
 					/* rotate force bits */
-					conn->slave.force >>= 1;
+					conn->slave.force >>= 1U;
 					if (force) {
 						conn->slave.force |= BIT(31);
 					}
@@ -1245,7 +1242,7 @@ void ull_conn_done(struct node_rx_event_done *done)
 
 #if defined(CONFIG_BT_CTLR_CONN_RSSI_EVENT)
 	/* generate RSSI event */
-	if (lll->rssi_sample_count == 0) {
+	if (lll->rssi_sample_count == 0U) {
 		struct node_rx_pdu *rx;
 		struct pdu_data *pdu_data_rx;
 
@@ -1274,18 +1271,17 @@ void ull_conn_done(struct node_rx_event_done *done)
 	     ((conn->llcp_type == LLCP_CONN_UPD) ||
 	      (conn->llcp_type == LLCP_CHAN_MAP))) ||
 	    (conn->llcp_cu.req != conn->llcp_cu.ack)) {
-		lll->latency_event = 0;
+		lll->latency_event = 0U;
 	}
 
 	/* check if latency needs update */
 	lazy = 0U;
 	if ((force) || (latency_event != lll->latency_event)) {
-		lazy = lll->latency_event + 1;
+		lazy = lll->latency_event + 1U;
 	}
 
 	/* update conn ticker */
-	if ((ticks_drift_plus != 0U) || (ticks_drift_minus != 0U) ||
-	    (lazy != 0U) || (force != 0U)) {
+	if (ticks_drift_plus || ticks_drift_minus || lazy || force) {
 		uint8_t ticker_id = TICKER_ID_CONN_BASE + lll->handle;
 		struct ll_conn *conn = lll->hdr.parent;
 		uint32_t ticker_status;
@@ -1629,38 +1625,6 @@ static int init_reset(void)
 
 	return 0;
 }
-
-#if defined(CONFIG_BT_PERIPHERAL)
-static void ticker_update_latency_cancel_op_cb(uint32_t ticker_status,
-					       void *params)
-{
-	struct ll_conn *conn = params;
-
-	LL_ASSERT(ticker_status == TICKER_STATUS_SUCCESS);
-
-	conn->slave.latency_cancel = 0U;
-}
-
-static void peripheral_latency_cancel(struct ll_conn *conn, uint16_t handle)
-{
-	/* break peripheral latency */
-	if (conn->lll.latency_event && !conn->slave.latency_cancel) {
-		uint32_t ticker_status;
-
-		conn->slave.latency_cancel = 1U;
-
-		ticker_status =
-			ticker_update(TICKER_INSTANCE_ID_CTLR,
-				      TICKER_USER_ID_THREAD,
-				      (TICKER_ID_CONN_BASE + handle),
-				      0, 0, 0, 0, 1, 0,
-				      ticker_update_latency_cancel_op_cb,
-				      (void *)conn);
-		LL_ASSERT((ticker_status == TICKER_STATUS_SUCCESS) ||
-			  (ticker_status == TICKER_STATUS_BUSY));
-	}
-}
-#endif /* CONFIG_BT_PERIPHERAL */
 
 static void ticker_update_conn_op_cb(uint32_t status, void *param)
 {
@@ -2395,8 +2359,8 @@ static inline int event_conn_upd_prep(struct ll_conn *conn, uint16_t lazy,
 				instant_latency;
 
 			lll->slave.window_widening_periodic_us =
-				(((lll_conn_ppm_local_get() +
-				   lll_conn_ppm_get(conn->slave.sca)) *
+				(((lll_clock_ppm_local_get() +
+				   lll_clock_ppm_get(conn->slave.sca)) *
 				  conn_interval_us) + (1000000 - 1)) / 1000000U;
 			lll->slave.window_widening_max_us =
 				(conn_interval_us >> 1) - EVENT_IFS_US;

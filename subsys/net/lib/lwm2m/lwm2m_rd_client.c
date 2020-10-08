@@ -76,6 +76,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
  * back into INIT again
  */
 enum sm_engine_state {
+	ENGINE_IDLE,
 	ENGINE_INIT,
 #if defined(CONFIG_LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP)
 	ENGINE_DO_BOOTSTRAP_REG,
@@ -127,7 +128,8 @@ static void set_sm_state(uint8_t sm_state)
 #if defined(CONFIG_LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP)
 	if (sm_state == ENGINE_BOOTSTRAP_REG_DONE) {
 		event = LWM2M_RD_CLIENT_EVENT_BOOTSTRAP_REG_COMPLETE;
-	} else if (sm_state == ENGINE_BOOTSTRAP_TRANS_DONE) {
+	} else if (client.engine_state == ENGINE_BOOTSTRAP_TRANS_DONE &&
+		   sm_state == ENGINE_DO_REGISTRATION) {
 		event = LWM2M_RD_CLIENT_EVENT_BOOTSTRAP_TRANSFER_COMPLETE;
 	} else
 #endif
@@ -502,7 +504,11 @@ static int sm_do_init(void)
 
 	/* Do bootstrap or registration */
 #if defined(CONFIG_LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP)
-	set_sm_state(ENGINE_DO_BOOTSTRAP_REG);
+	if (client.use_bootstrap) {
+		set_sm_state(ENGINE_DO_BOOTSTRAP_REG);
+	} else {
+		set_sm_state(ENGINE_DO_REGISTRATION);
+	}
 #else
 	set_sm_state(ENGINE_DO_REGISTRATION);
 #endif
@@ -859,6 +865,8 @@ static void lwm2m_rd_client_service(struct k_work *work)
 {
 	if (client.ctx) {
 		switch (get_sm_state()) {
+		case ENGINE_IDLE:
+			break;
 
 		case ENGINE_INIT:
 			sm_do_init();
@@ -908,9 +916,11 @@ static void lwm2m_rd_client_service(struct k_work *work)
 			break;
 
 		case ENGINE_DEREGISTER_FAILED:
+			set_sm_state(ENGINE_IDLE);
 			break;
 
 		case ENGINE_DEREGISTERED:
+			set_sm_state(ENGINE_IDLE);
 			break;
 
 		default:
@@ -921,11 +931,19 @@ static void lwm2m_rd_client_service(struct k_work *work)
 }
 
 void lwm2m_rd_client_start(struct lwm2m_ctx *client_ctx, const char *ep_name,
-			   lwm2m_ctx_event_cb_t event_cb)
+			   uint32_t flags, lwm2m_ctx_event_cb_t event_cb)
 {
+	if (!IS_ENABLED(CONFIG_LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP) &&
+	    (flags & LWM2M_RD_CLIENT_FLAG_BOOTSTRAP)) {
+		LOG_ERR("Bootstrap support is disabled. Please enable "
+			"CONFIG_LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP.");
+		return;
+	}
+
 	client.ctx = client_ctx;
 	client.ctx->sock_fd = -1;
 	client.event_cb = event_cb;
+	client.use_bootstrap = flags & LWM2M_RD_CLIENT_FLAG_BOOTSTRAP;
 
 	set_sm_state(ENGINE_INIT);
 	strncpy(client.ep_name, ep_name, CLIENT_EP_LEN - 1);
@@ -938,7 +956,15 @@ void lwm2m_rd_client_stop(struct lwm2m_ctx *client_ctx,
 	client.ctx = client_ctx;
 	client.event_cb = event_cb;
 
-	set_sm_state(ENGINE_DEREGISTER);
+	if (sm_is_registered()) {
+		set_sm_state(ENGINE_DEREGISTER);
+	} else {
+		if (client.ctx->sock_fd > -1) {
+			lwm2m_engine_context_close(client.ctx);
+		}
+		set_sm_state(ENGINE_IDLE);
+	}
+
 	LOG_INF("Stop LWM2M Client: %s", log_strdup(client.ep_name));
 }
 
