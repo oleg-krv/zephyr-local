@@ -98,16 +98,19 @@
 };
 
 &i2c1 {
+	pinctrl-0 = <&i2c1_sda_pb7 &i2c1_scl_pb6>;
 	status = "okay";
 	clock-frequency = <I2C_BITRATE_FAST>;
 };
 
 &i2c2 {
+	pinctrl-0 = <&i2c2_sda_pb11 &i2c2_scl_pb10>;
 	status = "okay";
 	clock-frequency = <I2C_BITRATE_FAST>;
 };
 
 &can1 {
+	pinctrl-0 = <&can_rx_pb8 &can_tx_pb9>;
 	/*
 	 * make sure CAN and USB are not enabled at the same time
 	 * because they share interrupts 19, 20 (stm32f103Xb.dtsi)
@@ -145,5 +148,6 @@
 };
 
 &adc1 {
+	pinctrl-0 = <&adc1_in0_pa0>;
 	status = "okay";
 };

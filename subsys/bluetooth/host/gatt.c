@@ -207,7 +207,11 @@ struct gatt_sc_cfg {
 	} data;
 };
 
+#if defined(CONFIG_BT_GATT_SERVICE_CHANGED)
 #define SC_CFG_MAX (CONFIG_BT_MAX_PAIRED + CONFIG_BT_MAX_CONN)
+#else
+#define SC_CFG_MAX 0
+#endif
 static struct gatt_sc_cfg sc_cfg[SC_CFG_MAX];
 BUILD_ASSERT(sizeof(struct sc_data) == sizeof(sc_cfg[0].data));
 
@@ -880,6 +884,7 @@ enum {
 	SC_NUM_FLAGS,
 };
 
+#if defined(CONFIG_BT_GATT_SERVICE_CHANGED)
 static struct gatt_sc {
 	struct bt_gatt_indicate_params params;
 	uint16_t start;
@@ -887,7 +892,16 @@ static struct gatt_sc {
 	struct k_delayed_work work;
 	ATOMIC_DEFINE(flags, SC_NUM_FLAGS);
 } gatt_sc;
+#endif /* defined(CONFIG_BT_GATT_SERVICE_CHANGED) */
 
+static inline void sc_work_submit(k_timeout_t timeout)
+{
+#if defined(CONFIG_BT_GATT_SERVICE_CHANGED)
+	k_delayed_work_submit(&gatt_sc.work, timeout);
+#endif
+}
+
+#if defined(CONFIG_BT_GATT_SERVICE_CHANGED)
 static void sc_indicate_rsp(struct bt_conn *conn,
 			    const struct bt_gatt_attr *attr, uint8_t err)
 {
@@ -902,7 +916,7 @@ static void sc_indicate_rsp(struct bt_conn *conn,
 	/* Check if there is new change in the meantime */
 	if (atomic_test_bit(gatt_sc.flags, SC_RANGE_CHANGED)) {
 		/* Reschedule without any delay since it is waiting already */
-		k_delayed_work_submit(&gatt_sc.work, K_NO_WAIT);
+		sc_work_submit(K_NO_WAIT);
 	}
 
 #if defined(CONFIG_BT_GATT_CACHING)
@@ -948,6 +962,7 @@ static void sc_process(struct k_work *work)
 
 	atomic_set_bit(sc->flags, SC_INDICATE_PENDING);
 }
+#endif /* defined(CONFIG_BT_GATT_SERVICE_CHANGED) */
 
 static void clear_ccc_cfg(struct bt_gatt_ccc_cfg *cfg)
 {
@@ -1042,15 +1057,15 @@ void bt_gatt_init(void)
 	k_delayed_work_submit(&db_hash_work, DB_HASH_TIMEOUT);
 #endif /* CONFIG_BT_GATT_CACHING */
 
-	if (IS_ENABLED(CONFIG_BT_GATT_SERVICE_CHANGED)) {
-		k_delayed_work_init(&gatt_sc.work, sc_process);
-		if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-			/* Make sure to not send SC indications until SC
-			 * settings are loaded
-			 */
-			atomic_set_bit(gatt_sc.flags, SC_INDICATE_PENDING);
-		}
+#if defined(CONFIG_BT_GATT_SERVICE_CHANGED)
+	k_delayed_work_init(&gatt_sc.work, sc_process);
+	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+		/* Make sure to not send SC indications until SC
+		 * settings are loaded
+		 */
+		atomic_set_bit(gatt_sc.flags, SC_INDICATE_PENDING);
 	}
+#endif /* defined(CONFIG_BT_GATT_SERVICE_CHANGED) */
 
 #if defined(CONFIG_BT_SETTINGS_CCC_STORE_ON_WRITE)
 	k_delayed_work_init(&gatt_ccc_store.work, ccc_delayed_store);
@@ -1080,7 +1095,7 @@ submit:
 	}
 
 	/* Reschedule since the range has changed */
-	k_delayed_work_submit(&gatt_sc.work, SC_TIMEOUT);
+	sc_work_submit(SC_TIMEOUT);
 }
 #endif /* BT_GATT_DYNAMIC_DB || (BT_GATT_CACHING && BT_SETTINGS) */
 
@@ -2774,9 +2789,9 @@ static void gatt_find_type_rsp(struct bt_conn *conn, uint8_t err,
 
 		uuid_svc.uuid.type = BT_UUID_TYPE_16;
 		if (params->type == BT_GATT_DISCOVER_PRIMARY) {
-			uuid_svc.val = BT_UUID_16(BT_UUID_GATT_PRIMARY)->val;
+			uuid_svc.val = BT_UUID_GATT_PRIMARY_VAL;
 		} else {
-			uuid_svc.val = BT_UUID_16(BT_UUID_GATT_SECONDARY)->val;
+			uuid_svc.val = BT_UUID_GATT_SECONDARY_VAL;
 		}
 
 		value.end_handle = end_handle;
@@ -2815,9 +2830,9 @@ static int gatt_find_type(struct bt_conn *conn,
 	req->end_handle = sys_cpu_to_le16(params->end_handle);
 
 	if (params->type == BT_GATT_DISCOVER_PRIMARY) {
-		uuid_val = BT_UUID_16(BT_UUID_GATT_PRIMARY)->val;
+		uuid_val = BT_UUID_GATT_PRIMARY_VAL;
 	} else {
-		uuid_val = BT_UUID_16(BT_UUID_GATT_SECONDARY)->val;
+		uuid_val = BT_UUID_GATT_SECONDARY_VAL;
 	}
 
 	req->type = sys_cpu_to_le16(uuid_val);
@@ -3125,9 +3140,9 @@ static int gatt_read_type(struct bt_conn *conn,
 	req->end_handle = sys_cpu_to_le16(params->end_handle);
 
 	if (params->type == BT_GATT_DISCOVER_INCLUDE) {
-		net_buf_add_le16(buf, BT_UUID_16(BT_UUID_GATT_INCLUDE)->val);
+		net_buf_add_le16(buf, BT_UUID_GATT_INCLUDE_VAL);
 	} else {
-		net_buf_add_le16(buf, BT_UUID_16(BT_UUID_GATT_CHRC)->val);
+		net_buf_add_le16(buf, BT_UUID_GATT_CHRC_VAL);
 	}
 
 	BT_DBG("start_handle 0x%04x end_handle 0x%04x", params->start_handle,
@@ -3194,9 +3209,9 @@ static uint16_t parse_service(struct bt_conn *conn, const void *pdu,
 
 		uuid_svc.uuid.type = BT_UUID_TYPE_16;
 		if (params->type == BT_GATT_DISCOVER_PRIMARY) {
-			uuid_svc.val = BT_UUID_16(BT_UUID_GATT_PRIMARY)->val;
+			uuid_svc.val = BT_UUID_GATT_PRIMARY_VAL;
 		} else {
-			uuid_svc.val = BT_UUID_16(BT_UUID_GATT_SECONDARY)->val;
+			uuid_svc.val = BT_UUID_GATT_SECONDARY_VAL;
 		}
 
 		value.end_handle = end_handle;
@@ -3259,9 +3274,9 @@ static int gatt_read_group(struct bt_conn *conn,
 	req->end_handle = sys_cpu_to_le16(params->end_handle);
 
 	if (params->type == BT_GATT_DISCOVER_PRIMARY) {
-		net_buf_add_le16(buf, BT_UUID_16(BT_UUID_GATT_PRIMARY)->val);
+		net_buf_add_le16(buf, BT_UUID_GATT_PRIMARY_VAL);
 	} else {
-		net_buf_add_le16(buf, BT_UUID_16(BT_UUID_GATT_SECONDARY)->val);
+		net_buf_add_le16(buf, BT_UUID_GATT_SECONDARY_VAL);
 	}
 
 	BT_DBG("start_handle 0x%04x end_handle 0x%04x", params->start_handle,
@@ -4335,11 +4350,6 @@ next:
 static int ccc_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 		   void *cb_arg)
 {
-	if (IS_ENABLED(CONFIG_BT_SETTINGS_CCC_LAZY_LOADING)) {
-		/* Only load CCCs on demand */
-		return 0;
-	}
-
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
 		struct ccc_store ccc_store[CCC_STORE_MAX];
 		struct ccc_load load;
@@ -4397,7 +4407,18 @@ static int ccc_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 	return 0;
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_ccc, "bt/ccc", NULL, ccc_set, NULL, NULL);
+static int ccc_set_cb(const char *name, size_t len_rd, settings_read_cb read_cb,
+		      void *cb_arg)
+{
+	if (IS_ENABLED(CONFIG_BT_SETTINGS_CCC_LAZY_LOADING)) {
+		/* Only load CCCs on demand */
+		return 0;
+	}
+
+	return ccc_set(name, len_rd, read_cb, cb_arg);
+}
+
+SETTINGS_STATIC_HANDLER_DEFINE(bt_ccc, "bt/ccc", NULL, ccc_set_cb, NULL, NULL);
 
 static int ccc_set_direct(const char *key, size_t len, settings_read_cb read_cb,
 			  void *cb_arg, void *param)
@@ -4750,7 +4771,7 @@ static int sc_commit(void)
 
 	if (atomic_test_bit(gatt_sc.flags, SC_RANGE_CHANGED)) {
 		/* Schedule SC indication since the range has changed */
-		k_delayed_work_submit(&gatt_sc.work, SC_TIMEOUT);
+		sc_work_submit(SC_TIMEOUT);
 	}
 
 	return 0;

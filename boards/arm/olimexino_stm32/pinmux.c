@@ -15,14 +15,6 @@
 
 /* pin assignments for OLIMEXINO-STM32 board */
 static const struct pin_config pinconf[] = {
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(i2c1), okay) && CONFIG_I2C
-	{STM32_PIN_PB6, STM32F1_PINMUX_FUNC_PB6_I2C1_SCL},
-	{STM32_PIN_PB7, STM32F1_PINMUX_FUNC_PB7_I2C1_SDA},
-#endif
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(i2c2), okay) && CONFIG_I2C
-	{STM32_PIN_PB10, STM32F1_PINMUX_FUNC_PB10_I2C2_SCL},
-	{STM32_PIN_PB11, STM32F1_PINMUX_FUNC_PB11_I2C2_SDA},
-#endif
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(spi1), okay) && CONFIG_SPI
 #ifdef CONFIG_SPI_STM32_USE_HW_SS
 	{STM32_PIN_PA4, STM32F1_PINMUX_FUNC_PA4_SPI1_MASTER_NSS_OE},
@@ -43,10 +35,6 @@ static const struct pin_config pinconf[] = {
 	{STM32_PIN_PA11, STM32F1_PINMUX_FUNC_PA11_USB_DM},
 	{STM32_PIN_PA12, STM32F1_PINMUX_FUNC_PA12_USB_DP},
 #endif /* CONFIG_USB_DC_STM32 */
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(can1), okay) && CONFIG_CAN
-	{STM32_PIN_PB8, STM32F1_PINMUX_FUNC_PB8_CAN_RX},
-	{STM32_PIN_PB9, STM32F1_PINMUX_FUNC_PB9_CAN_TX},
-#endif
 };
 
 static int pinmux_stm32_init(const struct device *port)
@@ -54,10 +42,6 @@ static int pinmux_stm32_init(const struct device *port)
 	ARG_UNUSED(port);
 
 	stm32_setup_pins(pinconf, ARRAY_SIZE(pinconf));
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(can1), okay) && CONFIG_CAN
-	/* Set pin-mux so that CAN1 is on PB8 and PB9 */
-	AFIO->MAPR |= AFIO_MAPR_CAN_REMAP_REMAP2;
-#endif
 
 	return 0;
 }

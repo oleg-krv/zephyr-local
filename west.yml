@@ -56,7 +56,7 @@ manifest:
       revision: f1fa8241f8786198ba41155413243de36ed878a5
       path: modules/hal/infineon
     - name: hal_nordic
-      revision: 0f4ff90fbf8137086e2f9c1b78a6fc2aa5ef731f
+      revision: fc12f5e2b47cf143254234c05f9ecbdb603a7101
       path: modules/hal/nordic
     - name: hal_openisa
       revision: 40d049f69c50b58ea20473bee14cf93f518bf262
@@ -71,10 +71,10 @@ manifest:
       revision: 69c3e1e6e167767cb75aa2b468df4ade05988cdb
       path: modules/hal/silabs
     - name: hal_st
-      revision: 5b3ec3e182d4310e8943cc34c6c70ae57d9711da
+      revision: b52fdbf4b62439be9fab9bb4bae9690a42d2fb14
       path: modules/hal/st
     - name: hal_stm32
-      revision: 8128bd26b2b94c6a0ebd9a2e3a8746d138e3de35
+      revision: 8895167f757275a2dbfbb1e6762d71c140e4103c
       path: modules/hal/stm32
     - name: hal_ti
       revision: 405dfc8faba13e01c1cb9e29e70b31b50f71d117
@@ -93,7 +93,7 @@ manifest:
       revision: aef137b1af8aa7a0f43345c82459254b8832262e
       path: modules/crypto/mbedtls
     - name: mcuboot
-      revision: a5d79cf8ccb2c71e68ef32a71d6a2716e831d12e
+      revision: e312fa2cec3e8440bf484d7da3443e149b7eb9d8
       path: bootloader/mcuboot
     - name: mcumgr
       revision: 5051f9d900bbb194a23d4ce80f3c6dc6d6780cc2
@@ -130,7 +130,7 @@ manifest:
       revision: 957d46bc3ce0d5f628f0d525196bb4db207672ee
     - name: nrf_hw_models
       path: modules/bsim_hw_models/nrf_hw_models
-      revision: f86079a7333968f0ba71fe1266e241295a4e9943
+      revision: 71a8a9ef086d57ff5f3974138b0951f24c2017ad
     - name: hal_xtensa
       revision: e7a57d0c252f9c5f3cab9d5ceadda8753cacee5b
       path: modules/hal/xtensa

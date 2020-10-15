@@ -103,7 +103,9 @@
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
 #define BT_SCAN_SYNC_TICKER_NODES ((TICKER_ID_SCAN_SYNC_LAST) - \
 				   (TICKER_ID_SCAN_SYNC_BASE) + 1)
-#endif /* CONFIG_BT_CTLR_ADV_PERIODIC */
+#else /* !CONFIG_BT_CTLR_SYNC_PERIODIC */
+#define BT_SCAN_SYNC_TICKER_NODES 0
+#endif /* !CONFIG_BT_CTLR_SYNC_PERIODIC */
 #else /* !CONFIG_BT_CTLR_ADV_EXT */
 #define BT_SCAN_AUX_TICKER_NODES 0
 #define BT_SCAN_SYNC_TICKER_NODES 0
@@ -854,6 +856,14 @@ void ll_rx_mem_release(void **node_rx)
 		rx = rx->next;
 
 		switch (rx_free->type) {
+#if defined(CONFIG_BT_BROADCASTER)
+#if defined(CONFIG_BT_CTLR_ADV_EXT)
+		case NODE_RX_TYPE_EXT_ADV_TERMINATE:
+			mem_release(rx_free, &mem_pdu_rx.free);
+			break;
+#endif /* CONFIG_BT_CTLR_ADV_EXT */
+#endif /* CONFIG_BT_BROADCASTER */
+
 #if defined(CONFIG_BT_CONN)
 		case NODE_RX_TYPE_CONNECTION:
 		{
@@ -915,20 +925,13 @@ void ll_rx_mem_release(void **node_rx)
 
 #if defined(CONFIG_BT_OBSERVER)
 		case NODE_RX_TYPE_REPORT:
-#endif /* CONFIG_BT_OBSERVER */
-
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
-#if defined(CONFIG_BT_OBSERVER)
 			__fallthrough;
 		case NODE_RX_TYPE_EXT_1M_REPORT:
 		case NODE_RX_TYPE_EXT_2M_REPORT:
 		case NODE_RX_TYPE_EXT_CODED_REPORT:
-#endif /* CONFIG_BT_OBSERVER */
-
-#if defined(CONFIG_BT_BROADCASTER)
-		case NODE_RX_TYPE_EXT_ADV_TERMINATE:
-#endif /* CONFIG_BT_BROADCASTER */
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
+#endif /* CONFIG_BT_OBSERVER */
 
 #if defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY)
 		case NODE_RX_TYPE_SCAN_REQ:

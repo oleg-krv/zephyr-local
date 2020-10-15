@@ -406,6 +406,7 @@
 /include/sw_isr_table.h                   @andrewboie @andyross
 /include/sys_clock.h                      @andrewboie @andyross
 /include/sys/sys_io.h                     @andrewboie @andyross
+/include/sys/kobject.h                    @andrewboie
 /include/toolchain.h                      @andrewboie @andyross @nashif
 /include/toolchain/                       @andrewboie @andyross
 /include/zephyr.h                         @andrewboie @andyross
@@ -439,6 +440,7 @@
 /samples/net/mqtt_publisher/              @jukkar @tbursztyka
 /samples/net/sockets/coap_*/              @rlubos
 /samples/net/sockets/                     @jukkar @tbursztyka @pfalcon
+/samples/net/sockets/*civetweb*           @Nukersson
 /samples/sensor/                          @MaureenHelm
 /samples/shields/                         @avisconti
 /samples/subsys/logging/                  @nordic-krch @jakub-uC

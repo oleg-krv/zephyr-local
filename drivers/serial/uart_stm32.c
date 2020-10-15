@@ -696,7 +696,7 @@ static int uart_stm32_init(const struct device *dev)
 		switch ((uint32_t)UART_STRUCT(dev)) {
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(usart1), okay)
 		case DT_REG_ADDR(DT_NODELABEL(usart1)):
-			if (remap == REMAP_FULL) {
+			if (remap == REMAP_1) {
 				LL_GPIO_AF_EnableRemap_USART1();
 			} else {
 				LL_GPIO_AF_DisableRemap_USART1();
@@ -705,7 +705,7 @@ static int uart_stm32_init(const struct device *dev)
 #endif
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(usart2), okay)
 		case DT_REG_ADDR(DT_NODELABEL(usart2)):
-			if (remap == REMAP_FULL) {
+			if (remap == REMAP_1) {
 				LL_GPIO_AF_EnableRemap_USART2();
 			} else {
 				LL_GPIO_AF_DisableRemap_USART2();
@@ -714,7 +714,7 @@ static int uart_stm32_init(const struct device *dev)
 #endif
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(usart3), okay)
 		case DT_REG_ADDR(DT_NODELABEL(usart3)):
-			if (remap == REMAP_FULL) {
+			if (remap == REMAP_2) {
 				LL_GPIO_AF_EnableRemap_USART3();
 			} else if (remap == REMAP_1) {
 				LL_GPIO_AF_RemapPartial_USART3();
@@ -815,7 +815,7 @@ static void uart_stm32_irq_config_func_##index(const struct device *dev)	\
 STM32_UART_IRQ_HANDLER_DECL(index);					\
 									\
 static const struct soc_gpio_pinctrl uart_pins_##index[] =		\
-					ST_STM32_DT_PINCTRL(0, index);	\
+				ST_STM32_DT_INST_PINCTRL(index, 0);	\
 									\
 static const struct uart_stm32_config uart_stm32_cfg_##index = {	\
 	.uconf = {							\
@@ -826,7 +826,7 @@ static const struct uart_stm32_config uart_stm32_cfg_##index = {	\
 		    .enr = DT_INST_CLOCKS_CELL(index, bits)		\
 	},								\
 	.hw_flow_control = DT_INST_PROP(index, hw_flow_control),	\
-	.parity = DT_INST_PROP(index, parity),				\
+	.parity = DT_INST_PROP_OR(index, parity, UART_CFG_PARITY_NONE),	\
 	.pinctrl_list = uart_pins_##index,				\
 	.pinctrl_list_size = ARRAY_SIZE(uart_pins_##index),		\
 };									\
