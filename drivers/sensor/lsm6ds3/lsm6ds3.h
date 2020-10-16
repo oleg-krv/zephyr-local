@@ -138,6 +138,7 @@ struct lsm6ds3_tf {
 #define LSM6DS3_SHUB_MAX_NUM_SLVS			2
 
 struct lsm6ds3_data {
+	const struct device *dev;
 	const struct device *bus;
 	int16_t acc[3];
 	uint32_t acc_gain;
@@ -177,7 +178,6 @@ struct lsm6ds3_data {
 	sensor_trigger_handler_t handler_drdy_acc;
 	sensor_trigger_handler_t handler_drdy_gyr;
 	sensor_trigger_handler_t handler_drdy_temp;
-	struct device *dev;
 
 #if defined(CONFIG_LSM6DS3_TRIGGER_OWN_THREAD)
 	K_THREAD_STACK_MEMBER(thread_stack, CONFIG_LSM6DS3_THREAD_STACK_SIZE);
@@ -196,20 +196,20 @@ struct lsm6ds3_data {
 int lsm6ds3_spi_init(const struct device *dev);
 int lsm6ds3_i2c_init(const struct device *dev);
 #if defined(CONFIG_LSM6DS3_SENSORHUB)
-int lsm6ds3_shub_init(struct device *dev);
-int lsm6ds3_shub_fetch_external_devs(struct device *dev);
+int lsm6ds3_shub_init(const struct device *dev);
+int lsm6ds3_shub_fetch_external_devs(const struct device *dev);
 int lsm6ds3_shub_get_idx(enum sensor_channel type);
-int lsm6ds3_shub_config(struct device *dev, enum sensor_channel chan,
+int lsm6ds3_shub_config(const struct device *dev, enum sensor_channel chan,
 			enum sensor_attribute attr,
 			const struct sensor_value *val);
 #endif /* CONFIG_LSM6DS3_SENSORHUB */
 
 #ifdef CONFIG_LSM6DS3_TRIGGER
-int lsm6ds3_trigger_set(struct device *dev,
+int lsm6ds3_trigger_set(const struct device *dev,
 			const struct sensor_trigger *trig,
 			sensor_trigger_handler_t handler);
 
-int lsm6ds3_init_interrupt(struct device *dev);
+int lsm6ds3_init_interrupt(const struct device *dev);
 #endif
 
 #endif /* ZEPHYR_DRIVERS_SENSOR_LSM6DS3_LSM6DS3_H_ */

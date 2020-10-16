@@ -190,9 +190,10 @@ static int lsm6ds3_accel_range_set(const struct device *dev, int32_t range)
 }
 #endif
 
-static int lsm6ds3_accel_config(const struct device *dev, enum sensor_channel chan,
-			    enum sensor_attribute attr,
-			    const struct sensor_value *val)
+static int lsm6ds3_accel_config(const struct device *dev,
+				enum sensor_channel chan,
+				enum sensor_attribute attr,
+				const struct sensor_value *val)
 {
 	switch (attr) {
 #ifdef LSM6DS3_ACCEL_FS_RUNTIME
@@ -251,9 +252,10 @@ static int lsm6ds3_gyro_range_set(const struct device *dev, int32_t range)
 }
 #endif
 
-static int lsm6ds3_gyro_config(const struct device *dev, enum sensor_channel chan,
-			    enum sensor_attribute attr,
-			    const struct sensor_value *val)
+static int lsm6ds3_gyro_config(const struct device *dev,
+			       enum sensor_channel chan,
+			       enum sensor_attribute attr,
+			       const struct sensor_value *val)
 {
 	switch (attr) {
 #ifdef LSM6DS3_GYRO_FS_RUNTIME
@@ -272,9 +274,10 @@ static int lsm6ds3_gyro_config(const struct device *dev, enum sensor_channel cha
 	return 0;
 }
 
-static int lsm6ds3_attr_set(const struct device *dev, enum sensor_channel chan,
-			   enum sensor_attribute attr,
-			   const struct sensor_value *val)
+static int lsm6ds3_attr_set(const struct device *dev,
+			    enum sensor_channel chan,
+			    enum sensor_attribute attr,
+			    const struct sensor_value *val)
 {
 	switch (chan) {
 	case SENSOR_CHAN_ACCEL_XYZ:
@@ -358,7 +361,8 @@ static int lsm6ds3_sample_fetch_shub(struct device *dev)
 }
 #endif /* CONFIG_LSM6DS3_SENSORHUB */
 
-static int lsm6ds3_sample_fetch(const struct device *dev, enum sensor_channel chan)
+static int lsm6ds3_sample_fetch(const struct device *dev,
+				enum sensor_channel chan)
 {
 	switch (chan) {
 	case SENSOR_CHAN_ACCEL_XYZ:
@@ -791,6 +795,8 @@ static int lsm6ds3_init(const struct device *dev)
 {
 	const struct lsm6ds3_config * const config = dev->config;
 	struct lsm6ds3_data *data = dev->data;
+
+	data->dev = dev;
 
 	data->bus = device_get_binding(config->bus_name);
 	if (!data->bus) {

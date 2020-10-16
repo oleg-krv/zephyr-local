@@ -20,21 +20,19 @@
 
 LOG_MODULE_DECLARE(LSM6DS3, CONFIG_SENSOR_LOG_LEVEL);
 
-static int lsm6ds3_i2c_read(struct device *dev, uint8_t reg_addr,
+static int lsm6ds3_i2c_read(struct lsm6ds3_data *data, uint8_t reg_addr,
 			    uint8_t *value, uint8_t len)
 {
-	struct lsm6ds3_data *data = dev->data;
-	const struct lsm6ds3_config *cfg = dev->config;
+	const struct lsm6ds3_config *cfg = data->dev->config;
 
 	return i2c_burst_read(data->bus, cfg->i2c_slv_addr,
 			      reg_addr, value, len);
 }
 
-static int lsm6ds3_i2c_write(struct device *dev, uint8_t reg_addr,
+static int lsm6ds3_i2c_write(struct lsm6ds3_data *data, uint8_t reg_addr,
 			     uint8_t *value, uint8_t len)
 {
-	struct lsm6ds3_data *data = dev->data;
-	const struct lsm6ds3_config *cfg = dev->config;
+	const struct lsm6ds3_config *cfg = data->dev->config;
 
 	return i2c_burst_write(data->bus, cfg->i2c_slv_addr,
 			       reg_addr, value, len);
@@ -48,7 +46,7 @@ int lsm6ds3_i2c_init(const struct device *dev)
 	data->ctx_i2c.write_reg = (stmdev_write_ptr) lsm6ds3_i2c_write,
 
 	data->ctx = &data->ctx_i2c;
-	data->ctx->handle = (void *)dev;
+	data->ctx->handle = data;
 
 	return 0;
 }
