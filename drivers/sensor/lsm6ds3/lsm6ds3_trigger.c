@@ -25,9 +25,9 @@ LOG_MODULE_DECLARE(LSM6DS3, CONFIG_SENSOR_LOG_LEVEL);
  */
 static int lsm6ds3_enable_t_int(struct device *dev, int enable)
 {
-	const struct lsm6ds3_config *cfg = dev->config_info;
-	struct lsm6ds3_data *lsm6ds3 = dev->driver_data;
-	lsm6ds3_pin_int2_route_t int2_route;
+	const struct lsm6ds3_config *cfg = dev->config;
+	struct lsm6ds3_data *lsm6ds3 = dev->data;
+	lsm6ds3_int2_ctrl_t int2_ctrl;
 
 	if (enable) {
 		union axis1bit16_t buf;
@@ -41,20 +41,20 @@ static int lsm6ds3_enable_t_int(struct device *dev, int enable)
 		return -EIO;
 
 	lsm6ds3_read_reg(lsm6ds3->ctx, LSM6DS3_INT2_CTRL,
-			 (uint8_t *)&int2_route.int2_ctrl, 1);
-	int2_route.int2_ctrl.int2_drdy_temp = enable;
+			 (uint8_t *)&int2_ctrl, 1);
+	int2_ctrl.int2_drdy_temp = enable;
 	return lsm6ds3_write_reg(lsm6ds3->ctx, LSM6DS3_INT2_CTRL,
-				 (uint8_t *)&int2_route.int2_ctrl, 1);
+				 (uint8_t *)&int2_ctrl, 1);
 }
 #endif
 
 /**
  * lsm6ds3_enable_xl_int - XL enable selected int pin to generate interrupt
  */
-static int lsm6ds3_enable_xl_int(struct device *dev, int enable)
+static int lsm6ds3_enable_xl_int(const struct device *dev, int enable)
 {
-	const struct lsm6ds3_config *cfg = dev->config_info;
-	struct lsm6ds3_data *lsm6ds3 = dev->driver_data;
+	const struct lsm6ds3_config *cfg = dev->config;
+	struct lsm6ds3_data *lsm6ds3 = dev->data;
 
 	if (enable) {
 		union axis3bit16_t buf;
@@ -65,22 +65,22 @@ static int lsm6ds3_enable_xl_int(struct device *dev, int enable)
 
 	/* set interrupt */
 	if (cfg->int_pin == 1) {
-		lsm6ds3_pin_int1_route_t int1_route;
+		lsm6ds3_int1_ctrl_t int1_ctrl;
 
 		lsm6ds3_read_reg(lsm6ds3->ctx, LSM6DS3_INT1_CTRL,
-				 (uint8_t *)&int1_route.int1_ctrl, 1);
+				 (uint8_t *)&int1_ctrl, 1);
 
-		int1_route.int1_ctrl.int1_drdy_xl = enable;
+		int1_ctrl.int1_drdy_xl = enable;
 		return lsm6ds3_write_reg(lsm6ds3->ctx, LSM6DS3_INT1_CTRL,
-					 (uint8_t *)&int1_route.int1_ctrl, 1);
+					 (uint8_t *)&int1_ctrl, 1);
 	} else {
-		lsm6ds3_pin_int2_route_t int2_route;
+		lsm6ds3_int2_ctrl_t int2_ctrl;
 
 		lsm6ds3_read_reg(lsm6ds3->ctx, LSM6DS3_INT2_CTRL,
-				 (uint8_t *)&int2_route.int2_ctrl, 1);
-		int2_route.int2_ctrl.int2_drdy_xl = enable;
+				 (uint8_t *)&int2_ctrl, 1);
+		int2_ctrl.int2_drdy_xl = enable;
 		return lsm6ds3_write_reg(lsm6ds3->ctx, LSM6DS3_INT2_CTRL,
-					 (uint8_t *)&int2_route.int2_ctrl, 1);
+					 (uint8_t *)&int2_ctrl, 1);
 	}
 }
 
@@ -89,8 +89,8 @@ static int lsm6ds3_enable_xl_int(struct device *dev, int enable)
  */
 static int lsm6ds3_enable_g_int(struct device *dev, int enable)
 {
-	const struct lsm6ds3_config *cfg = dev->config_info;
-	struct lsm6ds3_data *lsm6ds3 = dev->driver_data;
+	const struct lsm6ds3_config *cfg = dev->config;
+	struct lsm6ds3_data *lsm6ds3 = dev->data;
 
 	if (enable) {
 		union axis3bit16_t buf;
@@ -101,21 +101,21 @@ static int lsm6ds3_enable_g_int(struct device *dev, int enable)
 
 	/* set interrupt */
 	if (cfg->int_pin == 1) {
-		lsm6ds3_pin_int1_route_t int1_route;
+		lsm6ds3_int1_ctrl_t int1_ctrl;
 
 		lsm6ds3_read_reg(lsm6ds3->ctx, LSM6DS3_INT1_CTRL,
-				 (uint8_t *)&int1_route.int1_ctrl, 1);
-		int1_route.int1_ctrl.int1_drdy_g = enable;
+				 (uint8_t *)&int1_ctrl, 1);
+		int1_ctrl.int1_drdy_g = enable;
 		return lsm6ds3_write_reg(lsm6ds3->ctx, LSM6DS3_INT1_CTRL,
-					 (uint8_t *)&int1_route.int1_ctrl, 1);
+					 (uint8_t *)&int1_ctrl, 1);
 	} else {
-		lsm6ds3_pin_int2_route_t int2_route;
+		lsm6ds3_int2_ctrl_t int2_ctrl;
 
 		lsm6ds3_read_reg(lsm6ds3->ctx, LSM6DS3_INT2_CTRL,
-				 (uint8_t *)&int2_route.int2_ctrl, 1);
-		int2_route.int2_ctrl.int2_drdy_g = enable;
+				 (uint8_t *)&int2_ctrl, 1);
+		int2_ctrl.int2_drdy_g = enable;
 		return lsm6ds3_write_reg(lsm6ds3->ctx, LSM6DS3_INT2_CTRL,
-					 (uint8_t *)&int2_route.int2_ctrl, 1);
+					 (uint8_t *)&int2_ctrl, 1);
 	}
 }
 
@@ -161,14 +161,13 @@ int lsm6ds3_trigger_set(struct device *dev,
  * lsm6ds3_handle_interrupt - handle the drdy event
  * read data and call handler if registered any
  */
-static void lsm6ds3_handle_interrupt(void *arg)
+static void lsm6ds3_handle_interrupt(const struct device *dev)
 {
-	struct device *dev = arg;
-	struct lsm6ds3_data *lsm6ds3 = dev->driver_data;
+	struct lsm6ds3_data *lsm6ds3 = dev->data;
 	struct sensor_trigger drdy_trigger = {
 		.type = SENSOR_TRIG_DATA_READY,
 	};
-	const struct lsm6ds3_config *cfg = dev->config_info;
+	const struct lsm6ds3_config *cfg = dev->config;
 	lsm6ds3_status_reg_t status;
 
 	while (1) {
@@ -204,12 +203,12 @@ static void lsm6ds3_handle_interrupt(void *arg)
 				     GPIO_INT_EDGE_TO_ACTIVE);
 }
 
-static void lsm6ds3_gpio_callback(struct device *dev,
+static void lsm6ds3_gpio_callback(const struct device *dev,
 				    struct gpio_callback *cb, uint32_t pins)
 {
 	struct lsm6ds3_data *lsm6ds3 =
 		CONTAINER_OF(cb, struct lsm6ds3_data, gpio_cb);
-	const struct lsm6ds3_config *cfg = lsm6ds3->dev->config_info;
+	const struct lsm6ds3_config *cfg = lsm6ds3->dev->config;
 
 	ARG_UNUSED(pins);
 
@@ -224,16 +223,11 @@ static void lsm6ds3_gpio_callback(struct device *dev,
 }
 
 #ifdef CONFIG_LSM6DS3_TRIGGER_OWN_THREAD
-static void lsm6ds3_thread(int dev_ptr, int unused)
+static void lsm6ds3_thread(struct lsm6ds3_data *lsm6dso)
 {
-	struct device *dev = INT_TO_POINTER(dev_ptr);
-	struct lsm6ds3_data *lsm6ds3 = dev->driver_data;
-
-	ARG_UNUSED(unused);
-
 	while (1) {
 		k_sem_take(&lsm6ds3->gpio_sem, K_FOREVER);
-		lsm6ds3_handle_interrupt(dev);
+		lsm6ds3_handle_interrupt(lsm6dso->dev);
 	}
 }
 #endif /* CONFIG_LSM6DS3_TRIGGER_OWN_THREAD */
@@ -250,8 +244,8 @@ static void lsm6ds3_work_cb(struct k_work *work)
 
 int lsm6ds3_init_interrupt(struct device *dev)
 {
-	struct lsm6ds3_data *lsm6ds3 = dev->driver_data;
-	const struct lsm6ds3_config *cfg = dev->config_info;
+	struct lsm6ds3_data *lsm6ds3 = dev->data;
+	const struct lsm6ds3_config *cfg = dev->config;
 	int ret;
 
 	/* setup data ready gpio interrupt (INT1 or INT2) */
@@ -261,15 +255,14 @@ int lsm6ds3_init_interrupt(struct device *dev)
 			    cfg->int_gpio_port);
 		return -EINVAL;
 	}
-	lsm6ds3->dev = dev;
 
 #if defined(CONFIG_LSM6DS3_TRIGGER_OWN_THREAD)
 	k_sem_init(&lsm6ds3->gpio_sem, 0, UINT_MAX);
 
 	k_thread_create(&lsm6ds3->thread, lsm6ds3->thread_stack,
 			CONFIG_LSM6DS3_THREAD_STACK_SIZE,
-			(k_thread_entry_t)lsm6ds3_thread, dev,
-			0, NULL, K_PRIO_COOP(CONFIG_LSM6DS3_THREAD_PRIORITY),
+			(k_thread_entry_t)lsm6ds3_thread, lsm6ds3,
+			NULL, NULL, K_PRIO_COOP(CONFIG_LSM6DS3_THREAD_PRIORITY),
 			0, K_NO_WAIT);
 #elif defined(CONFIG_LSM6DS3_TRIGGER_GLOBAL_THREAD)
 	lsm6ds3->work.handler = lsm6ds3_work_cb;
