@@ -403,7 +403,9 @@ uint16_t bt_gatt_attr_get_handle(const struct bt_gatt_attr *attr);
 
 /** @brief Get the handle of the characteristic value descriptor.
  *
- * @param attr A Characteristic Attribute
+ * @param attr A Characteristic Attribute.
+ *
+ * @note The user_data of the attribute must of type @ref bt_gatt_chrc.
  *
  * @return the handle of the corresponding Characteristic Value. The value will
  *         be zero (the invalid handle) if @p attr was not a characteristic
@@ -576,6 +578,13 @@ ssize_t bt_gatt_attr_read_chrc(struct bt_conn *conn,
 			       const struct bt_gatt_attr *attr, void *buf,
 			       uint16_t len, uint16_t offset);
 
+#define BT_GATT_CHRC_INIT(_uuid, _handle, _props) \
+{                                                 \
+	.uuid = _uuid,                            \
+	.value_handle = _handle,                  \
+	.properties = _props,                     \
+}
+
 /** @def BT_GATT_CHARACTERISTIC
  *  @brief Characteristic and Value Declaration Macro.
  *
@@ -592,10 +601,9 @@ ssize_t bt_gatt_attr_read_chrc(struct bt_conn *conn,
 #define BT_GATT_CHARACTERISTIC(_uuid, _props, _perm, _read, _write, _value)  \
 	BT_GATT_ATTRIBUTE(BT_UUID_GATT_CHRC, BT_GATT_PERM_READ,              \
 			  bt_gatt_attr_read_chrc, NULL,                      \
-			  ((struct bt_gatt_chrc[]) { { .uuid = _uuid,        \
-						       .value_handle = 0U,   \
-						       .properties = _props, \
-						   } })),                    \
+			  ((struct bt_gatt_chrc[]) {                         \
+				BT_GATT_CHRC_INIT(_uuid, 0U, _props),        \
+						   })),                      \
 	BT_GATT_ATTRIBUTE(_uuid, _perm, _read, _write, _value)
 
 #if IS_ENABLED(CONFIG_BT_SETTINGS_CCC_LAZY_LOADING)
@@ -1113,15 +1121,29 @@ struct bt_gatt_discover_params;
  *  @brief Discover attribute callback function.
  *
  *  @param conn Connection object.
- *  @param attr Attribute found.
+ *  @param attr Attribute found, or NULL if not found.
  *  @param params Discovery parameters given.
  *
  *  If discovery procedure has completed this callback will be called with
  *  attr set to NULL. This will not happen if procedure was stopped by returning
- *  BT_GATT_ITER_STOP. The attribute is read-only and cannot be cached without
- *  copying its contents.
+ *  BT_GATT_ITER_STOP.
  *
- *  @return BT_GATT_ITER_CONTINUE if should continue attribute discovery.
+ *  The attribute object as well as its UUID and value objects are temporary and
+ *  must be copied to in order to cache its information.
+ *  Only the following fields of the attribute contains valid information:
+ *   - uuid      UUID representing the type of attribute.
+ *   - handle    Handle in the remote database.
+ *   - user_data The value of the attribute.
+ *               Will be NULL when discovering descriptors
+ *
+ *  To be able to read the value of the discovered attribute the user_data
+ *  must be cast to an appropriate type.
+ *   - @ref bt_gatt_service_val when UUID is @ref BT_UUID_GATT_PRIMARY or
+ *     @ref BT_UUID_GATT_SECONDARY.
+ *   - @ref bt_gatt_include when UUID is @ref BT_UUID_GATT_INCLUDE.
+ *   - @ref bt_gatt_chrc when UUID is @ref BT_UUID_GATT_CHRC.
+ *
+ *  @return BT_GATT_ITER_CONTINUE to continue discovery procedure.
  *  @return BT_GATT_ITER_STOP to stop discovery procedure.
  */
 typedef uint8_t (*bt_gatt_discover_func_t)(struct bt_conn *conn,

@@ -474,6 +474,15 @@ enum {
 	 * @note Requires @ref BT_LE_ADV_OPT_EXT_ADV
 	 */
 	BT_LE_ADV_OPT_USE_TX_POWER = BIT(14),
+
+	/** Disable advertising on channel index 37. */
+	BT_LE_ADV_OPT_DISABLE_CHAN_37 = BIT(15),
+
+	/** Disable advertising on channel index 38. */
+	BT_LE_ADV_OPT_DISABLE_CHAN_38 = BIT(16),
+
+	/** Disable advertising on channel index 39. */
+	BT_LE_ADV_OPT_DISABLE_CHAN_39 = BIT(17),
 };
 
 /** LE Advertising Parameters. */
@@ -612,12 +621,20 @@ struct bt_le_per_adv_param {
 			BT_GAP_ADV_FAST_INT_MIN_2, BT_GAP_ADV_FAST_INT_MAX_2, \
 			_peer)
 
+/** Non-connectable advertising with private address */
 #define BT_LE_ADV_NCONN BT_LE_ADV_PARAM(0, BT_GAP_ADV_FAST_INT_MIN_2, \
 					BT_GAP_ADV_FAST_INT_MAX_2, NULL)
 
+/** Non-connectable advertising with @ref BT_LE_ADV_OPT_USE_NAME */
 #define BT_LE_ADV_NCONN_NAME BT_LE_ADV_PARAM(BT_LE_ADV_OPT_USE_NAME, \
 					     BT_GAP_ADV_FAST_INT_MIN_2, \
 					     BT_GAP_ADV_FAST_INT_MAX_2, NULL)
+
+/** Non-connectable advertising with @ref BT_LE_ADV_OPT_USE_IDENTITY */
+#define BT_LE_ADV_NCONN_IDENTITY BT_LE_ADV_PARAM(BT_LE_ADV_OPT_USE_IDENTITY, \
+						 BT_GAP_ADV_FAST_INT_MIN_2, \
+						 BT_GAP_ADV_FAST_INT_MAX_2, \
+						 NULL)
 
 /**
  * Helper to declare periodic advertising parameters inline
