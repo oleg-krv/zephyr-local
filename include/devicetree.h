@@ -28,6 +28,15 @@
  * @}
  */
 
+/**
+ * @brief Name for an invalid node identifier
+ *
+ * This supports cases where factored macros can be invoked from paths where
+ * devicetree data may or may not be available.  It is a preprocessor identifier
+ * that does not match any valid devicetree node identifier.
+ */
+#define DT_INVALID_NODE _
+
 /*
  * Property suffixes
  * -----------------
@@ -1926,7 +1935,7 @@
 	IS_ENABLED(UTIL_CAT(DT_CAT(DT_COMPAT_, compat), _BUS_##bus))
 
 /* have these last so they have access to all previously defined macros */
-#include <devicetree/adc.h>
+#include <devicetree/io-channels.h>
 #include <devicetree/clocks.h>
 #include <devicetree/gpio.h>
 #include <devicetree/spi.h>

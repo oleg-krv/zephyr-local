@@ -54,6 +54,7 @@ static void isr_tx(void *param);
 static void isr_done(void *param);
 static void isr_window(void *param);
 static void isr_abort(void *param);
+static void isr_done_cleanup(void *param);
 static void isr_cleanup(void *param);
 
 static inline bool isr_rx_scan_check(struct lll_scan *lll, uint8_t irkmatch_ok,
@@ -145,6 +146,7 @@ static int prepare_cb(struct lll_prepare_param *p)
 		return 0;
 	}
 
+	/* Initialize scanning state */
 	lll->state = 0U;
 
 	radio_reset();
@@ -312,27 +314,34 @@ static int is_abort_cb(void *next, int prio, void *curr,
 
 	/* TODO: check prio */
 	if (next != curr) {
-		int err;
+#if defined(CONFIG_BT_CTLR_ADV_EXT)
+		if (unlikely(!lll->duration_reload || lll->duration_expire))
+#endif /* CONFIG_BT_CTLR_ADV_EXT */
+		{
+			int err;
 
-		/* wrap back after the pre-empter */
-		*resume_cb = resume_prepare_cb;
-		*resume_prio = 0; /* TODO: */
+			/* wrap back after the pre-empter */
+			*resume_cb = resume_prepare_cb;
+			*resume_prio = 0; /* TODO: */
 
-		/* Retain HF clock */
-		err = lll_hfclock_on();
-		LL_ASSERT(err >= 0);
+			/* Retain HF clock */
+			err = lll_hfclock_on();
+			LL_ASSERT(err >= 0);
 
-		return -EAGAIN;
+			return -EAGAIN;
+		}
 	}
 
-	radio_isr_set(isr_window, lll);
+#if defined(CONFIG_BT_CTLR_ADV_EXT)
+	if (unlikely(lll->duration_reload && !lll->duration_expire)) {
+		radio_isr_set(isr_done_cleanup, lll);
+	} else
+#endif /* CONFIG_BT_CTLR_ADV_EXT */
+	{
+		radio_isr_set(isr_window, lll);
+	}
+
 	radio_disable();
-
-	if (++lll->chan == 3U) {
-		lll->chan = 0U;
-	}
-
-	lll_chan_set(37 + lll->chan);
 
 	return 0;
 }
@@ -370,7 +379,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 static void ticker_stop_cb(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
 			   void *param)
 {
-	radio_isr_set(isr_cleanup, param);
+	radio_isr_set(isr_done_cleanup, param);
 	radio_disable();
 }
 
@@ -500,9 +509,18 @@ static void isr_tx(void *param)
 static void isr_common_done(void *param)
 {
 	struct node_rx_pdu *node_rx;
+	struct lll_scan *lll;
 
 	/* Clear radio status and events */
 	lll_isr_status_reset();
+
+	/* Reset scanning state */
+	lll = param;
+	lll->state = 0U;
+
+#if defined(CONFIG_BT_CTLR_ADV_EXT)
+	lll->is_adv_ind = 0U;
+#endif /* CONFIG_BT_CTLR_ADV_EXT */
 
 	/* setup tIFS switching */
 	radio_tmr_tifs_set(EVENT_IFS_US);
@@ -527,17 +545,9 @@ static void isr_common_done(void *param)
 
 static void isr_done(void *param)
 {
-	struct lll_scan *lll;
 	uint32_t start_us;
 
 	isr_common_done(param);
-
-	lll = param;
-	lll->state = 0U;
-
-#if defined(CONFIG_BT_CTLR_ADV_EXT)
-	lll->is_adv_ind = 0U;
-#endif /* CONFIG_BT_CTLR_ADV_EXT */
 
 #if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
 	start_us = radio_tmr_start_now(0);
@@ -562,8 +572,17 @@ static void isr_window(void *param)
 {
 	uint32_t ticks_at_start;
 	uint32_t remainder_us;
+	struct lll_scan *lll;
 
 	isr_common_done(param);
+
+	lll = param;
+
+	/* Next radio channel to scan, round-robin 37, 38, and 39. */
+	if (++lll->chan == 3U) {
+		lll->chan = 0U;
+	}
+	lll_chan_set(37 + lll->chan);
 
 	ticks_at_start = ticker_ticks_now_get() +
 			 HAL_TICKER_CNTR_CMP_OFFSET_MIN;
@@ -602,14 +621,28 @@ static void isr_abort(void *param)
 	isr_cleanup(param);
 }
 
+static void isr_done_cleanup(void *param)
+{
+	if (lll_is_done(param)) {
+		return;
+	}
+
+#if defined(CONFIG_BT_CTLR_ADV_EXT)
+	struct event_done_extra *extra;
+
+	extra = ull_event_done_extra_get();
+	LL_ASSERT(extra);
+
+	extra->type = EVENT_DONE_EXTRA_TYPE_SCAN;
+#endif  /* CONFIG_BT_CTLR_ADV_EXT */
+
+	isr_cleanup(param);
+}
+
 static void isr_cleanup(void *param)
 {
 	struct node_rx_hdr *node_rx;
 	struct lll_scan *lll;
-
-	if (lll_is_done(param)) {
-		return;
-	}
 
 	radio_filter_disable();
 
@@ -795,7 +828,7 @@ static inline int isr_rx_pdu(struct lll_scan *lll, uint8_t devmatch_ok,
 			lll_prof_cputime_capture();
 		}
 
-		radio_isr_set(isr_cleanup, lll);
+		radio_isr_set(isr_done_cleanup, lll);
 
 #if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
 		if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
