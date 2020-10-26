@@ -104,7 +104,7 @@ SECTION_FUNC(TEXT, arch_cpu_idle)
 	 * Clear PRIMASK and flush instruction buffer to immediately service
 	 * the wake-up interrupt.
 	 */
-    	cpsie	i
+	cpsie	i
 	isb
 
 	bx	lr

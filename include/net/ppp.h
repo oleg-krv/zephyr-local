@@ -547,16 +547,6 @@ void net_ppp_init(struct net_if *iface);
 enum net_event_ppp_cmd {
 	NET_EVENT_PPP_CMD_CARRIER_ON = 1,
 	NET_EVENT_PPP_CMD_CARRIER_OFF,
-	NET_EVENT_PPP_CMD_LINK_DEAD,
-	NET_EVENT_PPP_CMD_LINK_DOWN,
-#ifdef CONFIG_MODEM_GSM_SIMCOM_EXT
-	NET_EVENT_MODEM_OPERATOR_CONNECT,
-	NET_EVENT_MODEM_OPERATOR_DISCONNECT,
-	NET_EVENT_MODEM_SIM_ERROR,
-	NET_EVENT_MODEM_RESET,
-	NET_EVENT_MODEM_POWER_ON,
-	NET_EVENT_MODEM_POWER_OFF,
-#endif
 };
 
 #define NET_EVENT_PPP_CARRIER_ON					\
@@ -564,34 +554,6 @@ enum net_event_ppp_cmd {
 
 #define NET_EVENT_PPP_CARRIER_OFF					\
 	(_NET_PPP_EVENT | NET_EVENT_PPP_CMD_CARRIER_OFF)
-
-#define NET_EVENT_PPP_LINK_DEAD					\
-	(_NET_PPP_EVENT | NET_EVENT_PPP_CMD_LINK_DEAD)
-
-#define NET_EVENT_PPP_LINK_DOWN					\
-	(_NET_PPP_EVENT | NET_EVENT_PPP_CMD_LINK_DOWN)
-
-#ifdef CONFIG_MODEM_GSM_SIMCOM_EXT
-
-#define NET_EVENT_MODEM_OPERATOR_CONNECT		\
-	(_NET_PPP_EVENT | NET_EVENT_MODEM_OPERATOR_CONNECT)
-
-#define NET_EVENT_MODEM_OPERATOR_DISCONNECT		\
-	(_NET_PPP_EVENT | NET_EVENT_MODEM_OPERATOR_DISCONNECT)
-
-#define NET_EVENT_MODEM_SIM_ERROR				\
-	(_NET_PPP_EVENT | NET_EVENT_MODEM_SIM_ERROR)
-
-#define NET_EVENT_MODEM_RESET					\
-	(_NET_PPP_EVENT | NET_EVENT_MODEM_RESET)
-
-#define NET_EVENT_MODEM_POWER_ON				\
-	(_NET_PPP_EVENT | NET_EVENT_MODEM_POWER_ON)
-
-#define NET_EVENT_MODEM_POWER_OFF				\
-	(_NET_PPP_EVENT | NET_EVENT_MODEM_POWER_OFF)
-
-#endif
 
 struct net_if;
 
@@ -620,78 +582,6 @@ static inline void ppp_mgmt_raise_carrier_on_event(struct net_if *iface)
 void ppp_mgmt_raise_carrier_off_event(struct net_if *iface);
 #else
 static inline void ppp_mgmt_raise_carrier_off_event(struct net_if *iface)
-{
-	ARG_UNUSED(iface);
-}
-#endif
-
-#if defined(CONFIG_NET_L2_PPP_MGMT)
-void ppp_mgmt_raise_link_dead_event(struct net_if *iface);
-#else
-static inline void ppp_mgmt_raise_link_dead_event(struct net_if *iface)
-{
-	ARG_UNUSED(iface);
-}
-#endif
-
-#if defined(CONFIG_NET_L2_PPP_MGMT)
-void ppp_mgmt_raise_link_down_event(struct net_if *iface);
-#else
-static inline void ppp_mgmt_raise_link_down_event(struct net_if *iface)
-{
-	ARG_UNUSED(iface);
-}
-#endif
-
-#ifdef CONFIG_MODEM_GSM_SIMCOM_EXT
-void ppp_mgmt_raise_modem_operator_connect_event(struct net_if *iface);
-#else
-static inline void ppp_mgmt_raise_operator_connect_event(struct net_if *iface)
-{
-	ARG_UNUSED(iface);
-}
-#endif
-
-#ifdef CONFIG_MODEM_GSM_SIMCOM_EXT
-void ppp_mgmt_raise_modem_operator_disconnect_event(struct net_if *iface);
-#else
-static inline void ppp_mgmt_raise_operator_disconnect_event(struct net_if *iface)
-{
-	ARG_UNUSED(iface);
-}
-#endif
-
-#ifdef CONFIG_MODEM_GSM_SIMCOM_EXT
-void ppp_mgmt_raise_modem_sim_error_event(struct net_if *iface);
-#else
-static inline void ppp_mgmt_raise_modem_sim_error_event(struct net_if *iface)
-{
-	ARG_UNUSED(iface);
-}
-#endif
-
-#ifdef CONFIG_MODEM_GSM_SIMCOM_EXT
-void ppp_mgmt_raise_modem_reset_event(struct net_if *iface);
-#else
-static inline void ppp_mgmt_raise_modem_reset_event(struct net_if *iface)
-{
-	ARG_UNUSED(iface);
-}
-#endif
-
-#ifdef CONFIG_MODEM_GSM_SIMCOM_EXT
-void ppp_mgmt_raise_modem_power_on_event(struct net_if *iface);
-#else
-static inline void ppp_mgmt_raise_modem_power_on_event(struct net_if *iface)
-{
-	ARG_UNUSED(iface);
-}
-#endif
-
-#ifdef CONFIG_MODEM_GSM_SIMCOM_EXT
-void ppp_mgmt_raise_modem_power_off_event(struct net_if *iface);
-#else
-static inline void ppp_mgmt_raise_modem_power_off_event(struct net_if *iface)
 {
 	ARG_UNUSED(iface);
 }
