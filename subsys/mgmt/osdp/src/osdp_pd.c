@@ -709,9 +709,6 @@ void osdp_update(struct osdp *ctx)
 	switch (pd->state) {
 	case OSDP_PD_STATE_IDLE:
 		ret = pd_receve_packet(pd);
-		if (ret == 1) {
-			break;
-		}
 		if (ret == -1 || ((pd->rx_buf_len > 0 ||
 		    ISSET_FLAG(pd, PD_FLAG_SC_ACTIVE)) &&
 		    osdp_millis_since(pd->tstamp) > OSDP_RESP_TOUT_MS)) {
@@ -721,6 +718,9 @@ void osdp_update(struct osdp *ctx)
 			 */
 			LOG_ERR(TAG "receive errors/timeout");
 			pd->state = OSDP_PD_STATE_ERR;
+			break;
+		}
+		if (ret == 1) {
 			break;
 		}
 		if (ret == 0) {
@@ -793,6 +793,8 @@ int osdp_setup(struct osdp *ctx, uint8_t *key)
 #endif
 	return 0;
 }
+
+/* --- Exported Methods --- */
 
 int osdp_pd_get_cmd(struct osdp_cmd *cmd)
 {

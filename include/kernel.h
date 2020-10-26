@@ -266,7 +266,9 @@ struct _mem_domain_info {
 
 #ifdef CONFIG_THREAD_USERSPACE_LOCAL_DATA
 struct _thread_userspace_local_data {
+#if defined(CONFIG_ERRNO) && !defined(CONFIG_ERRNO_IN_TLS)
 	int errno_var;
+#endif
 };
 #endif
 
@@ -286,8 +288,26 @@ struct k_thread {
 
 	/**
 	 * abort function
-	 * */
-	void (*fn_abort)(void);
+	 *
+	 * This function pointer, if non-NULL, will be run once after the
+	 * thread has completely exited. It may run in the context of:
+	 *   - the idle thread if the thread self-exited
+	 *   - another thread calling k_thread_abort()
+	 *   - a fatal exception handler on a special stack
+	 *
+	 * It will never run in the context of the thread itself.
+	 *
+	 * A pointer to the thread object that was aborted is provided. At the
+	 * time this runs, this thread object has completely exited. It may
+	 * be re-used with k_thread_create() or return it to a heap or slab
+	 * pool.
+	 *
+	 * This function does not run with any kind of lock active and
+	 * there is the possibility of races leading to undefined behavior
+	 * if other threads are attempting to free or recycle this object
+	 * concurrently.
+	 */
+	void (*fn_abort)(struct k_thread *aborted);
 
 #if defined(CONFIG_THREAD_MONITOR)
 	/** thread entry and parameters description */
@@ -311,7 +331,7 @@ struct k_thread {
 	struct _thread_userspace_local_data *userspace_local_data;
 #endif
 
-#ifdef CONFIG_ERRNO
+#if defined(CONFIG_ERRNO) && !defined(CONFIG_ERRNO_IN_TLS)
 #ifndef CONFIG_USERSPACE
 	/** per-thread errno variable */
 	int errno_var;
@@ -346,6 +366,11 @@ struct k_thread {
 #endif
 	/** resource pool */
 	struct k_mem_pool *resource_pool;
+
+#if defined(CONFIG_THREAD_LOCAL_STORAGE)
+	/* Pointer to arch-specific TLS area */
+	uintptr_t tls;
+#endif /* CONFIG_THREAD_LOCAL_STORAGE */
 
 	/** arch-specifics: must always be at the end */
 	struct _thread_arch arch;
@@ -643,6 +668,8 @@ __syscall int k_thread_join(struct k_thread *thread, k_timeout_t timeout);
  *
  * This routine puts the current thread to sleep for @a duration,
  * specified as a k_timeout_t object.
+ *
+ * @note if @a timeout is set to K_FOREVER then the thread is suspended.
  *
  * @param timeout Desired duration of sleep.
  *

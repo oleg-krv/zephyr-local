@@ -634,6 +634,12 @@ void ll_rx_dequeue(void)
 		}
 	}
 	break;
+
+	case NODE_RX_TYPE_EXT_SCAN_TERMINATE:
+	{
+		ull_scan_term_dequeue(rx->handle);
+	}
+	break;
 #endif /* CONFIG_BT_OBSERVER */
 
 #if defined(CONFIG_BT_BROADCASTER)
@@ -864,6 +870,16 @@ void ll_rx_mem_release(void **node_rx)
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 #endif /* CONFIG_BT_BROADCASTER */
 
+#if defined(CONFIG_BT_OBSERVER)
+#if defined(CONFIG_BT_CTLR_ADV_EXT)
+		case NODE_RX_TYPE_EXT_SCAN_TERMINATE:
+		{
+			mem_release(rx_free, &mem_pdu_rx.free);
+		}
+		break;
+#endif /* CONFIG_BT_CTLR_ADV_EXT */
+#endif /* CONFIG_BT_OBSERVER */
+
 #if defined(CONFIG_BT_CONN)
 		case NODE_RX_TYPE_CONNECTION:
 		{
@@ -925,6 +941,7 @@ void ll_rx_mem_release(void **node_rx)
 
 #if defined(CONFIG_BT_OBSERVER)
 		case NODE_RX_TYPE_REPORT:
+
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 			__fallthrough;
 		case NODE_RX_TYPE_EXT_1M_REPORT:
@@ -1928,10 +1945,14 @@ static inline void rx_demux_event_done(memq_link_t *link,
 #endif /* CONFIG_BT_BROADCASTER */
 
 #if defined(CONFIG_BT_OBSERVER)
-		/* fallthrough checkpatch workaround! */
+	case EVENT_DONE_EXTRA_TYPE_SCAN:
+		ull_scan_done(done);
+		break;
+
 	case EVENT_DONE_EXTRA_TYPE_SCAN_AUX:
 		ull_scan_aux_done(done);
 		break;
+
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
 	case EVENT_DONE_EXTRA_TYPE_SYNC:
 		ull_sync_done(done);

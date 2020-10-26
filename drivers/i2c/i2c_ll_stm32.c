@@ -188,35 +188,13 @@ static int i2c_stm32_init(const struct device *dev)
 	cfg->irq_config_func(dev);
 #endif
 
-	if (cfg->pinctrl_list_size != 0) {
-#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32f1_pinctrl)
-		int remap;
-		/* Check that remap configuration is coherent across pins */
-		remap = stm32_dt_pinctrl_remap_check(cfg->pinctrl_list,
-						     cfg->pinctrl_list_size);
-		if (remap < 0) {
-			return remap;
-		}
-
-		/* A valid remapping configuration is provided */
-		/* Apply remapping before proceeding with pin configuration */
-		LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_AFIO);
-
-		switch ((uint32_t)cfg->i2c) {
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(i2c1), okay)
-		case DT_REG_ADDR(DT_NODELABEL(i2c1)):
-			if (remap == REMAP_1) {
-				LL_GPIO_AF_EnableRemap_I2C1();
-			} else {
-				LL_GPIO_AF_DisableRemap_I2C1();
-			}
-			break;
-#endif
-		}
-#endif /* DT_HAS_COMPAT_STATUS_OKAY(st_stm32f1_pinctrl) */
-
-		stm32_dt_pinctrl_configure(cfg->pinctrl_list,
-					   cfg->pinctrl_list_size);
+	/* Configure dt provided device signals when available */
+	ret = stm32_dt_pinctrl_configure(cfg->pinctrl_list,
+					 cfg->pinctrl_list_size,
+					 (uint32_t)cfg->i2c);
+	if (ret < 0) {
+		LOG_ERR("I2C pinctrl setup failed (%d)", ret);
+		return ret;
 	}
 
 	/*

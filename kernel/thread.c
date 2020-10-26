@@ -492,6 +492,9 @@ static char *setup_thread_stack(struct k_thread *new_thread,
 	 */
 	*((uint32_t *)stack_buf_start) = STACK_SENTINEL;
 #endif /* CONFIG_STACK_SENTINEL */
+#ifdef CONFIG_THREAD_LOCAL_STORAGE
+	delta += arch_tls_stack_setup(new_thread, (stack_ptr - delta));
+#endif /* CONFIG_THREAD_LOCAL_STORAGE */
 #ifdef CONFIG_THREAD_USERSPACE_LOCAL_DATA
 	size_t tls_size = sizeof(struct _thread_userspace_local_data);
 
@@ -565,6 +568,14 @@ char *z_setup_new_thread(struct k_thread *new_thread,
 	z_init_thread_base(&new_thread->base, prio, _THREAD_PRESTART, options);
 	stack_ptr = setup_thread_stack(new_thread, stack, stack_size);
 
+#ifdef KERNEL_COHERENCE
+	/* Check that the thread object is safe, but that the stack is
+	 * still cached!
+	 */
+	__ASSERT_NO_MSG(arch_mem_coherent(new_thread));
+	__ASSERT_NO_MSG(!arch_mem_coherent(stack));
+#endif
+
 	arch_new_thread(new_thread, stack, stack_ptr, entry, p1, p2, p3);
 
 	/* static threads overwrite it afterwards with real value */
@@ -616,10 +627,7 @@ char *z_setup_new_thread(struct k_thread *new_thread,
 	}
 #endif
 #ifdef CONFIG_USERSPACE
-	/* New threads inherit any memory domain membership by the parent */
-	new_thread->mem_domain_info.mem_domain = NULL;
-	k_mem_domain_add_thread(_current->mem_domain_info.mem_domain,
-				new_thread);
+	z_mem_domain_init_thread(new_thread);
 
 	if ((options & K_INHERIT_PERMS) != 0U) {
 		z_thread_perms_inherit(_current, new_thread);
@@ -827,8 +835,10 @@ FUNC_NORETURN void k_thread_user_mode_enter(k_thread_entry_t entry,
 #ifdef CONFIG_USERSPACE
 	__ASSERT(z_stack_is_user_capable(_current->stack_obj),
 		 "dropping to user mode with kernel-only stack object");
+#ifdef CONFIG_THREAD_USERSPACE_LOCAL_DATA
 	memset(_current->userspace_local_data, 0,
 	       sizeof(struct _thread_userspace_local_data));
+#endif
 	arch_user_mode_enter(entry, p1, p2, p3);
 #else
 	/* XXX In this case we do not reset the stack */
