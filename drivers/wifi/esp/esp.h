@@ -89,7 +89,6 @@ extern "C" {
 #define MDM_RING_BUF_SIZE	CONFIG_WIFI_ESP_MDM_RING_BUF_SIZE
 #define MDM_RECV_MAX_BUF	CONFIG_WIFI_ESP_MDM_RX_BUF_COUNT
 #define MDM_RECV_BUF_SIZE	CONFIG_WIFI_ESP_MDM_RX_BUF_SIZE
-#define CMD_BUF_ALLOC_TIMEOUT	K_SECONDS(1)
 
 #define ESP_CMD_TIMEOUT		K_SECONDS(10)
 #define ESP_SCAN_TIMEOUT	K_SECONDS(10)
@@ -173,7 +172,6 @@ struct esp_data {
 
 	/* modem cmds */
 	struct modem_cmd_handler_data cmd_handler_data;
-	uint8_t cmd_read_buf[MDM_RECV_BUF_SIZE];
 	uint8_t cmd_match_buf[MDM_RECV_BUF_SIZE];
 
 	/* socket data */

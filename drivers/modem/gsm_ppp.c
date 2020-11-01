@@ -28,7 +28,6 @@ LOG_MODULE_REGISTER(modem_gsm, CONFIG_MODEM_LOG_LEVEL);
 #define GSM_RX_STACK_SIZE      CONFIG_MODEM_GSM_RX_STACK_SIZE
 #define GSM_RECV_MAX_BUF       30
 #define GSM_RECV_BUF_SIZE      128
-#define GSM_BUF_ALLOC_TIMEOUT  K_SECONDS(1)
 
 /* During the modem setup, we first create DLCI control channel and then
  * PPP and AT channels. Currently the modem does not create possible GNSS
@@ -46,7 +45,6 @@ static struct gsm_modem {
 	struct modem_context context;
 
 	struct modem_cmd_handler_data cmd_handler_data;
-	uint8_t cmd_read_buf[GSM_CMD_READ_BUF];
 	uint8_t cmd_match_buf[GSM_CMD_READ_BUF];
 	struct k_sem sem_response;
 
@@ -728,12 +726,10 @@ static int gsm_init(const struct device *device)
 
 	gsm->cmd_handler_data.cmds[CMD_RESP] = response_cmds;
 	gsm->cmd_handler_data.cmds_len[CMD_RESP] = ARRAY_SIZE(response_cmds);
-	gsm->cmd_handler_data.read_buf = &gsm->cmd_read_buf[0];
-	gsm->cmd_handler_data.read_buf_len = sizeof(gsm->cmd_read_buf);
 	gsm->cmd_handler_data.match_buf = &gsm->cmd_match_buf[0];
 	gsm->cmd_handler_data.match_buf_len = sizeof(gsm->cmd_match_buf);
 	gsm->cmd_handler_data.buf_pool = &gsm_recv_pool;
-	gsm->cmd_handler_data.alloc_timeout = GSM_BUF_ALLOC_TIMEOUT;
+	gsm->cmd_handler_data.alloc_timeout = K_NO_WAIT;
 	gsm->cmd_handler_data.eol = "\r";
 
 	k_sem_init(&gsm->sem_response, 0, 1);

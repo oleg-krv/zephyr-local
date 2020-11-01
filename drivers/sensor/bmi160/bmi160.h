@@ -398,7 +398,36 @@ struct bmi160_range {
 	uint8_t reg_val;
 };
 
-struct bmi160_device_config {
+#define BMI160_BUS_SPI		DT_ANY_INST_ON_BUS_STATUS_OKAY(spi)
+#define BMI160_BUS_I2C		DT_ANY_INST_ON_BUS_STATUS_OKAY(i2c)
+
+struct bmi160_bus_cfg {
+	union {
+#if BMI160_BUS_SPI
+		const struct spi_config *spi_cfg;
+#endif
+#if BMI160_BUS_I2C
+		uint16_t i2c_addr;
+#endif
+	};
+};
+
+typedef int (*bmi160_reg_read_fn)(const struct device *bus,
+				  const struct bmi160_bus_cfg *bus_cfg,
+				  uint8_t reg_addr, void *data, uint8_t len);
+typedef int (*bmi160_reg_write_fn)(const struct device *bus,
+				   const struct bmi160_bus_cfg *bus_cfg,
+				   uint8_t reg_addr, void *data, uint8_t len);
+
+struct bmi160_reg_io {
+	bmi160_reg_read_fn read;
+	bmi160_reg_write_fn write;
+};
+
+struct bmi160_cfg {
+	struct bmi160_bus_cfg bus_cfg;
+	const struct bmi160_reg_io *reg_io;
+	const char *bus_label;
 #if defined(CONFIG_BMI160_TRIGGER)
 	const char *gpio_port;
 	gpio_pin_t int_pin;
@@ -454,9 +483,8 @@ struct bmi160_scale {
 	uint16_t gyr; /* micro radians/s/lsb */
 };
 
-struct bmi160_device_data {
-	const struct device *spi;
-	struct spi_config spi_cfg;
+struct bmi160_data {
+	const struct device *bus;
 #if defined(CONFIG_BMI160_TRIGGER)
 	const struct device *dev;
 	const struct device *gpio;
@@ -485,8 +513,18 @@ struct bmi160_device_data {
 #endif /* CONFIG_BMI160_TRIGGER */
 };
 
+static inline struct bmi160_data *to_data(const struct device *dev)
+{
+	return dev->data;
+}
+
+static inline const struct bmi160_cfg *to_config(const struct device *dev)
+{
+	return dev->config;
+}
+
 int bmi160_read(const struct device *dev, uint8_t reg_addr,
-		uint8_t *data, uint8_t len);
+		void *data, uint8_t len);
 int bmi160_byte_read(const struct device *dev, uint8_t reg_addr,
 		     uint8_t *byte);
 int bmi160_byte_write(const struct device *dev, uint8_t reg_addr,

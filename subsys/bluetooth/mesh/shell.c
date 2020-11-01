@@ -429,8 +429,30 @@ static int cmd_uuid(const struct shell *shell, size_t argc, char *argv[])
 
 static int cmd_reset(const struct shell *shell, size_t argc, char *argv[])
 {
-	bt_mesh_reset();
-	shell_print(shell, "Local node reset complete");
+	uint16_t addr;
+	if (argc < 2) {
+		return -EINVAL;
+	}
+
+	addr = strtoul(argv[1], NULL, 0);
+
+	if (addr == net.local) {
+		bt_mesh_reset();
+		shell_print(shell, "Local node reset complete");
+	} else {
+		int err;
+		bool reset = false;
+
+		err = bt_mesh_cfg_node_reset(net.net_idx, net.dst, &reset);
+		if (err) {
+			shell_error(shell, "Unable to send "
+					"Remote Node Reset (err %d)", err);
+			return 0;
+		}
+
+		shell_print(shell, "Remote node reset complete");
+	}
+
 	return 0;
 }
 
@@ -1868,7 +1890,7 @@ static int cmd_hb_pub(const struct shell *shell, size_t argc, char *argv[])
 	}
 }
 
-#if defined(CONFIG_BT_MESH_PROV)
+#if defined(CONFIG_BT_MESH_PROV_DEVICE)
 static int cmd_pb(bt_mesh_prov_bearer_t bearer, const struct shell *shell,
 		  size_t argc, char *argv[])
 {
@@ -2654,7 +2676,7 @@ static int cmd_cdb_app_key_del(const struct shell *shell, size_t argc,
 SHELL_STATIC_SUBCMD_SET_CREATE(mesh_cmds,
 	/* General operations */
 	SHELL_CMD_ARG(init, NULL, NULL, cmd_init, 1, 0),
-	SHELL_CMD_ARG(reset, NULL, NULL, cmd_reset, 1, 0),
+	SHELL_CMD_ARG(reset, NULL, "<addr>", cmd_reset, 2, 0),
 #if defined(CONFIG_BT_MESH_LOW_POWER)
 	SHELL_CMD_ARG(lpn, NULL, "<value: off, on>", cmd_lpn, 2, 0),
 	SHELL_CMD_ARG(poll, NULL, NULL, cmd_poll, 1, 0),
@@ -2808,4 +2830,4 @@ static int cmd_mesh(const struct shell *shell, size_t argc, char **argv)
 }
 
 SHELL_CMD_ARG_REGISTER(mesh, &mesh_cmds, "Bluetooth Mesh shell commands",
-		       cmd_mesh, 1, 1);
+			cmd_mesh, 1, 1);

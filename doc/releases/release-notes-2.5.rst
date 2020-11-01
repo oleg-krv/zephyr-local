@@ -225,6 +225,8 @@ Libraries / Subsystems
 
 * LVGL
 
+  * Library has been updated to minor release v7.6.1
+
 * Shell
 
 * Storage
@@ -260,6 +262,8 @@ MCUBoot
   * Added reset of Cortex SPLIM registers before boot.
   * Fixesd build issue that occurs if CONF_FILE contains multiple file paths
     instead of single file path.
+  * Added watchdog feed on nRF devices. See ``CONFIG_BOOT_WATCHDOG_FEED`` option.
+  * Removed the flash_area_read_is_empty() port implementation function.
 
 * imgtool
 

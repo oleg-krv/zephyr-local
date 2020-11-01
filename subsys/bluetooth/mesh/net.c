@@ -612,6 +612,7 @@ static void bt_mesh_net_relay(struct net_buf_simple *sbuf,
 	}
 
 	if (rx->net_if == BT_MESH_NET_IF_ADV &&
+	    !rx->friend_cred &&
 	    bt_mesh_relay_get() != BT_MESH_RELAY_ENABLED &&
 	    bt_mesh_gatt_proxy_get() != BT_MESH_GATT_PROXY_ENABLED) {
 		return;
@@ -624,7 +625,7 @@ static void bt_mesh_net_relay(struct net_buf_simple *sbuf,
 	 * Anything else (like GATT to adv, or locally originated packets)
 	 * use the Network Transmit state.
 	 */
-	if (rx->net_if == BT_MESH_NET_IF_ADV) {
+	if (rx->net_if == BT_MESH_NET_IF_ADV && !rx->friend_cred) {
 		transmit = bt_mesh_relay_retransmit_get();
 	} else {
 		transmit = bt_mesh_net_transmit_get();
@@ -661,18 +662,17 @@ static void bt_mesh_net_relay(struct net_buf_simple *sbuf,
 		goto done;
 	}
 
-	/* Sending to the GATT bearer should only happen if GATT Proxy
-	 * is enabled.
+	/* When the Friend node relays message for lpn, the message will be
+	 * retransmitted using the managed master security credentials and
+	 * the Network PDU shall be retransmitted to all network interfaces.
 	 */
 	if (IS_ENABLED(CONFIG_BT_MESH_GATT_PROXY) &&
-	    bt_mesh_gatt_proxy_get() == BT_MESH_GATT_PROXY_ENABLED) {
-		if (bt_mesh_proxy_relay(&buf->b, rx->ctx.recv_dst) &&
-		    BT_MESH_ADDR_IS_UNICAST(rx->ctx.recv_dst)) {
-			goto done;
-		}
+	    (rx->friend_cred ||
+	     bt_mesh_gatt_proxy_get() == BT_MESH_GATT_PROXY_ENABLED)) {
+		bt_mesh_proxy_relay(&buf->b, rx->ctx.recv_dst);
 	}
 
-	if (relay_to_adv(rx->net_if)) {
+	if (relay_to_adv(rx->net_if) || rx->friend_cred) {
 		bt_mesh_adv_send(buf, NULL, NULL);
 	}
 
@@ -827,38 +827,6 @@ static void ivu_refresh(struct k_work *work)
 		bt_mesh_net_iv_update(bt_mesh.iv_index, false);
 	} else if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
 		bt_mesh_store_iv(true);
-	}
-}
-
-void bt_mesh_net_start(void)
-{
-	if (bt_mesh_beacon_get() == BT_MESH_BEACON_ENABLED) {
-		bt_mesh_beacon_enable();
-	} else {
-		bt_mesh_beacon_disable();
-	}
-
-	if (IS_ENABLED(CONFIG_BT_MESH_GATT_PROXY) &&
-	    bt_mesh_gatt_proxy_get() != BT_MESH_GATT_PROXY_NOT_SUPPORTED) {
-		bt_mesh_proxy_gatt_enable();
-		bt_mesh_adv_update();
-	}
-
-	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER)) {
-		bt_mesh_lpn_init();
-	} else {
-		bt_mesh_scan_enable();
-	}
-
-	if (IS_ENABLED(CONFIG_BT_MESH_FRIEND)) {
-		bt_mesh_friend_init();
-	}
-
-	if (IS_ENABLED(CONFIG_BT_MESH_PROV)) {
-		struct bt_mesh_subnet *sub = bt_mesh_subnet_next(NULL);
-		uint16_t addr = bt_mesh_primary_addr();
-
-		bt_mesh_prov_complete(sub->net_idx, addr);
 	}
 }
 
