@@ -23,7 +23,7 @@ LOG_MODULE_DECLARE(LSM6DS3, CONFIG_SENSOR_LOG_LEVEL);
 /**
  * lsm6ds3_enable_t_int - TEMP enable selected int pin to generate interrupt
  */
-static int lsm6ds3_enable_t_int(struct device *dev, int enable)
+static int lsm6ds3_enable_t_int(const struct device *dev, int enable)
 {
 	const struct lsm6ds3_config *cfg = dev->config;
 	struct lsm6ds3_data *lsm6ds3 = dev->data;
@@ -87,7 +87,7 @@ static int lsm6ds3_enable_xl_int(const struct device *dev, int enable)
 /**
  * lsm6ds3_enable_g_int - Gyro enable selected int pin to generate interrupt
  */
-static int lsm6ds3_enable_g_int(struct device *dev, int enable)
+static int lsm6ds3_enable_g_int(const struct device *dev, int enable)
 {
 	const struct lsm6ds3_config *cfg = dev->config;
 	struct lsm6ds3_data *lsm6ds3 = dev->data;
@@ -122,11 +122,11 @@ static int lsm6ds3_enable_g_int(struct device *dev, int enable)
 /**
  * lsm6ds3_trigger_set - link external trigger to event data ready
  */
-int lsm6ds3_trigger_set(struct device *dev,
+int lsm6ds3_trigger_set(const struct device *dev,
 			  const struct sensor_trigger *trig,
 			  sensor_trigger_handler_t handler)
 {
-	struct lsm6ds3_data *lsm6ds3 = dev->driver_data;
+	struct lsm6ds3_data *lsm6ds3 = dev->data;
 
 	if (trig->chan == SENSOR_CHAN_ACCEL_XYZ) {
 		lsm6ds3->handler_drdy_acc = handler;
@@ -206,6 +206,7 @@ static void lsm6ds3_handle_interrupt(const struct device *dev)
 static void lsm6ds3_gpio_callback(const struct device *dev,
 				    struct gpio_callback *cb, uint32_t pins)
 {
+	ARG_UNUSED(dev);
 	struct lsm6ds3_data *lsm6ds3 =
 		CONTAINER_OF(cb, struct lsm6ds3_data, gpio_cb);
 	const struct lsm6ds3_config *cfg = lsm6ds3->dev->config;
@@ -223,11 +224,11 @@ static void lsm6ds3_gpio_callback(const struct device *dev,
 }
 
 #ifdef CONFIG_LSM6DS3_TRIGGER_OWN_THREAD
-static void lsm6ds3_thread(struct lsm6ds3_data *lsm6dso)
+FUNC_NORETURN static void lsm6ds3_thread(struct lsm6ds3_data *lsm6ds3)
 {
 	while (1) {
 		k_sem_take(&lsm6ds3->gpio_sem, K_FOREVER);
-		lsm6ds3_handle_interrupt(lsm6dso->dev);
+		lsm6ds3_handle_interrupt(lsm6ds3->dev);
 	}
 }
 #endif /* CONFIG_LSM6DS3_TRIGGER_OWN_THREAD */
@@ -242,7 +243,7 @@ static void lsm6ds3_work_cb(struct k_work *work)
 }
 #endif /* CONFIG_LSM6DS3_TRIGGER_GLOBAL_THREAD */
 
-int lsm6ds3_init_interrupt(struct device *dev)
+int lsm6ds3_init_interrupt(const struct device *dev)
 {
 	struct lsm6ds3_data *lsm6ds3 = dev->data;
 	const struct lsm6ds3_config *cfg = dev->config;
@@ -286,7 +287,8 @@ int lsm6ds3_init_interrupt(struct device *dev)
 
 	/* enable interrupt on int1/int2 in pulse mode */
 	if (lsm6ds3_int_notification_set(lsm6ds3->ctx,
-					 LSM6DS3_ALL_INT_PULSED) < 0) {
+					 //LSM6DS3_ALL_INT_PULSED) < 0) {
+									 LSM6DS3_INT_PULSED) <0) {
 		LOG_DBG("Could not set pulse mode");
 		return -EIO;
 	}

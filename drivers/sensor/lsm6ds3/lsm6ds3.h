@@ -173,7 +173,7 @@ struct lsm6ds3_data {
 	uint8_t gyro_fs;
 
 #ifdef CONFIG_LSM6DS3_TRIGGER
-	struct device *gpio;
+	const struct device *gpio;
 	struct gpio_callback gpio_cb;
 	sensor_trigger_handler_t handler_drdy_acc;
 	sensor_trigger_handler_t handler_drdy_gyr;
