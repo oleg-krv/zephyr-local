@@ -1420,15 +1420,17 @@ uint8_t ull_adv_data_set(struct ll_adv_set *adv, uint8_t len,
 	struct pdu_adv *pdu;
 	uint8_t idx;
 
-	/* Dont update data if directed or extended advertising. */
+	/* Dont update data if directed */
 	prev = lll_adv_data_peek(&adv->lll);
-	if ((prev->type == PDU_ADV_TYPE_DIRECT_IND) ||
-	    (IS_ENABLED(CONFIG_BT_CTLR_ADV_EXT) &&
-	     (prev->type == PDU_ADV_TYPE_EXT_IND))) {
+	if (prev->type == PDU_ADV_TYPE_DIRECT_IND) {
 		/* TODO: remember data, to be used if type is changed using
 		 * parameter set function ll_adv_params_set afterwards.
 		 */
 		return 0;
+	}
+
+	if (len > PDU_AC_DATA_SIZE_MAX) {
+		return BT_HCI_ERR_INVALID_PARAM;
 	}
 
 	/* update adv pdu fields. */

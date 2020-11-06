@@ -1811,6 +1811,7 @@ class CMake():
                 return None
         else:
             # A real error occurred, raise an exception
+            log_msg = ""
             if out:
                 log_msg = out.decode(sys.getdefaultencoding())
                 with open(os.path.join(self.build_dir, self.log), "a") as log:
@@ -1822,6 +1823,7 @@ class CMake():
                     logger.debug("Test skipped due to {} Overflow".format(res[0]))
                     self.instance.status = "skipped"
                     self.instance.reason = "{} overflow".format(res[0])
+                    self.suite.build_filtered_tests += 1
                 else:
                     self.instance.status = "error"
                     self.instance.reason = "Build failure"
@@ -3191,7 +3193,7 @@ class TestSuite(DisablePyTestCollectionMixin):
                             passes += 1
                         elif instance.results[k] == 'BLOCK':
                             errors += 1
-                        elif instance.results[k] == 'SKIP':
+                        elif instance.results[k] == 'SKIP' or instance.status in ['skipped']:
                             skips += 1
                         else:
                             fails += 1
@@ -3290,8 +3292,7 @@ class TestSuite(DisablePyTestCollectionMixin):
                         elif instance.results[k] == 'PASS' \
                             or (not instance.run and instance.status in ["passed"]):
                             pass
-                        elif instance.results[k] == 'SKIP' \
-                            or (not instance.run and instance.status in ["skipped"]):
+                        elif instance.results[k] == 'SKIP' or (instance.status in ["skipped"]):
                             el = ET.SubElement(eleTestcase, 'skipped', type="skipped", message=instance.reason)
                         else:
                             el = ET.SubElement(

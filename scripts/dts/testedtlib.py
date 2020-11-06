@@ -156,6 +156,22 @@ def test_child_binding():
     assert str(grandchild.description) == "grandchild node"
     assert str(grandchild.props) == "OrderedDict([('grandchild-prop', <Property, name: grandchild-prop, type: int, value: 2>)])"
 
+    binding_file = Path("test-bindings/child-binding.yaml").resolve()
+    top = edtlib.Binding(binding_file, {})
+    child = top.child_binding
+    assert Path(top.path) == binding_file
+    assert Path(child.path) == binding_file
+    assert top.compatible == 'child-binding'
+    assert child.compatible == 'child-binding'
+
+    binding_file = Path("test-bindings/child-binding-with-compat.yaml").resolve()
+    top = edtlib.Binding(binding_file, {})
+    child = top.child_binding
+    assert Path(top.path) == binding_file
+    assert Path(child.path) == binding_file
+    assert top.compatible == 'child-binding-with-compat'
+    assert child.compatible == 'child-compat'
+
 def test_props():
     '''Test Node.props (derived from DT and 'properties:' in the binding)'''
     edt = edtlib.EDT("test.dts", ["test-bindings"])

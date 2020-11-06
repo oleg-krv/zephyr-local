@@ -21,7 +21,8 @@ Each devicetree node (dtlib.Node) gets a corresponding edtlib.Node instance,
 which has all the information related to the node.
 
 The top-level entry points for the library are the EDT and Binding classes.
-See their constructor docstrings for details.
+See their constructor docstrings for details. There is also a
+bindings_from_paths() helper function.
 """
 
 # NOTE: testedtlib.py is the test suite for this library.
@@ -1389,9 +1390,10 @@ class Binding:
       The free-form description of the binding.
 
     compatible:
-      The compatible string the binding matches. This may be None if the
-      Binding object is a child binding or if it's inferred from node
-      properties.
+      The compatible string the binding matches. This is None if the Binding is
+      inferred from node properties. If the Binding is a child binding, then
+      this will be inherited from the parent binding unless the child binding
+      explicitly sets its own compatible.
 
     prop2specs:
       A collections.OrderedDict mapping property names to PropertySpec objects
@@ -1507,6 +1509,14 @@ class Binding:
             if key.endswith("-cells"):
                 self.specifier2cells[key[:-len("-cells")]] = val
 
+        # Make child binding compatibles match ours if they are missing.
+        if self.compatible is not None:
+            child = self.child_binding
+            while child is not None:
+                if child.compatible is None:
+                    child.compatible = self.compatible
+                child = child.child_binding
+
         # Drop the reference to the open warn file. This is necessary
         # to make this object pickleable, but also allows it to get
         # garbage collected and closed if nobody else is using it.
@@ -1527,7 +1537,14 @@ class Binding:
     @property
     def compatible(self):
         "See the class docstring"
+        if hasattr(self, '_compatible'):
+            return self._compatible
         return self.raw.get('compatible')
+
+    @compatible.setter
+    def compatible(self, compatible):
+        "See the class docstring"
+        self._compatible = compatible
 
     @property
     def bus(self):
@@ -1701,6 +1718,26 @@ class Binding:
         else:
             raise _err("can't _warn() outside of Binding.__init__")
 
+
+def bindings_from_paths(yaml_paths, ignore_errors=False):
+    """
+    Get a list of Binding objects from the yaml files 'yaml_paths'.
+
+    If 'ignore_errors' is True, YAML files that cause an EDTError when
+    loaded are ignored. (No other exception types are silenced.)
+    """
+
+    ret = []
+    fname2path = {os.path.basename(path): path for path in yaml_paths}
+    for path in yaml_paths:
+        try:
+            ret.append(Binding(path, fname2path))
+        except EDTError:
+            if ignore_errors:
+                continue
+            raise
+
+    return ret
 
 class PropertySpec:
     """

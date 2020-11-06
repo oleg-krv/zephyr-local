@@ -27,6 +27,9 @@ LOG_MODULE_REGISTER(wifi_esp);
 
 #include "esp.h"
 
+#define RX_NET_PKT_ALLOC_TIMEOUT				\
+	K_MSEC(CONFIG_WIFI_ESP_RX_NET_PKT_ALLOC_TIMEOUT)
+
 /* pin settings */
 enum modem_control_pins {
 #if DT_INST_NODE_HAS_PROP(0, power_gpios)
@@ -322,7 +325,7 @@ struct net_pkt *esp_prepare_pkt(struct esp_data *dev, struct net_buf *src,
 	size_t to_copy;
 
 	pkt = net_pkt_rx_alloc_with_buffer(dev->net_iface, len, AF_UNSPEC,
-					   0, K_MSEC(100));
+					   0, RX_NET_PKT_ALLOC_TIMEOUT);
 	if (!pkt) {
 		return NULL;
 	}
@@ -446,14 +449,24 @@ MODEM_CMD_DIRECT_DEFINE(on_cmd_ipd)
 
 	ret = data_offset + data_len; /* Skip */
 
-	pkt = esp_prepare_pkt(dev, data->rx_buf, data_offset, data_len);
-	if (!pkt) {
-		/* FIXME: Should probably terminate connection */
-		LOG_ERR("Failed to get net_pkt: len %d", data_len);
+	if ((sock->flags & (ESP_SOCK_CONNECTED | ESP_SOCK_CLOSE_PENDING)) !=
+							ESP_SOCK_CONNECTED) {
+		LOG_DBG("Received data on closed link %d", link_id);
 		goto out;
 	}
 
+	pkt = esp_prepare_pkt(dev, data->rx_buf, data_offset, data_len);
+	if (!pkt) {
+		LOG_ERR("Failed to get net_pkt: len %d", data_len);
+		if (sock->type == SOCK_STREAM) {
+			sock->flags |= ESP_SOCK_CLOSE_PENDING;
+		}
+		goto submit_work;
+	}
+
 	k_fifo_put(&sock->fifo_rx_pkt, pkt);
+
+submit_work:
 	k_work_submit_to_queue(&dev->workq, &sock->recv_work);
 
 out:

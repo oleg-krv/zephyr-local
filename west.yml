@@ -90,7 +90,7 @@ manifest:
       revision: 9339a1331cc36e82c180d8277ab22953282595d9
       path: modules/lib/gui/lvgl
     - name: mbedtls
-      revision: aef137b1af8aa7a0f43345c82459254b8832262e
+      revision: e3e135f89693a0342bbc72f31a4e00cdf36c3977
       path: modules/crypto/mbedtls
     - name: mcuboot
       revision: c71d2186077f9fd5f6d1aa53ee3f09dc41ce78f6
@@ -102,7 +102,7 @@ manifest:
       revision: 1c4fdba512b268033a4cf926bddd323866c3261a
       path: tools/net-tools
     - name: hal_nxp
-      revision: 960930271323f9bb3c9e65560b686da1833d8ade
+      revision: 10c2089ed5e4694d74cd5f2cb417bc6af11d17e2
       path: modules/hal/nxp
     - name: open-amp
       revision: de1b85a13032a2de1d8b6695ae5f800b613e739d

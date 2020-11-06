@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * @file
- * @brief Populated vector table
+/*
+ * Populated vector table
  */
 
 #include <toolchain.h>
@@ -44,12 +43,12 @@ _ASM_FILE_PROLOGUE
  * |          + 0x300 | FIQ / vFIQ       |                         |
  * |          + 0x380 | SError / vSError |                         |
  * +------------------+------------------+-------------------------+
- * |          + 0x400 | Synchronous      | Lower EL using  AArch64 |
+ * |          + 0x400 | Synchronous      | Lower EL using AArch64  |
  * |          + 0x480 | IRQ / vIRQ       |                         |
  * |          + 0x500 | FIQ / vFIQ       |                         |
  * |          + 0x580 | SError / vSError |                         |
  * +------------------+------------------+-------------------------+
- * |          + 0x600 | Synchronous      | Lower EL using AArch64  |
+ * |          + 0x600 | Synchronous      | Lower EL using AArch32  |
  * |          + 0x680 | IRQ / vIRQ       |                         |
  * |          + 0x700 | FIQ / vFIQ       |                         |
  * |          + 0x780 | SError / vSError |                         |
@@ -58,6 +57,7 @@ _ASM_FILE_PROLOGUE
 
 	/* The whole table must be 2K aligned */
 	.align 11
+
 SECTION_SUBSEC_FUNC(exc_vector_table,_vector_table_section,_vector_table)
 
 	/* Current EL with SP0 / Synchronous */
@@ -78,7 +78,7 @@ SECTION_SUBSEC_FUNC(exc_vector_table,_vector_table_section,_vector_table)
 
 	/* Current EL with SPx / Synchronous */
 	.align 7
-	b	z_arm64_svc
+	b	z_arm64_sync_exc
 
 	/* Current EL with SPx / IRQ */
 	.align 7
@@ -95,10 +95,42 @@ SECTION_SUBSEC_FUNC(exc_vector_table,_vector_table_section,_vector_table)
 
 	/* Current EL with SPx / SError */
 	.align 7
-	z_arm64_enter_exc x0, x1, x2
+	z_arm64_enter_exc x0, x1
 
 	mov	x1, sp
 	mov	x0, #0 /* K_ERR_CPU_EXCEPTION */
 
 	b	z_arm64_fatal_error
+
+	/* Lower EL using AArch64 / Synchronous */
+	.align 7
+	b	.
+
+	/* Lower EL using AArch64 / IRQ */
+	.align 7
+	b	.
+
+	/* Lower EL using AArch64 / FIQ */
+	.align 7
+	b	.
+
+	/* Lower EL using AArch64 / SError */
+	.align 7
+	b	.
+
+	/* Lower EL using AArch32 / Synchronous */
+	.align 7
+	b	.
+
+	/* Lower EL using AArch32 / IRQ */
+	.align 7
+	b	.
+
+	/* Lower EL using AArch32 / FIQ */
+	.align 7
+	b	.
+
+	/* Lower EL using AArch32 / SError */
+	.align 7
+	b	.
 

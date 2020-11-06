@@ -303,7 +303,7 @@ static void isr_tx(void *param)
 	/* +/- 2us active clock jitter, +1 us hcto compensation */
 	hcto = radio_tmr_tifs_base_get() + EVENT_IFS_US + 4 + 1;
 	hcto += radio_rx_chain_delay_get(lll->phy_s, 1);
-	hcto += addr_us_get(0);
+	hcto += addr_us_get(lll->phy_s);
 	hcto -= radio_tx_chain_delay_get(lll->phy_s, 0);
 	radio_tmr_hcto_configure(hcto);
 
@@ -327,7 +327,7 @@ static void isr_tx(void *param)
 
 	radio_gpio_lna_setup();
 	radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() + EVENT_IFS_US - 4 -
-				 radio_tx_chain_delay_get(0, 0) -
+				 radio_tx_chain_delay_get(lll->phy_s, 0) -
 				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
 #endif /* CONFIG_BT_CTLR_GPIO_LNA_PIN */
 
@@ -421,14 +421,9 @@ static inline int isr_rx_pdu(struct lll_adv_aux *lll_aux,
 	pdu_adv = lll_adv_data_curr_get(lll);
 	pdu_aux = lll_adv_aux_data_latest_get(lll_aux, &upd);
 
-	if (pdu_adv->type == PDU_ADV_TYPE_EXT_IND) {
-		/* AdvA is placed at 2nd byte of ext hdr data */
-		addr = &pdu_aux->adv_ext_ind.ext_hdr_adi_adv_data[1];
-		tx_addr = pdu_aux->tx_addr;
-	} else {
-		addr = pdu_adv->adv_ind.addr;
-		tx_addr = pdu_adv->tx_addr;
-	}
+	/* AdvA is placed at 2nd byte of ext hdr data */
+	addr = &pdu_aux->adv_ext_ind.ext_hdr_adi_adv_data[1];
+	tx_addr = pdu_aux->tx_addr;
 
 	if ((pdu_rx->type == PDU_ADV_TYPE_AUX_SCAN_REQ) &&
 	    (pdu_rx->len == sizeof(struct pdu_adv_scan_req)) &&

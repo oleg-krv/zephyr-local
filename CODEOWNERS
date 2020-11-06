@@ -129,6 +129,7 @@
 /boards/shields/                          @erwango
 /boards/shields/atmel_rf2xx/              @nandojve
 /boards/shields/esp_8266/                 @nandojve
+/boards/shields/inventek_eswifi/          @nandojve
 /boards/x86/                              @andrewboie @nashif @jenmwms @aasthagr
 /boards/xtensa/                           @nashif @dcpleung
 /boards/xtensa/intel_s1000_crb/           @sathishkuttan @dcpleung
@@ -206,6 +207,7 @@
 /drivers/i2s/*litex*                      @mateusz-holenko @kgugala @pgielda
 /drivers/ieee802154/                      @jukkar @tbursztyka
 /drivers/ieee802154/ieee802154_rf2xx*     @jukkar @tbursztyka @nandojve
+/drivers/ieee802154/ieee802154_cc13xx*    @bwitherspoon @cfriedt
 /drivers/interrupt_controller/            @andrewboie
 /drivers/interrupt_controller/intc_gic.c  @stephanosio
 /drivers/*/intc_vexriscv_litex.c          @mateusz-holenko @kgugala @pgielda
@@ -285,7 +287,7 @@
 /drivers/watchdog/*gecko*                 @oanerer
 /drivers/watchdog/wdt_handlers.c          @andrewboie
 /drivers/wifi/                            @jukkar @tbursztyka @pfalcon
-/drivers/wifi/eswifi/                     @loicpoulain
+/drivers/wifi/eswifi/                     @loicpoulain @nandojve
 /drivers/wifi/winc1500/                   @kludentwo
 /dts/arc/                                 @abrodkin @ruuddw @iriszzw
 /dts/arm/atmel/sam4e*                     @nandojve
@@ -446,6 +448,7 @@
 /samples/drivers/counter/maxim_ds3231/    @pabigot
 /samples/lorawan/                         @Mani-Sadhasivam
 /samples/net/                             @jukkar @tbursztyka @pfalcon
+/samples/net/cloud/tagoio_http_post/      @nandojve
 /samples/net/dns_resolve/                 @jukkar @tbursztyka @pfalcon
 /samples/net/lwm2m_client/                @rlubos
 /samples/net/mqtt_publisher/              @jukkar @tbursztyka
