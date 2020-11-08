@@ -256,6 +256,15 @@ end:
 	return buf;
 }
 
+#define is_6lo_technology(pkt)						\
+	(IS_ENABLED(CONFIG_NET_IPV6) &&	net_pkt_family(pkt) == AF_INET6 && \
+	 ((IS_ENABLED(CONFIG_NET_L2_BT) &&				\
+	   net_pkt_lladdr_dst(pkt)->type == NET_LINK_BLUETOOTH) ||	\
+	  (IS_ENABLED(CONFIG_NET_L2_IEEE802154) &&			\
+	   net_pkt_lladdr_dst(pkt)->type == NET_LINK_IEEE802154) ||	\
+	  (IS_ENABLED(CONFIG_NET_L2_CANBUS) &&				\
+	   net_pkt_lladdr_dst(pkt)->type == NET_LINK_CANBUS)))
+
 static void tcp_send(struct net_pkt *pkt)
 {
 	NET_DBG("%s", log_strdup(tcp_th(pkt)));
@@ -270,9 +279,35 @@ static void tcp_send(struct net_pkt *pkt)
 		goto out;
 	}
 
-	if (net_send_data(pkt) < 0) {
-		NET_ERR("net_send_data()");
+	/* We must have special handling for some network technologies that
+	 * tweak the IP protocol headers during packet sending. This happens
+	 * with Bluetooth and IEEE 802.15.4 which use IPv6 header compression
+	 * (6lo) and alter the sent network packet. So in order to avoid any
+	 * corruption of the original data buffer, we must copy the sent data.
+	 * For Bluetooth, its fragmentation code will even mangle the data
+	 * part of the message so we need to copy those too.
+	 */
+	if (is_6lo_technology(pkt)) {
+		struct net_pkt *new_pkt;
+
+		new_pkt = net_pkt_clone(pkt, TCP_PKT_ALLOC_TIMEOUT);
+		if (!new_pkt) {
+			goto out;
+		}
+
+		if (net_send_data(new_pkt) < 0) {
+			net_pkt_unref(new_pkt);
+		}
+
+		/* We simulate sending of the original pkt and unref it like
+		 * the device driver would do.
+		 */
 		tcp_pkt_unref(pkt);
+	} else {
+		if (net_send_data(pkt) < 0) {
+			NET_ERR("net_send_data()");
+			tcp_pkt_unref(pkt);
+		}
 	}
 out:
 	tcp_pkt_unref(pkt);
@@ -831,6 +866,14 @@ static int tcp_send_data(struct tcp *conn)
 	ret = tcp_out_ext(conn, PSH | ACK, pkt, conn->seq + conn->unacked_len);
 	if (ret == 0) {
 		conn->unacked_len += len;
+
+		if (conn->data_mode == TCP_DATA_MODE_RESEND) {
+			net_stats_update_tcp_resent(net_pkt_iface(pkt), len);
+			net_stats_update_tcp_seg_rexmit(conn->iface);
+		} else {
+			net_stats_update_tcp_sent(net_pkt_iface(pkt), len);
+			net_stats_update_tcp_seg_sent(net_pkt_iface(pkt));
+		}
 	}
 
 	/* The data we want to send, has been moved to the send queue so we
@@ -1203,6 +1246,10 @@ static struct tcp *tcp_conn_new(struct net_pkt *pkt)
 		goto err;
 	}
 err:
+	if (!conn) {
+		net_stats_update_tcp_seg_conndrop(net_pkt_iface(pkt));
+	}
+
 	return conn;
 }
 
@@ -1271,6 +1318,8 @@ static void tcp_in(struct tcp *conn, struct net_pkt *pkt)
 	}
 
 	if (FL(&fl, &, RST)) {
+		net_stats_update_tcp_seg_rst(net_pkt_iface(pkt));
+
 		conn_state(conn, TCP_CLOSED);
 	}
 next_state:
@@ -1382,6 +1431,7 @@ next_state:
 				NET_ERR("conn: %p, Invalid len_acked=%u "
 					"(total=%zu)", conn, len_acked,
 					conn->send_data_total);
+				net_stats_update_tcp_seg_drop(conn->iface);
 				tcp_out(conn, RST);
 				conn_state(conn, TCP_CLOSED);
 				break;
@@ -1390,6 +1440,7 @@ next_state:
 			conn->send_data_total -= len_acked;
 			conn->unacked_len -= len_acked;
 			conn_seq(conn, + len_acked);
+			net_stats_update_tcp_seg_recv(conn->iface);
 
 			conn_send_data_dump(conn);
 
@@ -1428,10 +1479,14 @@ next_state:
 				if (tcp_data_get(conn, pkt) < 0) {
 					break;
 				}
+
+				net_stats_update_tcp_seg_recv(conn->iface);
 				conn_ack(conn, + len);
 				tcp_out(conn, ACK);
 			} else if (net_tcp_seq_greater(conn->ack, th_seq(th))) {
 				tcp_out(conn, ACK); /* peer has resent */
+
+				net_stats_update_tcp_seg_ackerr(conn->iface);
 			}
 		}
 		break;
