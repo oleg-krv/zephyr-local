@@ -5,6 +5,7 @@
  */
 
 #include <stddef.h>
+#include <sys/util.h>
 #if defined(CONFIG_BT_CTLR_RX_PDU_META)
 #include "lll_meta.h"
 #endif /* CONFIG_BT_CTLR_RX_PDU_META */
@@ -151,87 +152,49 @@ struct lll_event {
 	uint8_t                     is_aborted:1;
 };
 
+#define DEFINE_NODE_RX_USER_TYPE(i, _) NODE_RX_TYPE_##i,
+
 enum node_rx_type {
 	/* Unused */
 	NODE_RX_TYPE_NONE = 0x00,
 	/* Signals completion of RX event */
-	NODE_RX_TYPE_EVENT_DONE = 0x01,
+	NODE_RX_TYPE_EVENT_DONE,
 	/* Signals arrival of RX Data Channel payload */
-	NODE_RX_TYPE_DC_PDU = 0x02,
+	NODE_RX_TYPE_DC_PDU,
 	/* Signals release of RX Data Channel payload */
-	NODE_RX_TYPE_DC_PDU_RELEASE = 0x03,
-
-#if defined(CONFIG_BT_OBSERVER)
+	NODE_RX_TYPE_DC_PDU_RELEASE,
 	/* Advertisement report from scanning */
-	NODE_RX_TYPE_REPORT = 0x04,
+	NODE_RX_TYPE_REPORT,
+	NODE_RX_TYPE_EXT_1M_REPORT,
+	NODE_RX_TYPE_EXT_2M_REPORT,
+	NODE_RX_TYPE_EXT_CODED_REPORT,
+	NODE_RX_TYPE_EXT_SCAN_TERMINATE,
+	NODE_RX_TYPE_SYNC,
+	NODE_RX_TYPE_SYNC_LOST,
+	NODE_RX_TYPE_EXT_ADV_TERMINATE,
+	NODE_RX_TYPE_SCAN_REQ,
+	NODE_RX_TYPE_CONNECTION,
+	NODE_RX_TYPE_TERMINATE,
+	NODE_RX_TYPE_CONN_UPDATE,
+	NODE_RX_TYPE_ENC_REFRESH,
+	NODE_RX_TYPE_APTO,
+	NODE_RX_TYPE_CHAN_SEL_ALGO,
+	NODE_RX_TYPE_PHY_UPDATE,
+	NODE_RX_TYPE_RSSI,
+	NODE_RX_TYPE_PROFILE,
+	NODE_RX_TYPE_ADV_INDICATION,
+	NODE_RX_TYPE_SCAN_INDICATION,
+	NODE_RX_TYPE_CIS_REQUEST,
+	NODE_RX_TYPE_CIS_ESTABLISHED,
+	NODE_RX_TYPE_MESH_ADV_CPLT,
+	NODE_RX_TYPE_MESH_REPORT,
 
-#if defined(CONFIG_BT_CTLR_ADV_EXT)
-	NODE_RX_TYPE_EXT_1M_REPORT = 0x05,
-	NODE_RX_TYPE_EXT_2M_REPORT = 0x06,
-	NODE_RX_TYPE_EXT_CODED_REPORT = 0x07,
-	NODE_RX_TYPE_EXT_SCAN_TERMINATE = 0x08,
-#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
-	NODE_RX_TYPE_SYNC = 0x09,
-	NODE_RX_TYPE_SYNC_LOST = 0x0a,
-#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
-#endif /* CONFIG_BT_CTLR_ADV_EXT */
-#endif /* CONFIG_BT_OBSERVER */
-
-#if defined(CONFIG_BT_BROADCASTER)
-#if defined(CONFIG_BT_CTLR_ADV_EXT)
-	NODE_RX_TYPE_EXT_ADV_TERMINATE = 0x0b,
-#endif /* CONFIG_BT_CTLR_ADV_EXT */
-#endif /* CONFIG_BT_BROADCASTER */
-
-#if defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY)
-	NODE_RX_TYPE_SCAN_REQ = 0x0c,
-#endif /* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY */
-
-#if defined(CONFIG_BT_CONN)
-	NODE_RX_TYPE_CONNECTION = 0x0d,
-	NODE_RX_TYPE_TERMINATE = 0x0e,
-	NODE_RX_TYPE_CONN_UPDATE = 0x0f,
-	NODE_RX_TYPE_ENC_REFRESH = 0x10,
-
-#if defined(CONFIG_BT_CTLR_LE_PING)
-	NODE_RX_TYPE_APTO = 0x11,
-#endif /* CONFIG_BT_CTLR_LE_PING */
-
-	NODE_RX_TYPE_CHAN_SEL_ALGO = 0x12,
-
-#if defined(CONFIG_BT_CTLR_PHY)
-	NODE_RX_TYPE_PHY_UPDATE = 0x13,
-#endif /* CONFIG_BT_CTLR_PHY */
-
-#if defined(CONFIG_BT_CTLR_CONN_RSSI)
-	NODE_RX_TYPE_RSSI = 0x14,
-#endif /* CONFIG_BT_CTLR_CONN_RSSI */
-#endif /* CONFIG_BT_CONN */
-
-#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
-	NODE_RX_TYPE_PROFILE = 0x15,
-#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
-
-#if defined(CONFIG_BT_CTLR_ADV_INDICATION)
-	NODE_RX_TYPE_ADV_INDICATION = 0x16,
-#endif /* CONFIG_BT_CTLR_ADV_INDICATION */
-
-#if defined(CONFIG_BT_CTLR_SCAN_INDICATION)
-	NODE_RX_TYPE_SCAN_INDICATION = 0x17,
-#endif /* CONFIG_BT_CTLR_SCAN_INDICATION */
-
-#if defined(CONFIG_BT_HCI_MESH_EXT)
-	NODE_RX_TYPE_MESH_ADV_CPLT = 0x18,
-	NODE_RX_TYPE_MESH_REPORT = 0x19,
-#endif /* CONFIG_BT_HCI_MESH_EXT */
-
-/* Following proprietary defines must be at end of enum range */
 #if defined(CONFIG_BT_CTLR_USER_EXT)
-	NODE_RX_TYPE_USER_START = 0x1a,
-	NODE_RX_TYPE_USER_END = NODE_RX_TYPE_USER_START +
-				CONFIG_BT_CTLR_USER_EVT_RANGE,
+	/* No entries shall be added after the NODE_RX_TYPE_USER_START/END */
+	NODE_RX_TYPE_USER_START,
+	UTIL_LISTIFY(CONFIG_BT_CTLR_USER_EVT_RANGE, DEFINE_NODE_RX_USER_TYPE, _)
+	NODE_RX_TYPE_USER_END,
 #endif /* CONFIG_BT_CTLR_USER_EXT */
-
 };
 
 /* Footer of node_rx_hdr */
@@ -281,9 +244,16 @@ struct node_rx_hdr {
 	};
 };
 
+/* Template node rx type with memory aligned offset to PDU buffer.
+ * NOTE: offset to memory aligned pdu buffer location is used to reference
+ *       node rx type specific information, like, terminate or sync lost reason
+ *       from a dedicated node rx structure storage location.
+ */
 struct node_rx_pdu {
 	struct node_rx_hdr hdr;
-	uint8_t               pdu[0];
+	union {
+		uint8_t    pdu[0] __aligned(4);
+	};
 };
 
 enum {

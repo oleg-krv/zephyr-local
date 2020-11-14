@@ -3823,11 +3823,13 @@ static void bt_hci_evt_read_remote_version_complete(struct net_buf *buf)
 {
 	struct bt_hci_evt_remote_version_info *evt;
 	struct bt_conn *conn;
+	uint16_t handle;
 
 	evt = net_buf_pull_mem(buf, sizeof(*evt));
-	conn = bt_conn_lookup_handle(evt->handle);
+	handle = sys_le16_to_cpu(evt->handle);
+	conn = bt_conn_lookup_handle(handle);
 	if (!conn) {
-		BT_ERR("No connection for handle %u", evt->handle);
+		BT_ERR("No connection for handle %u", handle);
 		return;
 	}
 
@@ -7607,6 +7609,14 @@ static bool valid_adv_ext_param(const struct bt_le_adv_param *param)
 		}
 	}
 
+	if (IS_ENABLED(CONFIG_BT_PRIVACY) &&
+	    param->peer &&
+	    (param->options & BT_LE_ADV_OPT_USE_IDENTITY) &&
+	    (param->options & BT_LE_ADV_OPT_DIR_ADDR_RPA)) {
+		/* own addr type used for both RPAs in directed advertising. */
+		return false;
+	}
+
 	if (param->id >= bt_dev.id_count ||
 	    !bt_addr_le_cmp(&bt_dev.id_addr[param->id], BT_ADDR_LE_ANY)) {
 		return false;
@@ -7798,6 +7808,11 @@ static int le_adv_set_random_addr(struct bt_le_ext_adv *adv, uint32_t options,
 	id_addr = &bt_dev.id_addr[adv->id];
 
 	if (options & BT_LE_ADV_OPT_CONNECTABLE) {
+		if (dir_adv && (options & BT_LE_ADV_OPT_DIR_ADDR_RPA) &&
+		    !BT_FEAT_LE_PRIVACY(bt_dev.le.features)) {
+			return -ENOTSUP;
+		}
+
 		if (IS_ENABLED(CONFIG_BT_PRIVACY) &&
 		    !(options & BT_LE_ADV_OPT_USE_IDENTITY)) {
 			err = le_adv_set_private_addr(adv);
@@ -7805,7 +7820,7 @@ static int le_adv_set_random_addr(struct bt_le_ext_adv *adv, uint32_t options,
 				return err;
 			}
 
-			if (BT_FEAT_LE_PRIVACY(bt_dev.le.features)) {
+			if (dir_adv && (options & BT_LE_ADV_OPT_DIR_ADDR_RPA)) {
 				*own_addr_type = BT_HCI_OWN_ADDR_RPA_OR_RANDOM;
 			} else {
 				*own_addr_type = BT_ADDR_LE_RANDOM;
@@ -7825,16 +7840,8 @@ static int le_adv_set_random_addr(struct bt_le_ext_adv *adv, uint32_t options,
 			}
 
 			*own_addr_type = id_addr->type;
-		}
 
-		if (dir_adv) {
-			if (IS_ENABLED(CONFIG_BT_SMP) &&
-			    !IS_ENABLED(CONFIG_BT_PRIVACY) &&
-			    BT_FEAT_LE_PRIVACY(bt_dev.le.features) &&
-			    (options & BT_LE_ADV_OPT_DIR_ADDR_RPA)) {
-				/* This will not use RPA for our own address
-				 * since we have set zeroed out the local IRK.
-				 */
+			if (dir_adv && (options & BT_LE_ADV_OPT_DIR_ADDR_RPA)) {
 				*own_addr_type |= BT_HCI_OWN_ADDR_RPA_MASK;
 			}
 		}

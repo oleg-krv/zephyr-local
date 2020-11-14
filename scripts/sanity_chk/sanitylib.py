@@ -336,6 +336,7 @@ class BinaryHandler(Handler):
         super().__init__(instance, type_str)
 
         self.terminated = False
+        self.call_west_flash = False
 
         # Tool options
         self.valgrind = False
@@ -394,6 +395,8 @@ class BinaryHandler(Handler):
 
         if self.call_make_run:
             command = [self.generator_cmd, "run"]
+        elif self.call_west_flash:
+            command = ["west", "flash", "--skip-rebuild", "-d", self.build_dir]
         else:
             command = [self.binary]
 
@@ -1659,19 +1662,23 @@ class TestInstance(DisablePyTestCollectionMixin):
 
         target_ready = bool(self.testcase.type == "unit" or \
                         self.platform.type == "native" or \
-                        self.platform.simulation in ["mdb", "nsim", "renode", "qemu"] or \
+                        self.platform.simulation in ["mdb-nsim", "nsim", "renode", "qemu", "tsim"] or \
                         filter == 'runnable')
 
         if self.platform.simulation == "nsim":
             if not find_executable("nsimdrv"):
                 target_ready = False
 
-        if self.platform.simulation == "mdb":
+        if self.platform.simulation == "mdb-nsim":
             if not find_executable("mdb"):
                 target_ready = False
 
         if self.platform.simulation == "renode":
             if not find_executable("renode"):
+                target_ready = False
+
+        if self.platform.simulation == "tsim":
+            if not find_executable("tsim-leon3"):
                 target_ready = False
 
         testcase_runnable = self.testcase_runnable(self.testcase, fixtures)
@@ -2055,17 +2062,25 @@ class ProjectBuilder(FilterBuilder):
 
             handler.binary = os.path.join(instance.build_dir, "zephyr", "zephyr.exe")
             instance.handler = handler
-        elif instance.platform.simulation == "nsim":
-            if find_executable("nsimdrv"):
-                instance.handler = BinaryHandler(instance, "nsim")
-                instance.handler.call_make_run = True
         elif instance.platform.simulation == "renode":
             if find_executable("renode"):
                 instance.handler = BinaryHandler(instance, "renode")
                 instance.handler.pid_fn = os.path.join(instance.build_dir, "renode.pid")
                 instance.handler.call_make_run = True
+        elif instance.platform.simulation == "tsim":
+            instance.handler = BinaryHandler(instance, "tsim")
+            instance.handler.call_make_run = True
         elif self.device_testing:
             instance.handler = DeviceHandler(instance, "device")
+        elif instance.platform.simulation == "nsim":
+            if find_executable("nsimdrv"):
+                instance.handler = BinaryHandler(instance, "nsim")
+                instance.handler.call_make_run = True
+        elif instance.platform.simulation == "mdb-nsim":
+            if find_executable("mdb"):
+                instance.handler = BinaryHandler(instance, "nsim")
+                instance.handler.pid_fn = os.path.join(instance.build_dir, "mdb.pid")
+                instance.handler.call_west_flash = True
 
         if instance.handler:
             instance.handler.args = args

@@ -418,6 +418,16 @@ void ll_reset(void)
 {
 	int err;
 
+	/* Note: The sequence of reset control flow is as follows:
+	 * - Reset ULL context, i.e. stop ULL scheduling, abort LLL events etc.
+	 * - Reset LLL context, i.e. post LLL event abort, let LLL cleanup its
+	 *   variables, if any.
+	 * - Reset ULL static variables (which otherwise was mem-zeroed in cases
+	 *   if power-on reset wherein architecture startup mem-zeroes .bss
+	 *   sections.
+	 * - Initialize ULL context variable, similar to on-power-up.
+	 */
+
 #if defined(CONFIG_BT_BROADCASTER)
 	/* Reset adv state */
 	err = ull_adv_reset();
@@ -518,6 +528,12 @@ void ll_reset(void)
 		k_sem_take(&sem, K_FOREVER);
 #endif /* !CONFIG_BT_CTLR_ZLI */
 	}
+
+#if defined(CONFIG_BT_BROADCASTER)
+	/* Finalize after adv state LLL context reset */
+	err = ull_adv_reset_finalize();
+	LL_ASSERT(!err);
+#endif /* CONFIG_BT_BROADCASTER */
 
 	/* Common to init and reset */
 	err = init_reset();
@@ -812,10 +828,10 @@ void ll_rx_dequeue(void)
 	case NODE_RX_TYPE_MESH_REPORT:
 #endif /* CONFIG_BT_HCI_MESH_EXT */
 
-#if defined(CONFIG_BT_CTLR_USER_EXT)
-	case NODE_RX_TYPE_USER_START ... NODE_RX_TYPE_USER_END:
+#if CONFIG_BT_CTLR_USER_EVT_RANGE > 0
+	case NODE_RX_TYPE_USER_START ... NODE_RX_TYPE_USER_END - 1:
 		__fallthrough;
-#endif /* CONFIG_BT_CTLR_USER_EXT */
+#endif /* CONFIG_BT_CTLR_USER_EVT_RANGE > 0 */
 
 	/* Ensure that at least one 'case' statement is present for this
 	 * code block.
@@ -990,9 +1006,9 @@ void ll_rx_mem_release(void **node_rx)
 		case NODE_RX_TYPE_MESH_REPORT:
 #endif /* CONFIG_BT_HCI_MESH_EXT */
 
-#if defined(CONFIG_BT_CTLR_USER_EXT)
-		case NODE_RX_TYPE_USER_START ... NODE_RX_TYPE_USER_END:
-#endif /* CONFIG_BT_CTLR_USER_EXT */
+#if CONFIG_BT_CTLR_USER_EVT_RANGE > 0
+		case NODE_RX_TYPE_USER_START ... NODE_RX_TYPE_USER_END - 1:
+#endif /* CONFIG_BT_CTLR_USER_EVT_RANGE > 0 */
 
 		/* Ensure that at least one 'case' statement is present for this
 		 * code block.

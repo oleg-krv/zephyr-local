@@ -18,7 +18,17 @@ struct ll_sync_set {
 	uint16_t volatile timeout_reload; /* Non-zero when sync established */
 	uint16_t timeout_expire;
 
-	struct node_rx_hdr node_rx_lost;
+	/* node rx type with memory aligned storage for sync lost reason.
+	 * HCI will reference the value using the pdu member of
+	 * struct node_rx_pdu.
+	 */
+	struct {
+		struct node_rx_hdr hdr;
+		union {
+			uint8_t    pdu[0] __aligned(4);
+			uint8_t    reason;
+		};
+	} node_rx_lost;
 };
 
 struct node_rx_sync {

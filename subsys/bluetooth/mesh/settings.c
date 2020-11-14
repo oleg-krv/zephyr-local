@@ -31,11 +31,13 @@
 #include "crypto.h"
 #include "rpl.h"
 #include "transport.h"
+#include "heartbeat.h"
 #include "access.h"
 #include "foundation.h"
 #include "proxy.h"
 #include "settings.h"
 #include "lpn.h"
+#include "cfg.h"
 
 /* Tracking of what storage changes are pending for App and Net Keys. We
  * track this in a separate array here instead of within the respective
@@ -158,14 +160,6 @@ static struct key_update cdb_key_updates[CONFIG_BT_MESH_CDB_SUBNET_COUNT +
 static struct node_update cdb_node_updates[0];
 static struct key_update cdb_key_updates[0];
 #endif
-
-/* We need this so we don't overwrite app-hardcoded values in case FCB
- * contains a history of changes but then has a NULL at the end.
- */
-static struct {
-	bool valid;
-	struct cfg_val cfg;
-} stored_cfg;
 
 static inline int mesh_x_set(settings_read_cb read_cb, void *cb_arg, void *out,
 			     size_t read_len)
@@ -397,24 +391,9 @@ static int app_key_set(const char *name, size_t len_rd,
 static int hb_pub_set(const char *name, size_t len_rd,
 		      settings_read_cb read_cb, void *cb_arg)
 {
-	struct bt_mesh_hb_pub *pub = bt_mesh_hb_pub_get();
+	struct bt_mesh_hb_pub pub;
 	struct hb_pub_val hb_val;
 	int err;
-
-	if (!pub) {
-		return -ENOENT;
-	}
-
-	if (len_rd == 0) {
-		pub->dst = BT_MESH_ADDR_UNASSIGNED;
-		pub->count = 0U;
-		pub->ttl = 0U;
-		pub->period = 0U;
-		pub->feat = 0U;
-
-		BT_DBG("Cleared heartbeat publication");
-		return 0;
-	}
 
 	err = mesh_x_set(read_cb, cb_arg, &hb_val, sizeof(hb_val));
 	if (err) {
@@ -422,17 +401,19 @@ static int hb_pub_set(const char *name, size_t len_rd,
 		return err;
 	}
 
-	pub->dst = hb_val.dst;
-	pub->period = hb_val.period;
-	pub->ttl = hb_val.ttl;
-	pub->feat = hb_val.feat;
-	pub->net_idx = hb_val.net_idx;
+	pub.dst = hb_val.dst;
+	pub.period = bt_mesh_hb_pwr2(hb_val.period);
+	pub.ttl = hb_val.ttl;
+	pub.feat = hb_val.feat;
+	pub.net_idx = hb_val.net_idx;
 
 	if (hb_val.indefinite) {
-		pub->count = 0xffff;
+		pub.count = 0xffff;
 	} else {
-		pub->count = 0U;
+		pub.count = 0U;
 	}
+
+	(void)bt_mesh_hb_pub_set(&pub);
 
 	BT_DBG("Restored heartbeat publication");
 
@@ -442,28 +423,27 @@ static int hb_pub_set(const char *name, size_t len_rd,
 static int cfg_set(const char *name, size_t len_rd,
 		   settings_read_cb read_cb, void *cb_arg)
 {
-	struct bt_mesh_cfg_srv *cfg = bt_mesh_cfg_get();
+	struct cfg_val cfg;
 	int err;
 
-	if (!cfg) {
-		return -ENOENT;
-	}
-
 	if (len_rd == 0) {
-		stored_cfg.valid = false;
 		BT_DBG("Cleared configuration state");
 		return 0;
 	}
 
-
-	err = mesh_x_set(read_cb, cb_arg, &stored_cfg.cfg,
-			 sizeof(stored_cfg.cfg));
+	err = mesh_x_set(read_cb, cb_arg, &cfg, sizeof(cfg));
 	if (err) {
 		BT_ERR("Failed to set \'cfg\'");
 		return err;
 	}
 
-	stored_cfg.valid = true;
+	bt_mesh_net_transmit_set(cfg.net_transmit);
+	bt_mesh_relay_set(cfg.relay, cfg.relay_retransmit);
+	bt_mesh_beacon_set(cfg.beacon);
+	bt_mesh_gatt_proxy_set(cfg.gatt_proxy);
+	bt_mesh_friend_set(cfg.frnd);
+	bt_mesh_default_ttl_set(cfg.default_ttl);
+
 	BT_DBG("Restored configuration state");
 
 	return 0;
@@ -1006,9 +986,6 @@ static void commit_mod(struct bt_mesh_model *mod, struct bt_mesh_elem *elem,
 
 static int mesh_commit(void)
 {
-	struct bt_mesh_hb_pub *hb_pub;
-	struct bt_mesh_cfg_srv *cfg;
-
 	if (!bt_mesh_subnet_next(NULL)) {
 		/* Nothing to do since we're not yet provisioned */
 		return 0;
@@ -1023,24 +1000,6 @@ static int mesh_commit(void)
 	}
 
 	bt_mesh_model_foreach(commit_mod, NULL);
-
-	hb_pub = bt_mesh_hb_pub_get();
-	if (hb_pub && hb_pub->dst != BT_MESH_ADDR_UNASSIGNED &&
-	    hb_pub->count && hb_pub->period) {
-		BT_DBG("Starting heartbeat publication");
-		k_work_submit(&hb_pub->timer.work);
-	}
-
-	cfg = bt_mesh_cfg_get();
-	if (cfg && stored_cfg.valid) {
-		cfg->net_transmit = stored_cfg.cfg.net_transmit;
-		cfg->relay = stored_cfg.cfg.relay;
-		cfg->relay_retransmit = stored_cfg.cfg.relay_retransmit;
-		cfg->beacon = stored_cfg.cfg.beacon;
-		cfg->gatt_proxy = stored_cfg.cfg.gatt_proxy;
-		cfg->frnd = stored_cfg.cfg.frnd;
-		cfg->default_ttl = stored_cfg.cfg.default_ttl;
-	}
 
 	atomic_set_bit(bt_mesh.flags, BT_MESH_VALID);
 
@@ -1245,23 +1204,20 @@ static void store_pending_rpl(struct bt_mesh_rpl *rpl, void *user_data)
 
 static void store_pending_hb_pub(void)
 {
-	struct bt_mesh_hb_pub *pub = bt_mesh_hb_pub_get();
+	struct bt_mesh_hb_pub pub;
 	struct hb_pub_val val;
 	int err;
 
-	if (!pub) {
-		return;
-	}
-
-	if (pub->dst == BT_MESH_ADDR_UNASSIGNED) {
+	bt_mesh_hb_pub_get(&pub);
+	if (pub.dst == BT_MESH_ADDR_UNASSIGNED) {
 		err = settings_delete("bt/mesh/HBPub");
 	} else {
-		val.indefinite = (pub->count == 0xffff);
-		val.dst = pub->dst;
-		val.period = pub->period;
-		val.ttl = pub->ttl;
-		val.feat = pub->feat;
-		val.net_idx = pub->net_idx;
+		val.indefinite = (pub.count == 0xffff);
+		val.dst = pub.dst;
+		val.period = bt_mesh_hb_log(pub.period);
+		val.ttl = pub.ttl;
+		val.feat = pub.feat;
+		val.net_idx = pub.net_idx;
 
 		err = settings_save_one("bt/mesh/HBPub", &val, sizeof(val));
 	}
@@ -1275,21 +1231,16 @@ static void store_pending_hb_pub(void)
 
 static void store_pending_cfg(void)
 {
-	struct bt_mesh_cfg_srv *cfg = bt_mesh_cfg_get();
 	struct cfg_val val;
 	int err;
 
-	if (!cfg) {
-		return;
-	}
-
-	val.net_transmit = cfg->net_transmit;
-	val.relay = cfg->relay;
-	val.relay_retransmit = cfg->relay_retransmit;
-	val.beacon = cfg->beacon;
-	val.gatt_proxy = cfg->gatt_proxy;
-	val.frnd = cfg->frnd;
-	val.default_ttl = cfg->default_ttl;
+	val.net_transmit = bt_mesh_net_transmit_get();
+	val.relay = bt_mesh_relay_get();
+	val.relay_retransmit = bt_mesh_relay_retransmit_get();
+	val.beacon = bt_mesh_beacon_enabled();
+	val.gatt_proxy = bt_mesh_gatt_proxy_get();
+	val.frnd = bt_mesh_friend_get();
+	val.default_ttl = bt_mesh_default_ttl_get();
 
 	err = settings_save_one("bt/mesh/Cfg", &val, sizeof(val));
 	if (err) {

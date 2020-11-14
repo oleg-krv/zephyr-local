@@ -155,6 +155,23 @@ struct gdb_ctx;
 extern int z_gdb_main_loop(struct gdb_ctx *ctx, bool start);
 #endif
 
+#ifdef CONFIG_INSTRUMENT_THREAD_SWITCHING
+void z_thread_mark_switched_in(void);
+void z_thread_mark_switched_out(void);
+#else
+
+/**
+ * @brief Called after a thread has been selected to run
+ */
+#define z_thread_mark_switched_in()
+
+/**
+ * @brief Called before a thread has been selected to run
+ */
+
+#define z_thread_mark_switched_out()
+
+#endif /* CONFIG_INSTRUMENT_THREAD_SWITCHING */
 
 #ifdef __cplusplus
 }

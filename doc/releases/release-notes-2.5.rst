@@ -9,6 +9,9 @@ We are pleased to announce the release of Zephyr RTOS version 2.5.0.
 
 Major enhancements with this release include:
 
+* Introduced support for the SPARC processor architecture and the LEON
+  processor implementation.
+
 The following sections provide detailed lists of changes by component.
 
 Security Vulnerability Related
@@ -46,7 +49,10 @@ API Changes
 Deprecated in this release
 ==========================
 
+* Nordic nRF5340 PDK board deprecated and planned to be removed in 2.6.0.
 * ARM Musca-A board and SoC support deprecated and planned to be removed in 2.6.0.
+
+* DEVICE_INIT was deprecated in favor of utilizing DEVICE_DEFINE directly.
 
 Removed APIs in this release
 ============================
@@ -76,6 +82,11 @@ Architectures
 
 * RISC-V
 
+* SPARC
+
+  * Added support for the SPARC architecture, compatible with the SPARC V8
+    specification and the SPARC ABI.
+
 * x86
 
 Boards & SoC Support
@@ -88,6 +99,12 @@ Boards & SoC Support
 * Changes for ARC boards:
 
 * Added support for these ARM boards:
+
+* Added support for these SPARC boards:
+
+  * GR716-MINI LEON3FT microcontroller development board
+  * Generic LEON3 board configuration for GRLIB FPGA reference designs
+  * SPARC QEMU for emulating LEON3 processors and running kernel tests
 
 * Made these changes in other boards:
 
@@ -186,7 +203,15 @@ Bluetooth
 
 * Host
 
+  * When privacy has been enabled in order to advertise towards a
+    privacy-enabled peer the BT_LE_ADV_OPT_DIR_ADDR_RPA option must now
+    be set, same as when privacy has been disabled.
+
 * Mesh
+
+  * The ``bt_mesh_cfg_srv`` structure has been deprecated in favor of a
+    standalone Heartbeat API and Kconfig entries for default state values.
+
 
 * BLE split software Controller
 

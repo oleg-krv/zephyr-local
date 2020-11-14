@@ -19,6 +19,10 @@
 #include <stdbool.h>
 #include <toolchain.h>
 
+#ifdef CONFIG_THREAD_RUNTIME_STATS_USE_TIMING_FUNCTIONS
+#include <timing/timing.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -272,6 +276,38 @@ struct _thread_userspace_local_data {
 };
 #endif
 
+/* private, used by k_poll and k_work_poll */
+struct k_work_poll;
+typedef int (*_poller_cb_t)(struct k_poll_event *event, uint32_t state);
+struct z_poller {
+	bool is_polling;
+	uint8_t mode;
+};
+
+#ifdef CONFIG_THREAD_RUNTIME_STATS
+struct k_thread_runtime_stats {
+	/* Thread execution cycles */
+#ifdef CONFIG_THREAD_RUNTIME_STATS_USE_TIMING_FUNCTIONS
+	timing_t execution_cycles;
+#else
+	uint64_t execution_cycles;
+#endif
+};
+
+typedef struct k_thread_runtime_stats k_thread_runtime_stats_t;
+
+struct _thread_runtime_stats {
+	/* Timestamp when last switched in */
+#ifdef CONFIG_THREAD_RUNTIME_STATS_USE_TIMING_FUNCTIONS
+	timing_t last_switched_in;
+#else
+	uint32_t last_switched_in;
+#endif
+
+	k_thread_runtime_stats_t stats;
+};
+#endif
+
 /**
  * @ingroup thread_apis
  * Thread Structure
@@ -308,6 +344,10 @@ struct k_thread {
 	 * concurrently.
 	 */
 	void (*fn_abort)(struct k_thread *aborted);
+
+#if defined(CONFIG_POLL)
+	struct z_poller poller;
+#endif
 
 #if defined(CONFIG_THREAD_MONITOR)
 	/** thread entry and parameters description */
@@ -371,6 +411,11 @@ struct k_thread {
 	/* Pointer to arch-specific TLS area */
 	uintptr_t tls;
 #endif /* CONFIG_THREAD_LOCAL_STORAGE */
+
+#ifdef CONFIG_THREAD_RUNTIME_STATS
+	/** Runtime statistics */
+	struct _thread_runtime_stats rt_stats;
+#endif
 
 	/** arch-specifics: must always be at the end */
 	struct _thread_arch arch;
@@ -2710,15 +2755,6 @@ __syscall int k_stack_pop(struct k_stack *stack, stack_data_t *data,
 /** @} */
 
 struct k_work;
-struct k_work_poll;
-
-/* private, used by k_poll and k_work_poll */
-typedef int (*_poller_cb_t)(struct k_poll_event *event, uint32_t state);
-struct _poller {
-	volatile bool is_polling;
-	struct k_thread *thread;
-	_poller_cb_t cb;
-};
 
 /**
  * @addtogroup thread_apis
@@ -2765,7 +2801,8 @@ struct k_delayed_work {
 
 struct k_work_poll {
 	struct k_work work;
-	struct _poller poller;
+	struct k_work_q *workq;
+	struct z_poller poller;
 	struct k_poll_event *events;
 	int num_events;
 	k_work_handler_t real_handler;
@@ -4706,7 +4743,7 @@ struct k_poll_event {
 	sys_dnode_t _node;
 
 	/** PRIVATE - DO NOT TOUCH */
-	struct _poller *poller;
+	struct z_poller *poller;
 
 	/** optional user-specified tag, opaque, untouched by the API */
 	uint32_t tag:8;
@@ -5057,6 +5094,28 @@ __syscall void k_str_out(char *c, size_t n);
  *         -EINVAL If the floating point disabling could not be performed.
  */
 __syscall int k_float_disable(struct k_thread *thread);
+
+#ifdef CONFIG_THREAD_RUNTIME_STATS
+
+/**
+ * @brief Get the runtime statistics of a thread
+ *
+ * @param thread ID of thread.
+ * @param stats Pointer to struct to copy statistics into.
+ * @return -EINVAL if null pointers, otherwise 0
+ */
+int k_thread_runtime_stats_get(k_tid_t thread,
+			       k_thread_runtime_stats_t *stats);
+
+/**
+ * @brief Get the runtime statistics of all threads
+ *
+ * @param stats Pointer to struct to copy statistics into.
+ * @return -EINVAL if null pointers, otherwise 0
+ */
+int k_thread_runtime_stats_all_get(k_thread_runtime_stats_t *stats);
+
+#endif
 
 #ifdef __cplusplus
 }

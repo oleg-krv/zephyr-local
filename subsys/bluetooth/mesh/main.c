@@ -28,10 +28,12 @@
 #include "subnet.h"
 #include "app_keys.h"
 #include "rpl.h"
+#include "cfg.h"
 #include "beacon.h"
 #include "lpn.h"
 #include "friend.h"
 #include "transport.h"
+#include "heartbeat.h"
 #include "access.h"
 #include "foundation.h"
 #include "proxy.h"
@@ -244,9 +246,9 @@ int bt_mesh_suspend(void)
 		return err;
 	}
 
-	bt_mesh_hb_pub_disable();
+	bt_mesh_hb_suspend();
 
-	if (bt_mesh_beacon_get() == BT_MESH_BEACON_ENABLED) {
+	if (bt_mesh_beacon_enabled()) {
 		bt_mesh_beacon_disable();
 	}
 
@@ -287,7 +289,9 @@ int bt_mesh_resume(void)
 		return err;
 	}
 
-	if (bt_mesh_beacon_get() == BT_MESH_BEACON_ENABLED) {
+	bt_mesh_hb_resume();
+
+	if (bt_mesh_beacon_enabled()) {
 		bt_mesh_beacon_enable();
 	}
 
@@ -322,8 +326,10 @@ int bt_mesh_init(const struct bt_mesh_prov *prov,
 		}
 	}
 
+	bt_mesh_cfg_init();
 	bt_mesh_net_init();
 	bt_mesh_trans_init();
+	bt_mesh_hb_init();
 	bt_mesh_beacon_init();
 	bt_mesh_adv_init();
 
@@ -344,7 +350,7 @@ static void model_start(struct bt_mesh_model *mod, struct bt_mesh_elem *elem,
 
 int bt_mesh_start(void)
 {
-	if (bt_mesh_beacon_get() == BT_MESH_BEACON_ENABLED) {
+	if (bt_mesh_beacon_enabled()) {
 		bt_mesh_beacon_enable();
 	} else {
 		bt_mesh_beacon_disable();
@@ -372,6 +378,8 @@ int bt_mesh_start(void)
 
 		bt_mesh_prov_complete(sub->net_idx, addr);
 	}
+
+	bt_mesh_hb_start();
 
 	bt_mesh_model_foreach(model_start, NULL);
 
