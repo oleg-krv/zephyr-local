@@ -69,6 +69,11 @@ endchoice
 
 endif # LSM6DS3_TRIGGER
 
+config LSM6DS3_ENABLE_FIFO
+	bool "Enable FIFO buffer"
+	help
+	  Enable/disable FIFO buffer
+
 config LSM6DS3_ENABLE_TEMP
 	bool "Enable temperature"
 	help

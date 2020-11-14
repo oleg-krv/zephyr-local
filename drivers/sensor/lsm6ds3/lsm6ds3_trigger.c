@@ -171,9 +171,24 @@ static void lsm6ds3_handle_interrupt(const struct device *dev)
 	lsm6ds3_status_reg_t status;
 
 	while (1) {
+#if defined(CONFIG_LSM6DS3_ENABLE_FIFO)
+		lsm6ds3_fifo_status2_t lsm6ds3_fifo_status2;
+		if (lsm6ds3_read_reg(lsm6ds3->ctx, LSM6DS3_FIFO_STATUS2,
+							   (uint8_t*)&lsm6ds3_fifo_status2, 1) < 0) {
+			LOG_ERR("failed reading FIFO status reg");
+			goto HI_EXIT;
+		};
+		if (lsm6ds3_fifo_status2.fth && (lsm6ds3->handler_drdy_acc != NULL)) {
+			lsm6ds3->handler_drdy_acc(dev, &drdy_trigger);
+			continue;
+		} else {
+			break;
+		}
+
+#else
 		if (lsm6ds3_status_reg_get(lsm6ds3->ctx, &status) < 0) {
-			LOG_DBG("failed reading status reg");
-			return;
+			LOG_ERR("failed reading status reg");
+			goto HI_EXIT;
 		}
 
 		if ((status.xlda == 0) && (status.gda == 0)
@@ -197,8 +212,10 @@ static void lsm6ds3_handle_interrupt(const struct device *dev)
 			lsm6ds3->handler_drdy_temp(dev, &drdy_trigger);
 		}
 #endif
-	}
 
+#endif // CONFIG_LSM6DS3_ENABLE_FIFO
+	}
+	HI_EXIT:
 	gpio_pin_interrupt_configure(lsm6ds3->gpio, cfg->int_gpio_pin,
 				     GPIO_INT_EDGE_TO_ACTIVE);
 }
