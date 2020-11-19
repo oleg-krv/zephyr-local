@@ -625,41 +625,38 @@ end:
 	return result;
 }
 
-static int tcp_data_get(struct tcp *conn, struct net_pkt *pkt)
+static int tcp_data_get(struct tcp *conn, struct net_pkt *pkt, size_t len)
 {
-	int len = tcp_data_len(pkt);
+	int ret = 0;
 
 	if (tcp_recv_cb) {
 		tcp_recv_cb(conn, pkt);
 		goto out;
 	}
 
-	if (len > 0) {
-		if (conn->context->recv_cb) {
-			struct net_pkt *up =
-				net_pkt_clone(pkt, TCP_PKT_ALLOC_TIMEOUT);
+	if (conn->context->recv_cb) {
+		struct net_pkt *up = net_pkt_clone(pkt, TCP_PKT_ALLOC_TIMEOUT);
 
-			if (!up) {
-				len = -ENOBUFS;
-				goto out;
-			}
-
-			net_pkt_cursor_init(up);
-			net_pkt_set_overwrite(up, true);
-
-			net_pkt_skip(up, net_pkt_get_len(up) - len);
-
-			/* Do not pass data to application with TCP conn
-			 * locked as there could be an issue when the app tries
-			 * to send the data and the conn is locked. So the recv
-			 * data is placed in fifo which is flushed in tcp_in()
-			 * after unlocking the conn
-			 */
-			k_fifo_put(&conn->recv_data, up);
+		if (!up) {
+			ret = -ENOBUFS;
+			goto out;
 		}
+
+		net_pkt_cursor_init(up);
+		net_pkt_set_overwrite(up, true);
+
+		net_pkt_skip(up, net_pkt_get_len(up) - len);
+
+		/* Do not pass data to application with TCP conn
+		 * locked as there could be an issue when the app tries
+		 * to send the data and the conn is locked. So the recv
+		 * data is placed in fifo which is flushed in tcp_in()
+		 * after unlocking the conn
+		 */
+		k_fifo_put(&conn->recv_data, up);
 	}
  out:
-	return len;
+	return ret;
 }
 
 static int tcp_finalize_pkt(struct net_pkt *pkt)
@@ -1253,6 +1250,12 @@ err:
 	return conn;
 }
 
+static bool tcp_validate_seq(struct tcp *conn, struct tcphdr *hdr)
+{
+	return (net_tcp_seq_cmp(th_seq(hdr), conn->ack) >= 0) &&
+		(net_tcp_seq_cmp(th_seq(hdr), conn->ack + conn->recv_win) < 0);
+}
+
 /* TCP state machine, everything happens here */
 static void tcp_in(struct tcp *conn, struct net_pkt *pkt)
 {
@@ -1278,6 +1281,19 @@ static void tcp_in(struct tcp *conn, struct net_pkt *pkt)
 
 	if (th && th->th_off < 5) {
 		tcp_out(conn, RST);
+		conn_state(conn, TCP_CLOSED);
+		goto next_state;
+	}
+
+	if (FL(&fl, &, RST)) {
+		/* We only accept RST packet that has valid seq field. */
+		if (!tcp_validate_seq(conn, th)) {
+			net_stats_update_tcp_seg_rsterr(net_pkt_iface(pkt));
+			k_mutex_unlock(&conn->lock);
+			return;
+		}
+
+		net_stats_update_tcp_seg_rst(net_pkt_iface(pkt));
 		conn_state(conn, TCP_CLOSED);
 		goto next_state;
 	}
@@ -1317,11 +1333,6 @@ static void tcp_in(struct tcp *conn, struct net_pkt *pkt)
 		}
 	}
 
-	if (FL(&fl, &, RST)) {
-		net_stats_update_tcp_seg_rst(net_pkt_iface(pkt));
-
-		conn_state(conn, TCP_CLOSED);
-	}
 next_state:
 	len = pkt ? tcp_data_len(pkt) : 0;
 
@@ -1359,7 +1370,7 @@ next_state:
 			}
 
 			if (len) {
-				if (tcp_data_get(conn, pkt) < 0) {
+				if (tcp_data_get(conn, pkt, len) < 0) {
 					break;
 				}
 				conn_ack(conn, + len);
@@ -1376,7 +1387,7 @@ next_state:
 			tcp_send_timer_cancel(conn);
 			conn_ack(conn, th_seq(th) + 1);
 			if (len) {
-				if (tcp_data_get(conn, pkt) < 0) {
+				if (tcp_data_get(conn, pkt, len) < 0) {
 					break;
 				}
 				conn_ack(conn, + len);
@@ -1409,7 +1420,7 @@ next_state:
 		} else if (th && FL(&fl, ==, (FIN | ACK | PSH),
 				    th_seq(th) == conn->ack)) {
 			if (len) {
-				if (tcp_data_get(conn, pkt) < 0) {
+				if (tcp_data_get(conn, pkt, len) < 0) {
 					break;
 				}
 			}
@@ -1476,7 +1487,7 @@ next_state:
 
 		if (th && len) {
 			if (th_seq(th) == conn->ack) {
-				if (tcp_data_get(conn, pkt) < 0) {
+				if (tcp_data_get(conn, pkt, len) < 0) {
 					break;
 				}
 
@@ -2230,6 +2241,72 @@ static void test_cb_register(sa_family_t family, uint8_t proto, uint16_t remote_
 	}
 }
 #endif /* CONFIG_NET_TEST_PROTOCOL */
+
+void net_tcp_foreach(net_tcp_cb_t cb, void *user_data)
+{
+	struct tcp *conn;
+	struct tcp *tmp;
+	int key;
+
+	key = irq_lock();
+
+	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&tcp_conns, conn, tmp, next) {
+
+		if (atomic_get(&conn->ref_count) > 0) {
+			irq_unlock(key);
+			cb(conn, user_data);
+			key = irq_lock();
+		}
+	}
+
+	irq_unlock(key);
+}
+
+uint16_t net_tcp_get_recv_mss(const struct tcp *conn)
+{
+	sa_family_t family = net_context_get_family(conn->context);
+
+	if (family == AF_INET) {
+#if defined(CONFIG_NET_IPV4)
+		struct net_if *iface = net_context_get_iface(conn->context);
+
+		if (iface && net_if_get_mtu(iface) >= NET_IPV4TCPH_LEN) {
+			/* Detect MSS based on interface MTU minus "TCP,IP
+			 * header size"
+			 */
+			return net_if_get_mtu(iface) - NET_IPV4TCPH_LEN;
+		}
+#else
+		return 0;
+#endif /* CONFIG_NET_IPV4 */
+	}
+#if defined(CONFIG_NET_IPV6)
+	else if (family == AF_INET6) {
+		struct net_if *iface = net_context_get_iface(conn->context);
+		int mss = 0;
+
+		if (iface && net_if_get_mtu(iface) >= NET_IPV6TCPH_LEN) {
+			/* Detect MSS based on interface MTU minus "TCP,IP
+			 * header size"
+			 */
+			mss = net_if_get_mtu(iface) - NET_IPV6TCPH_LEN;
+		}
+
+		if (mss < NET_IPV6_MTU) {
+			mss = NET_IPV6_MTU;
+		}
+
+		return mss;
+	}
+#endif /* CONFIG_NET_IPV6 */
+
+	return 0;
+}
+
+const char *net_tcp_state_str(enum tcp_state state)
+{
+	return tcp_state_to_str(state, false);
+}
 
 void net_tcp_init(void)
 {

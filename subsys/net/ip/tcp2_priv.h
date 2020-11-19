@@ -83,7 +83,7 @@
 
 #define conn_mss(_conn)					\
 	((_conn)->recv_options.mss_found ?		\
-	 (_conn)->recv_options.mss : NET_IPV6_MTU)
+	 (_conn)->recv_options.mss : (uint16_t)NET_IPV6_MTU)
 
 #define conn_state(_conn, _s)						\
 ({									\
@@ -230,3 +230,5 @@ struct tcp { /* TCP connection */
 
 #define FL(_fl, _op, _mask, _args...)					\
 	_flags(_fl, _op, _mask, strlen("" #_args) ? _args : true)
+
+typedef void (*net_tcp_cb_t)(struct tcp *conn, void *user_data);

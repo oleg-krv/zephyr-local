@@ -56,7 +56,7 @@ manifest:
       revision: f1fa8241f8786198ba41155413243de36ed878a5
       path: modules/hal/infineon
     - name: hal_nordic
-      revision: 844f117c70ffdd5c119b33731ab4fd285e524aee
+      revision: d7b3b6e3cea622ecc93fcacd3f2cfddf83746aff
       path: modules/hal/nordic
     - name: hal_openisa
       revision: 40d049f69c50b58ea20473bee14cf93f518bf262
@@ -90,7 +90,7 @@ manifest:
       revision: 31acbaa36e9e74ab88ac81e3d21e7f1d00a71136
       path: modules/lib/gui/lvgl
     - name: mbedtls
-      revision: e3e135f89693a0342bbc72f31a4e00cdf36c3977
+      revision: 13cf2e52024a144ecee9f37680681760a85febab
       path: modules/crypto/mbedtls
     - name: mcuboot
       revision: c71d2186077f9fd5f6d1aa53ee3f09dc41ce78f6
@@ -99,7 +99,7 @@ manifest:
       revision: f28a637db12c4b12fb2b18bddc6b2a0deaa95251
       path: modules/lib/mcumgr
     - name: net-tools
-      revision: e53774b71288a85f7321bfbfa57cae6d3419f022
+      revision: c72fbf3300264a8a4bb48be314ca93765c863a19
       path: tools/net-tools
     - name: hal_nxp
       revision: 56915d2942a3af7205b3c4991a8b87e915de7f59
@@ -139,7 +139,7 @@ manifest:
       revision: c39888ff74acf421eeff9a7514fa9b172c3373f7
     - name: trusted-firmware-m
       path: modules/tee/tfm
-      revision: 8e2f6a851a3787b2a86c6606df1333b407324c31
+      revision: 6edaaaaaa1a227cb1ccc9ef698a9d2e258a9bbd5
 
   self:
     path: zephyr

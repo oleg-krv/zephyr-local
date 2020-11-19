@@ -100,6 +100,7 @@ start_configuration ()
 	    if [ -n "$*" ]; then
 	        echo -n " with extra arguments '$*'"
 	    fi
+
 	    echo "..."
     else
 	    echo "Could not start Docker container '$image'"
@@ -146,7 +147,10 @@ start_zephyr ()
 	cmake -GNinja -DBOARD=native_posix -B build "$@" . && \
 	ninja -C build
 
-    ninja -C build run &
+    # Run the binary directly so that ninja does not print errors that
+    # could be confusing.
+    #ninja -C build run &
+    build/zephyr/zephyr.exe &
     zephyr_pid=$!
 
     sleep 3
@@ -241,6 +245,7 @@ wait_docker ()
 docker_exec ()
 {
     local result=0
+    local docker_result=0
     local overlay=""
 
     if [ -n "$zephyr_overlay" ]; then
@@ -315,6 +320,32 @@ docker_exec ()
 	    stop_zephyr
 	    ;;
 
+	dumb_http_server_mt)
+	    # First the non-tls version
+	    start_configuration || return $?
+	    start_zephyr "$overlay" "-DCONFIG_NET_SAMPLE_SERVE_LARGE_FILE=y" || return $?
+	    start_docker "/usr/local/bin/http-get-file-test.sh 5" || return $?
+	    wait_docker
+	    docker_result=$?
+
+	    # curl timeout is return code 28. If we get that, zephyr will never
+	    # return so we can just kill it here
+	    if [ $docker_result -eq 28 ]; then
+	        stop_zephyr
+	        result=1
+	    else
+	        sleep 1
+	        wait_zephyr
+	        result=$?
+	    fi
+
+	    stop_docker
+
+	    if [ $result -ne 0 ] || [ $docker_result -ne 0 ]; then
+	        break;
+	    fi
+	    ;;
+
 	mqtt_publisher)
 	    start_configuration || return $?
 	    start_docker "/usr/local/sbin/mosquitto -v
@@ -359,6 +390,28 @@ docker_exec ()
 	    stop_docker
 
 	    return $result
+	    ;;
+
+	gptp)
+	    start_configuration || return $?
+	    start_docker \
+		    "/usr/local/sbin/ptp4l -2 -f /etc/gptp.cfg -m -q -l 6 -S -i eth0" \
+	        || return $?
+
+	    # For native_posix gPTP run, the delay threshold needs to be huge
+	    start_zephyr "$overlay" "-DCONFIG_NET_SAMPLE_RUN_DURATION=10" \
+	                 "-DCONFIG_NET_GPTP_NEIGHBOR_PROP_DELAY_THR=12000000"
+
+	    wait_zephyr
+	    gptp_result=$?
+
+	    if [ $gptp_result -eq 1 -o $gptp_result -eq 2 ]; then
+	        result=0
+	    else
+	        result=1
+	    fi
+
+	    stop_docker
 	    ;;
 
 	*)
