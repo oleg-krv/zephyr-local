@@ -99,7 +99,7 @@ manifest:
       revision: f28a637db12c4b12fb2b18bddc6b2a0deaa95251
       path: modules/lib/mcumgr
     - name: net-tools
-      revision: c72fbf3300264a8a4bb48be314ca93765c863a19
+      revision: dcfa04f4aaf30ae7c2dbf34a05a569ca1c04b2ce
       path: tools/net-tools
     - name: hal_nxp
       revision: 56915d2942a3af7205b3c4991a8b87e915de7f59
@@ -111,10 +111,10 @@ manifest:
       revision: 3f545d76a2e6d1db83a470ccdb5bebd1f484e137
       path: modules/lib/loramac-node
     - name: openthread
-      revision: 07f430dac6c400abdd358ba1173c0f94b94a5a80
+      revision: f9fbfad0119d7b0d473eaac50c2f0a0a483c2823
       path: modules/lib/openthread
     - name: segger
-      revision: 874d9e9696b00c09f9eeefe839028dc25fe44983
+      revision: 38c79a447e4a47d413b4e8d34448316a5cece77c
       path: modules/debug/segger
     - name: tinycbor
       path: modules/lib/tinycbor
