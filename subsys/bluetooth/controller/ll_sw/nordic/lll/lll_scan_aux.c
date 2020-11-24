@@ -303,23 +303,7 @@ static int isr_rx_pdu(struct lll_scan_aux *lll, uint8_t rssi_ready)
 
 	trx_cnt++;
 
-	switch (lll->phy) {
-	case BIT(0):
-		node_rx->hdr.type = NODE_RX_TYPE_EXT_1M_REPORT;
-		break;
-
-	case BIT(1):
-		node_rx->hdr.type = NODE_RX_TYPE_EXT_2M_REPORT;
-		break;
-
-	case BIT(2):
-		node_rx->hdr.type = NODE_RX_TYPE_EXT_CODED_REPORT;
-		break;
-
-	default:
-		LL_ASSERT(0);
-		break;
-	}
+	node_rx->hdr.type = NODE_RX_TYPE_EXT_AUX_REPORT;
 
 	ftr = &(node_rx->hdr.rx_ftr);
 	ftr->param = lll;
@@ -327,7 +311,8 @@ static int isr_rx_pdu(struct lll_scan_aux *lll, uint8_t rssi_ready)
 	ftr->radio_end_us = radio_tmr_end_get() -
 			    radio_rx_chain_delay_get(lll->phy, 1);
 
-	ftr->rssi = (rssi_ready) ? (radio_rssi_get() & 0x7f) : 0x7f;
+	ftr->rssi = (rssi_ready) ? radio_rssi_get() :
+				   BT_HCI_LE_RSSI_NOT_AVAILABLE;
 
 #if defined(CONFIG_BT_CTLR_PRIVACY)
 	/* TODO: Use correct rl_idx value when privacy support is added */

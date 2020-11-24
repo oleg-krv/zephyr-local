@@ -1916,12 +1916,12 @@ static void le_set_phy(struct net_buf *buf, struct net_buf **evt)
 	handle = sys_le16_to_cpu(cmd->handle);
 	phy_opts = sys_le16_to_cpu(cmd->phy_opts);
 
-	mask_phys = 0x01;
+	mask_phys = BT_HCI_LE_PHY_PREFER_1M;
 	if (IS_ENABLED(CONFIG_BT_CTLR_PHY_2M)) {
-		mask_phys |= BIT(1);
+		mask_phys |= BT_HCI_LE_PHY_PREFER_2M;
 	}
 	if (IS_ENABLED(CONFIG_BT_CTLR_PHY_CODED)) {
-		mask_phys |= BIT(2);
+		mask_phys |= BT_HCI_LE_PHY_PREFER_CODED;
 	}
 
 	if (cmd->all_phys & BT_HCI_LE_PHY_TX_ANY) {
@@ -3986,7 +3986,7 @@ static void le_ext_adv_legacy_report(struct pdu_data *pdu_data,
 	adv_info->prim_phy = BT_HCI_LE_EXT_SCAN_PHY_1M;
 	adv_info->sec_phy = 0U;
 	adv_info->sid = 0xff;
-	adv_info->tx_power = 0x7f;
+	adv_info->tx_power = BT_HCI_LE_ADV_TX_POWER_NO_PREF;
 	adv_info->rssi = rssi;
 	adv_info->interval = 0U;
 
@@ -4005,12 +4005,26 @@ static void le_ext_adv_legacy_report(struct pdu_data *pdu_data,
 	memcpy(&adv_info->data[0], &adv->adv_ind.data[0], data_len);
 }
 
+static void node_rx_extra_list_release(struct node_rx_pdu *node_rx_extra)
+{
+	while (node_rx_extra) {
+		struct node_rx_pdu *node_rx_curr;
+
+		node_rx_curr = node_rx_extra;
+		node_rx_extra = node_rx_curr->hdr.rx_ftr.extra;
+
+		node_rx_curr->hdr.next = NULL;
+		ll_rx_mem_release((void **)&node_rx_curr);
+	}
+}
+
 static void le_ext_adv_report(struct pdu_data *pdu_data,
 			      struct node_rx_pdu *node_rx,
 			      struct net_buf *buf, uint8_t phy)
 {
 	struct bt_hci_evt_le_ext_advertising_info *adv_info;
 	struct bt_hci_evt_le_ext_advertising_report *sep;
+	int8_t tx_pwr = BT_HCI_LE_ADV_TX_POWER_NO_PREF;
 	struct pdu_adv *adv = (void *)pdu_data;
 	struct node_rx_pdu *node_rx_curr;
 	struct node_rx_pdu *node_rx_next;
@@ -4024,11 +4038,10 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 	uint8_t data_status = 0U;
 	uint8_t data_len = 0U;
 	uint8_t evt_type = 0U;
-	int8_t tx_pwr = 0x7f;
 	uint8_t *data = NULL;
 	uint8_t sec_phy = 0U;
-	int8_t rssi = 0x7f;
 	uint8_t info_len;
+	int8_t rssi;
 
 #if defined(CONFIG_BT_CTLR_PRIVACY)
 	uint8_t rl_idx;
@@ -4036,6 +4049,7 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 
 	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
 	    !(le_event_mask & BT_EVT_MASK_LE_EXT_ADVERTISING_REPORT)) {
+		node_rx_extra_list_release(node_rx->hdr.rx_ftr.extra);
 		return;
 	}
 
@@ -4069,7 +4083,7 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 
 		p = (void *)&adv->adv_ext_ind;
 		h = (void *)p->ext_hdr_adi_adv_data;
-		ptr = (uint8_t *)h + sizeof(*h);
+		ptr = (void *)h;
 
 		BT_DBG("    Ext. adv mode= 0x%x, hdr len= %u", p->adv_mode,
 		       p->ext_hdr_len);
@@ -4077,8 +4091,13 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 		evt_type_curr = p->adv_mode;
 
 		if (!p->ext_hdr_len) {
+			hdr_len = offsetof(struct pdu_adv_com_ext_adv,
+					   ext_hdr_adi_adv_data);
+
 			goto no_ext_hdr;
 		}
+
+		ptr += sizeof(*h);
 
 		if (h->adv_addr) {
 			bt_addr_le_t addr;
@@ -4188,16 +4207,16 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 
 				BT_DBG("ACAD: <todo>");
 			}
-
-			if (hdr_len < adv->len) {
-				data_len_curr = adv->len - hdr_len;
-				data_curr = ptr;
-
-				BT_DBG("    AD Data (%u): <todo>", data_len);
-			}
 		}
 
 no_ext_hdr:
+		if (hdr_len < adv->len) {
+			data_len_curr = adv->len - hdr_len;
+			data_curr = ptr;
+
+			BT_DBG("    AD Data (%u): <todo>", data_len);
+		}
+
 		if (node_rx_curr == node_rx) {
 			evt_type = evt_type_curr;
 			adv_addr_type = adv_addr_type_curr;
@@ -4238,8 +4257,11 @@ no_ext_hdr:
 		}
 
 		if (!node_rx_next) {
-			if (sec_phy_curr) {
-				data_status = BIT(1);
+			bool has_aux_ptr = !!sec_phy_curr;
+
+			if (has_aux_ptr) {
+				data_status =
+				  BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_INCOMPLETE;
 			}
 
 			break;
@@ -4265,12 +4287,23 @@ no_ext_hdr:
 		/* if data cannot fit the event, mark it as incomplete */
 		if (data_len > data_max_len) {
 			data_len = data_max_len;
-			data_status = BIT(0);
+			data_status =
+				BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL;
 		}
 	} else {
 		/* Data incomplete and no more to come */
-		if (!(adv_addr || (adi && ((tx_pwr != 0x7f) || data)))) {
-			goto le_ext_adv_report_invalid;
+		if (!(adv_addr ||
+		      (adi && ((tx_pwr != BT_HCI_LE_ADV_TX_POWER_NO_PREF) ||
+			       data)))) {
+			/* No device address and no valid AD data parsed or
+			 * Tx Power present for this PDU chain that has ADI,
+			 * skip HCI event generation.
+			 * In other terms, generate HCI event if device address
+			 * is present or if Tx pwr and/or data is present from
+			 * anonymous device.
+			 */
+			node_rx_extra_list_release(node_rx->hdr.rx_ftr.extra);
+			return;
 		}
 	}
 
@@ -4285,7 +4318,7 @@ no_ext_hdr:
 
 	/* Set directed advertising bit */
 	if ((evt_type == BT_HCI_LE_ADV_EVT_TYPE_CONN) && direct_addr) {
-		evt_type |= BIT(2);
+		evt_type |= BT_HCI_LE_ADV_EVT_TYPE_DIRECT;
 	}
 
 	/* TODO: Set scan response bit */
@@ -4331,16 +4364,7 @@ no_ext_hdr:
 	adv_info->length = data_len;
 	memcpy(&adv_info->data[0], data, data_len);
 
-le_ext_adv_report_invalid:
-	/* Free the node_rx list */
-	node_rx_next = node_rx->hdr.rx_ftr.extra;
-	while (node_rx_next) {
-		node_rx_curr = node_rx_next;
-		node_rx_next = node_rx_curr->hdr.rx_ftr.extra;
-
-		node_rx_curr->hdr.next = NULL;
-		ll_rx_mem_release((void **)&node_rx_curr);
-	}
+	node_rx_extra_list_release(node_rx->hdr.rx_ftr.extra);
 }
 
 static void le_adv_ext_report(struct pdu_data *pdu_data,
@@ -4360,21 +4384,21 @@ static void le_adv_ext_1M_report(struct pdu_data *pdu_data,
 				 struct node_rx_pdu *node_rx,
 				 struct net_buf *buf)
 {
-	le_adv_ext_report(pdu_data, node_rx, buf, BIT(0));
+	le_adv_ext_report(pdu_data, node_rx, buf, BT_HCI_LE_EXT_SCAN_PHY_1M);
 }
 
 static void le_adv_ext_2M_report(struct pdu_data *pdu_data,
 				 struct node_rx_pdu *node_rx,
 				 struct net_buf *buf)
 {
-	le_adv_ext_report(pdu_data, node_rx, buf, BIT(1));
+	le_adv_ext_report(pdu_data, node_rx, buf, BT_HCI_LE_EXT_SCAN_PHY_2M);
 }
 
 static void le_adv_ext_coded_report(struct pdu_data *pdu_data,
 				    struct node_rx_pdu *node_rx,
 				    struct net_buf *buf)
 {
-	le_adv_ext_report(pdu_data, node_rx, buf, BIT(2));
+	le_adv_ext_report(pdu_data, node_rx, buf, BT_HCI_LE_EXT_SCAN_PHY_CODED);
 }
 
 static void le_scan_timeout(struct pdu_data *pdu_data,
@@ -4422,6 +4446,205 @@ static void le_per_adv_sync_established(struct pdu_data *pdu_data,
 	sep->phy = find_lsb_set(se->phy);
 	sep->interval = sys_cpu_to_le16(se->interval);
 	sep->clock_accuracy = se->sca;
+}
+
+static void le_per_adv_sync_report(struct pdu_data *pdu_data,
+				   struct node_rx_pdu *node_rx,
+				   struct net_buf *buf)
+{
+	struct bt_hci_evt_le_per_advertising_report *sep;
+	int8_t tx_pwr = BT_HCI_LE_ADV_TX_POWER_NO_PREF;
+	struct pdu_adv *adv = (void *)pdu_data;
+	struct node_rx_pdu *node_rx_curr;
+	struct node_rx_pdu *node_rx_next;
+	uint8_t total_data_len = 0U;
+	uint8_t data_status = 0U;
+	uint8_t data_len = 0U;
+	uint8_t *data = NULL;
+	int8_t rssi;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_PER_ADVERTISING_REPORT)) {
+		node_rx_extra_list_release(node_rx->hdr.rx_ftr.extra);
+		return;
+	}
+
+	node_rx_curr = node_rx;
+	node_rx_next = node_rx_curr->hdr.rx_ftr.extra;
+	do {
+		struct pdu_adv_com_ext_adv *p;
+		uint8_t data_len_curr = 0U;
+		uint8_t *data_curr = NULL;
+		uint8_t sec_phy_curr = 0U;
+		struct pdu_adv_hdr *h;
+		uint8_t hdr_len;
+		uint8_t *ptr;
+
+		/* The Link Layer currently returns RSSI as an absolute value */
+		rssi = -(node_rx_curr->hdr.rx_ftr.rssi);
+
+		BT_DBG("len = %u, rssi = %d", adv->len, rssi);
+
+		p = (void *)&adv->adv_ext_ind;
+		h = (void *)p->ext_hdr_adi_adv_data;
+		ptr = (void *)h;
+
+		BT_DBG("    Ext. adv mode= 0x%x, hdr len= %u", p->adv_mode,
+		       p->ext_hdr_len);
+
+		if (!p->ext_hdr_len) {
+			hdr_len = ptr - (uint8_t *)p;
+
+			goto no_ext_hdr;
+		}
+
+		ptr += sizeof(*h);
+
+		/* No AdvA */
+		/* No TargetA */
+		/* No ADI */
+
+		/* AuxPtr */
+		if (h->aux_ptr) {
+			struct pdu_adv_aux_ptr *aux;
+			uint8_t aux_phy;
+
+			aux = (void *)ptr;
+			ptr += sizeof(*aux);
+
+			sec_phy_curr = aux->phy + 1;
+
+			aux_phy = BIT(aux->phy);
+
+			BT_DBG("    AuxPtr chan_idx = %u, ca = %u, offs_units "
+			       "= %u offs = 0x%x, phy = 0x%x", aux->chan_idx,
+			       aux->ca, aux->offs_units, aux->offs, aux_phy);
+		}
+
+		/* No SyncInfo */
+
+		/* Tx Power */
+		if (h->tx_pwr) {
+			tx_pwr = *(int8_t *)ptr;
+			ptr++;
+
+			BT_DBG("    Tx pwr= %d dB", tx_pwr);
+		}
+
+		hdr_len = ptr - (uint8_t *)p;
+		if (hdr_len <= (offsetof(struct pdu_adv_com_ext_adv,
+					 ext_hdr_adi_adv_data) +
+				sizeof(struct pdu_adv_hdr))) {
+			hdr_len = offsetof(struct pdu_adv_com_ext_adv,
+					   ext_hdr_adi_adv_data);
+			ptr = (uint8_t *)h;
+		}
+
+		if (hdr_len > (p->ext_hdr_len +
+			       offsetof(struct pdu_adv_com_ext_adv,
+					ext_hdr_adi_adv_data))) {
+			BT_WARN("    Header length %u/%u, INVALID.", hdr_len,
+				p->ext_hdr_len);
+		} else {
+			uint8_t acad_len = p->ext_hdr_len +
+					   offsetof(struct pdu_adv_com_ext_adv,
+						    ext_hdr_adi_adv_data) -
+					   hdr_len;
+
+			if (acad_len) {
+				ptr += acad_len;
+				hdr_len += acad_len;
+
+				BT_DBG("ACAD: <todo>");
+			}
+		}
+
+no_ext_hdr:
+		if (hdr_len < adv->len) {
+			data_len_curr = adv->len - hdr_len;
+			data_curr = ptr;
+
+			BT_DBG("    AD Data (%u): <todo>", data_len);
+		}
+
+		if (node_rx_curr == node_rx) {
+			data_len = data_len_curr;
+			total_data_len = data_len;
+			data = data_curr;
+		} else {
+			/* TODO: Validate current value with previous ??
+			 */
+
+			if (!data) {
+				data_len = data_len_curr;
+				total_data_len = data_len;
+				data = data_curr;
+			} else {
+				total_data_len += data_len_curr;
+
+				/* TODO: construct new HCI event for this
+				 * fragment.
+				 */
+			}
+		}
+
+		if (!node_rx_next) {
+			bool has_aux_ptr = !!sec_phy_curr;
+
+			if (has_aux_ptr) {
+				data_status =
+				  BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_INCOMPLETE;
+			}
+
+			break;
+		}
+
+		node_rx_curr = node_rx_next;
+		node_rx_next = node_rx_curr->hdr.rx_ftr.extra;
+		adv = (void *)node_rx_curr->pdu;
+	} while (1);
+
+	/* FIXME: move most of below into above loop to dispatch fragments of
+	 * data in HCI event.
+	 */
+
+	/* If data complete */
+	if (!data_status) {
+		uint8_t data_max_len;
+
+		data_max_len = CONFIG_BT_DISCARDABLE_BUF_SIZE -
+			       BT_HCI_ACL_HDR_SIZE - sizeof(*sep);
+
+		/* if data cannot fit the event, mark it as incomplete */
+		if (data_len > data_max_len) {
+			data_len = data_max_len;
+			data_status =
+				BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL;
+		}
+	} else {
+		/* Data incomplete and no more to come */
+		if ((tx_pwr == BT_HCI_LE_ADV_TX_POWER_NO_PREF) && !data) {
+			/* No Tx Power value and no valid AD data parsed in this
+			 * chain of PDUs, skip HCI event generation.
+			 */
+			node_rx_extra_list_release(node_rx->hdr.rx_ftr.extra);
+			return;
+		}
+	}
+
+	/* Start constructing the event */
+	sep = meta_evt(buf, BT_HCI_EVT_LE_PER_ADVERTISING_REPORT,
+		       sizeof(*sep) + data_len);
+
+	sep->handle = sys_cpu_to_le16(node_rx->hdr.handle);
+	sep->tx_power = tx_pwr;
+	sep->rssi = rssi;
+	sep->cte_type = 0U; /* TODO */
+	sep->data_status = data_status;
+	sep->length = data_len;
+	memcpy(&sep->data[0], data, data_len);
+
+	node_rx_extra_list_release(node_rx->hdr.rx_ftr.extra);
 }
 
 static void le_per_adv_sync_lost(struct pdu_data *pdu_data,
@@ -4801,6 +5024,9 @@ static void encode_control(struct node_rx_pdu *node_rx,
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
 	case NODE_RX_TYPE_SYNC:
 		le_per_adv_sync_established(pdu_data, node_rx, buf);
+		break;
+	case NODE_RX_TYPE_SYNC_REPORT:
+		le_per_adv_sync_report(pdu_data, node_rx, buf);
 		break;
 	case NODE_RX_TYPE_SYNC_LOST:
 		le_per_adv_sync_lost(pdu_data, node_rx, buf);
@@ -5267,6 +5493,7 @@ uint8_t hci_get_class(struct node_rx_pdu *node_rx)
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
 			__fallthrough;
 		case NODE_RX_TYPE_SYNC:
+		case NODE_RX_TYPE_SYNC_REPORT:
 		case NODE_RX_TYPE_SYNC_LOST:
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 #endif /* CONFIG_BT_OBSERVER */
