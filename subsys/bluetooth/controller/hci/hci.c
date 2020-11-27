@@ -749,6 +749,13 @@ static void read_supported_commands(struct net_buf *buf, struct net_buf **evt)
 
 	/* LE Read TX Power. */
 	rp->commands[38] |= BIT(7);
+
+#if defined(CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO)
+	/* Read Supported Codecs */
+	rp->commands[29] |= BIT(5);
+	/* Read Supported Codecs [v2], Codec Capabilities, Controller Delay */
+	rp->commands[45] |= BIT(2) | BIT(3) | BIT(4);
+#endif /* CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO */
 }
 
 static void read_local_features(struct net_buf *buf, struct net_buf **evt)
@@ -774,6 +781,240 @@ static void read_bd_addr(struct net_buf *buf, struct net_buf **evt)
 	ll_addr_get(0, &rp->bdaddr.val[0]);
 }
 
+#if defined(CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO)
+uint8_t __weak hci_vendor_read_std_codecs(
+	const struct bt_hci_std_codec_info_v2 **codecs)
+{
+	ARG_UNUSED(codecs);
+
+	/* return number of supported codecs */
+	return 0;
+}
+
+uint8_t __weak hci_vendor_read_vs_codecs(
+	const struct bt_hci_vs_codec_info_v2 **codecs)
+{
+	ARG_UNUSED(codecs);
+
+	/* return number of supported codecs */
+	return 0;
+}
+
+static void read_codecs(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_rp_read_codecs *rp;
+	const struct bt_hci_std_codec_info_v2 *std_codec_info;
+	const struct bt_hci_vs_codec_info_v2 *vs_codec_info;
+	struct bt_hci_std_codecs *std_codecs;
+	struct bt_hci_vs_codecs *vs_codecs;
+	size_t std_codecs_bytes;
+	size_t vs_codecs_bytes;
+	uint8_t num_std_codecs;
+	uint8_t num_vs_codecs;
+	uint8_t i;
+
+	/* read standard codec information */
+	num_std_codecs = hci_vendor_read_std_codecs(&std_codec_info);
+	std_codecs_bytes = sizeof(struct bt_hci_std_codecs) +
+		num_std_codecs * sizeof(struct bt_hci_std_codec_info);
+	/* read vendor-specific codec information */
+	num_vs_codecs = hci_vendor_read_vs_codecs(&vs_codec_info);
+	vs_codecs_bytes = sizeof(struct bt_hci_vs_codecs) +
+		num_vs_codecs *	sizeof(struct bt_hci_vs_codec_info);
+
+	/* allocate response packet */
+	rp = hci_cmd_complete(evt, sizeof(*rp) +
+			      std_codecs_bytes +
+			      vs_codecs_bytes);
+	rp->status = 0x00;
+
+	/* copy standard codec information */
+	std_codecs = (struct bt_hci_std_codecs *)&rp->codecs[0];
+	std_codecs->num_codecs = num_std_codecs;
+	for (i = 0; i < num_std_codecs; i++) {
+		struct bt_hci_std_codec_info *codec;
+
+		codec = &std_codecs->codec_info[i];
+		codec->codec_id = std_codec_info[i].codec_id;
+	}
+
+	/* copy vendor specific codec information */
+	vs_codecs = (struct bt_hci_vs_codecs *)&rp->codecs[std_codecs_bytes];
+	vs_codecs->num_codecs = num_vs_codecs;
+	for (i = 0; i < num_std_codecs; i++) {
+		struct bt_hci_vs_codec_info *codec;
+
+		codec = &vs_codecs->codec_info[i];
+		codec->company_id =
+			sys_cpu_to_le16(vs_codec_info[i].company_id);
+		codec->codec_id = sys_cpu_to_le16(vs_codec_info[i].codec_id);
+	}
+}
+
+static void read_codecs_v2(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_rp_read_codecs_v2 *rp;
+	const struct bt_hci_std_codec_info_v2 *std_codec_info;
+	const struct bt_hci_vs_codec_info_v2 *vs_codec_info;
+	struct bt_hci_std_codecs_v2 *std_codecs;
+	struct bt_hci_vs_codecs_v2 *vs_codecs;
+	size_t std_codecs_bytes;
+	size_t vs_codecs_bytes;
+	uint8_t num_std_codecs;
+	uint8_t num_vs_codecs;
+	uint8_t i;
+
+	/* read standard codec information */
+	num_std_codecs = hci_vendor_read_std_codecs(&std_codec_info);
+	std_codecs_bytes = sizeof(struct bt_hci_std_codecs_v2) +
+		num_std_codecs * sizeof(struct bt_hci_std_codec_info_v2);
+	/* read vendor-specific codec information */
+	num_vs_codecs = hci_vendor_read_vs_codecs(&vs_codec_info);
+	vs_codecs_bytes = sizeof(struct bt_hci_vs_codecs_v2) +
+		num_vs_codecs *	sizeof(struct bt_hci_vs_codec_info_v2);
+
+	/* allocate response packet */
+	rp = hci_cmd_complete(evt, sizeof(*rp) +
+			      std_codecs_bytes +
+			      vs_codecs_bytes);
+	rp->status = 0x00;
+
+	/* copy standard codec information */
+	std_codecs = (struct bt_hci_std_codecs_v2 *)&rp->codecs[0];
+	std_codecs->num_codecs = num_std_codecs;
+	for (i = 0; i < num_std_codecs; i++) {
+		struct bt_hci_std_codec_info_v2 *codec;
+
+		codec = &std_codecs->codec_info[i];
+		codec->codec_id = std_codec_info[i].codec_id;
+		codec->transports = std_codec_info[i].transports;
+	}
+
+	/* copy vendor specific codec information  */
+	vs_codecs = (struct bt_hci_vs_codecs_v2 *)&rp->codecs[std_codecs_bytes];
+	vs_codecs->num_codecs = num_vs_codecs;
+	for (i = 0; i < num_std_codecs; i++) {
+		struct bt_hci_vs_codec_info_v2 *codec;
+
+		codec = &vs_codecs->codec_info[i];
+		codec->company_id =
+			sys_cpu_to_le16(vs_codec_info[i].company_id);
+		codec->codec_id = sys_cpu_to_le16(vs_codec_info[i].codec_id);
+		codec->transports = vs_codec_info[i].transports;
+	}
+}
+
+uint8_t __weak hci_vendor_read_codec_capabilities(uint8_t coding_format,
+						  uint16_t company_id,
+						  uint16_t vs_codec_id,
+						  uint8_t transport,
+						  uint8_t direction,
+						  uint8_t *num_capabilities,
+						  size_t *capabilities_bytes,
+						  const uint8_t **capabilities)
+{
+	ARG_UNUSED(coding_format);
+	ARG_UNUSED(company_id);
+	ARG_UNUSED(vs_codec_id);
+	ARG_UNUSED(transport);
+	ARG_UNUSED(direction);
+	ARG_UNUSED(capabilities);
+
+	*num_capabilities = 0;
+	*capabilities_bytes = 0;
+
+	/* return status */
+	return 0x00;
+}
+
+static void read_codec_capabilities(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_read_codec_capabilities *cmd = (void *)buf->data;
+	struct bt_hci_rp_read_codec_capabilities *rp;
+	const uint8_t *capabilities;
+	size_t capabilities_bytes;
+	uint8_t num_capabilities;
+	uint16_t vs_codec_id;
+	uint16_t company_id;
+	uint8_t status;
+
+	company_id = sys_le16_to_cpu(cmd->codec_id.company_id);
+	vs_codec_id = sys_le16_to_cpu(cmd->codec_id.vs_codec_id);
+
+	/* read codec capabilities */
+	status = hci_vendor_read_codec_capabilities(cmd->codec_id.coding_format,
+						    company_id,
+						    vs_codec_id,
+						    cmd->transport,
+						    cmd->direction,
+						    &num_capabilities,
+						    &capabilities_bytes,
+						    &capabilities);
+
+	/* allocate response packet */
+	rp = hci_cmd_complete(evt, sizeof(*rp) + capabilities_bytes);
+	rp->status = status;
+
+	/* copy codec capabilities information */
+	rp->num_capabilities = num_capabilities;
+	memcpy(&rp->capabilities, capabilities, capabilities_bytes);
+}
+
+uint8_t __weak hci_vendor_read_ctlr_delay(uint8_t coding_format,
+					  uint16_t company_id,
+					  uint16_t vs_codec_id,
+					  uint8_t transport,
+					  uint8_t direction,
+					  uint8_t codec_config_len,
+					  const uint8_t *codec_config,
+					  uint32_t *min_delay,
+					  uint32_t *max_delay)
+{
+	ARG_UNUSED(coding_format);
+	ARG_UNUSED(company_id);
+	ARG_UNUSED(vs_codec_id);
+	ARG_UNUSED(transport);
+	ARG_UNUSED(direction);
+	ARG_UNUSED(codec_config_len);
+	ARG_UNUSED(codec_config);
+
+	*min_delay = 0;
+	*max_delay = 0x3D0900; /* 4 seconds, maximum value allowed by spec */
+
+	/* return status */
+	return 0x00;
+}
+
+static void read_ctlr_delay(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_read_ctlr_delay *cmd = (void *)buf->data;
+	struct bt_hci_rp_read_ctlr_delay *rp;
+	uint16_t vs_codec_id;
+	uint16_t company_id;
+	uint32_t min_delay;
+	uint32_t max_delay;
+	uint8_t status;
+
+	company_id = sys_le16_to_cpu(cmd->codec_id.company_id);
+	vs_codec_id = sys_le16_to_cpu(cmd->codec_id.vs_codec_id);
+
+	status = hci_vendor_read_ctlr_delay(cmd->codec_id.coding_format,
+					    company_id,
+					    vs_codec_id,
+					    cmd->transport,
+					    cmd->direction,
+					    cmd->codec_config_len,
+					    cmd->codec_config,
+					    &min_delay,
+					    &max_delay);
+
+	rp = hci_cmd_complete(evt, sizeof(*rp));
+	rp->status = status;
+	sys_put_le24(min_delay, rp->min_ctlr_delay);
+	sys_put_le24(max_delay, rp->max_ctlr_delay);
+}
+#endif /* CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO */
+
 static int info_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 			   struct net_buf **evt)
 {
@@ -793,6 +1034,24 @@ static int info_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 	case BT_OCF(BT_HCI_OP_READ_BD_ADDR):
 		read_bd_addr(cmd, evt);
 		break;
+
+#if defined(CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO)
+	case BT_OCF(BT_HCI_OP_READ_CODECS):
+		read_codecs(cmd, evt);
+		break;
+
+	case BT_OCF(BT_HCI_OP_READ_CODECS_V2):
+		read_codecs_v2(cmd, evt);
+		break;
+
+	case BT_OCF(BT_HCI_OP_READ_CODEC_CAPABILITIES):
+		read_codec_capabilities(cmd, evt);
+		break;
+
+	case BT_OCF(BT_HCI_OP_READ_CTLR_DELAY):
+		read_ctlr_delay(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO */
 
 	default:
 		return -EINVAL;
@@ -2063,6 +2322,51 @@ static void le_read_tx_power(struct net_buf *buf, struct net_buf **evt)
 	ll_tx_pwr_get(&rp->min_tx_power, &rp->max_tx_power);
 }
 
+#if IS_ENABLED(CONFIG_BT_CTLR_DF)
+#if IS_ENABLED(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
+static void le_df_set_conn_cte_tx_params(struct net_buf *buf,
+					 struct net_buf **evt)
+{
+	struct bt_hci_cp_le_set_conn_cte_tx_params *cmd = (void *)buf->data;
+	struct bt_hci_rp_le_set_conn_cte_tx_params *rp;
+	uint16_t handle, handle_le16;
+	uint8_t status;
+
+	handle_le16 = cmd->handle;
+	handle = sys_le16_to_cpu(handle_le16);
+
+	status = ll_df_set_conn_cte_tx_params(handle, cmd->cte_types,
+					      cmd->switch_pattern_len,
+					      cmd->ant_id);
+
+	rp = hci_cmd_complete(evt, sizeof(*rp));
+
+	rp->status = status;
+	rp->handle = handle_le16;
+}
+#endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RSP */
+
+static void le_df_read_ant_inf(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_rp_le_read_ant_info *rp;
+	uint8_t max_switch_pattern_len;
+	uint8_t switch_sample_rates;
+	uint8_t max_cte_len;
+	uint8_t num_ant;
+
+	ll_df_read_ant_inf(&switch_sample_rates, &num_ant,
+			   &max_switch_pattern_len, &max_cte_len);
+
+	rp = hci_cmd_complete(evt, sizeof(*rp));
+
+	rp->max_switch_pattern_len = max_switch_pattern_len;
+	rp->switch_sample_rates = switch_sample_rates;
+	rp->max_cte_len = max_cte_len;
+	rp->num_ant = num_ant;
+	rp->status = 0x00;
+}
+#endif /* CONFIG_BT_CTLR_DF */
+
 #if defined(CONFIG_BT_CTLR_DTM_HCI)
 static void le_rx_test(struct net_buf *buf, struct net_buf **evt)
 {
@@ -3058,6 +3362,17 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 	case BT_OCF(BT_HCI_OP_LE_READ_TX_POWER):
 		le_read_tx_power(cmd, evt);
 		break;
+
+#if defined(CONFIG_BT_CTLR_DF)
+	case BT_OCF(BT_HCI_OP_LE_READ_ANT_INFO):
+		le_df_read_ant_inf(cmd, evt);
+		break;
+#if IS_ENABLED(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
+	case BT_OCF(BT_HCI_OP_LE_SET_CONN_CTE_TX_PARAMS):
+		le_df_set_conn_cte_tx_params(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RSP) */
+#endif /* CONFIG_BT_CTLR_DF */
 
 #if defined(CONFIG_BT_CTLR_DTM_HCI)
 	case BT_OCF(BT_HCI_OP_LE_RX_TEST):

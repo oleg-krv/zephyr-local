@@ -74,7 +74,7 @@ manifest:
       revision: b52fdbf4b62439be9fab9bb4bae9690a42d2fb14
       path: modules/hal/st
     - name: hal_stm32
-      revision: fadf64171cb1eb947b2de4a53c903ca2350e5ea2
+      revision: c8e88fd73e34f5f4e80fa83372ad340188fa89d9
       path: modules/hal/stm32
     - name: hal_ti
       revision: 277d70a65ab14d46bf1ec0935cf9bb28bbaa8ab9
@@ -84,7 +84,7 @@ manifest:
       path: modules/hal/libmetal
     - name: hal_quicklogic
       repo-path: hal_quicklogic
-      revision: 7deb3aab1cc430a7650143f9833cfc8ddad76eb5
+      revision: b3a66fe6d04d87fd1533a5c8de51d0599fcd08d0
       path: modules/hal/quicklogic
     - name: lvgl
       revision: 31acbaa36e9e74ab88ac81e3d21e7f1d00a71136
@@ -139,7 +139,7 @@ manifest:
       revision: c39888ff74acf421eeff9a7514fa9b172c3373f7
     - name: trusted-firmware-m
       path: modules/tee/tfm
-      revision: 6edaaaaaa1a227cb1ccc9ef698a9d2e258a9bbd5
+      revision: dfc26a443c43514867090fee2ff82be809ae40b0
 
   self:
     path: zephyr

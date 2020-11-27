@@ -227,6 +227,7 @@
 /drivers/led/                             @Mani-Sadhasivam
 /drivers/led_strip/                       @mbolivar-nordic
 /drivers/lora/                            @Mani-Sadhasivam
+/drivers/memc/                            @gmarull
 /drivers/modem/                           @mike-scott
 /drivers/modem/hl7800.c                   @rerickson1
 /drivers/modem/Kconfig.hl7800             @rerickson1
@@ -463,7 +464,7 @@
 /samples/net/mqtt_publisher/              @jukkar @tbursztyka
 /samples/net/sockets/coap_*/              @rlubos
 /samples/net/sockets/                     @jukkar @tbursztyka @pfalcon
-/samples/net/sockets/*civetweb*           @Nukersson
+/samples/net/*civetweb*                   @Nukersson
 /samples/sensor/                          @MaureenHelm
 /samples/shields/                         @avisconti
 /samples/subsys/logging/                  @nordic-krch @jakub-uC
