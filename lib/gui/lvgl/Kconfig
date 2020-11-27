@@ -21,6 +21,14 @@ config APP_LINK_WITH_LVGL
 	  disabled if the include paths for LVGL are causing aliasing
 	  issues for 'app'.
 
+config LVGL_USER_INIT_FILE
+    bool "Use user config file"
+    default n
+
+config LVGL_USER_INIT_FILE_INCLUDE
+    string "User config file"
+    default "lv_user.h"
+
 rsource "Kconfig.graphical"
 rsource "Kconfig.memory"
 rsource "Kconfig.input"

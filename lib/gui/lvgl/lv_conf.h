@@ -871,4 +871,7 @@ typedef void *lv_obj_user_data_t;
 
 #define LV_USE_WIN IS_ENABLED(CONFIG_LVGL_USE_WIN)
 
+#ifdef CONFIG_LVGL_USER_INIT_FILE
+#include CONFIG_LVGL_USER_INIT_FILE_INCLUDE
+#endif
 #endif /* ZEPHYR_LIB_GUI_LVGL_LV_CONF_H_ */
