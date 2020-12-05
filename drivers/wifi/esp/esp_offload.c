@@ -52,7 +52,7 @@ static int _sock_connect(struct esp_data *dev, struct esp_socket *sock)
 	char connect_msg[100];
 	int ret;
 
-	if (!esp_flag_is_set(dev, EDF_STA_CONNECTED)) {
+	if (!esp_flags_are_set(dev, EDF_STA_CONNECTED)) {
 		return -ENETUNREACH;
 	}
 
@@ -78,9 +78,7 @@ static int _sock_connect(struct esp_data *dev, struct esp_socket *sock)
 		sock->ip_proto == IPPROTO_TCP ? "TCP" : "UDP",
 		log_strdup(addr_str));
 
-	ret = modem_cmd_send(&dev->mctx.iface, &dev->mctx.cmd_handler,
-			     NULL, 0, connect_msg, &dev->sem_response,
-			     ESP_CMD_TIMEOUT);
+	ret = esp_cmd_send(dev, NULL, 0, connect_msg, ESP_CMD_TIMEOUT);
 	if (ret == 0) {
 		sock->flags |= ESP_SOCK_CONNECTED;
 	} else if (ret == -ETIMEDOUT) {
@@ -212,7 +210,7 @@ static int _sock_send(struct esp_data *dev, struct esp_socket *sock)
 		MODEM_CMD("SEND FAIL", on_cmd_send_fail, 0U, ""),
 	};
 
-	if (!esp_flag_is_set(dev, EDF_STA_CONNECTED)) {
+	if (!esp_flags_are_set(dev, EDF_STA_CONNECTED)) {
 		return -ENETUNREACH;
 	}
 
@@ -339,7 +337,7 @@ static int esp_sendto(struct net_pkt *pkt,
 
 	LOG_DBG("link %d, timeout %d", sock->link_id, timeout);
 
-	if (!esp_flag_is_set(dev, EDF_STA_CONNECTED)) {
+	if (!esp_flags_are_set(dev, EDF_STA_CONNECTED)) {
 		return -ENETUNREACH;
 	}
 
@@ -383,19 +381,7 @@ static int esp_sendto(struct net_pkt *pkt,
 		return 0;
 	}
 
-	/*
-	 * FIXME:
-	 * In _modem_cmd_send() in modem_cmd_handler.c it can happen that a
-	 * response, eg 'OK', is received before k_sem_reset(sem) is called.
-	 * If the sending thread can be preempted, the command handler could
-	 * run and call k_sem_give(). This will cause a timeout and the send
-	 * will fail. This can be avoided by locking the scheduler. Maybe this
-	 * should be done in _modem_cmd_send() instead.
-	 */
-	k_sched_lock();
 	ret = _sock_send(dev, sock);
-	k_sched_unlock();
-
 	if (ret == 0) {
 		net_pkt_unref(sock->tx_pkt);
 	} else {
@@ -533,9 +519,7 @@ static void esp_recvdata_work(struct k_work *work)
 
 	snprintk(cmd, sizeof(cmd), "AT+CIPRECVDATA=%d,%d", sock->link_id, len);
 
-	ret = modem_cmd_send(&dev->mctx.iface, &dev->mctx.cmd_handler,
-			     cmds, ARRAY_SIZE(cmds), cmd, &dev->sem_response,
-			     ESP_CMD_TIMEOUT);
+	ret = esp_cmd_send(dev, cmds, ARRAY_SIZE(cmds), cmd, ESP_CMD_TIMEOUT);
 	if (ret < 0) {
 		LOG_ERR("Error during rx: link %d, ret %d", sock->link_id,
 			ret);

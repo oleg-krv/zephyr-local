@@ -417,10 +417,10 @@ static int prepare_cb(struct lll_prepare_param *p)
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 	/* TODO: if coded we use S8? */
 	radio_phy_set(lll->phy_p, 1);
-	radio_pkt_configure(8, PDU_AC_PAYLOAD_SIZE_MAX, (lll->phy_p << 1));
+	radio_pkt_configure(8, PDU_AC_LEG_PAYLOAD_SIZE_MAX, (lll->phy_p << 1));
 #else /* !CONFIG_BT_CTLR_ADV_EXT */
 	radio_phy_set(0, 0);
-	radio_pkt_configure(8, PDU_AC_PAYLOAD_SIZE_MAX, 0);
+	radio_pkt_configure(8, PDU_AC_LEG_PAYLOAD_SIZE_MAX, 0);
 #endif /* !CONFIG_BT_CTLR_ADV_EXT */
 
 	aa = sys_cpu_to_le32(PDU_AC_ACCESS_ADDR);
@@ -773,12 +773,12 @@ static void isr_done(void *param)
 #if defined(CONFIG_BT_CTLR_ADV_EXT) && defined(BT_CTLR_ADV_EXT_PBACK)
 	} else {
 		struct pdu_adv_com_ext_adv *p;
-		struct pdu_adv_hdr *h;
+		struct pdu_adv_ext_hdr *h;
 		struct pdu_adv *pdu;
 
 		pdu = lll_adv_data_curr_get(lll);
 		p = (void *)&pdu->adv_ext_ind;
-		h = (void *)p->ext_hdr_adi_adv_data;
+		h = (void *)p->ext_hdr_adv_data;
 
 		if ((pdu->type == PDU_ADV_TYPE_EXT_IND) && h->aux_ptr) {
 			radio_filter_disable();

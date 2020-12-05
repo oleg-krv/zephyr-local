@@ -86,6 +86,7 @@ Architectures
 
   * Added support for the SPARC architecture, compatible with the SPARC V8
     specification and the SPARC ABI.
+  * FPU is supported in both shared and unshared FP register mode.
 
 * x86
 
@@ -310,6 +311,12 @@ MCUBoot
   * Add possibility to set confirm flag for hex files as well.
   * Usage of --confirm implies --pad.
   * Fixed 'custom_tlvs' argument handling.
+
+
+Trusted-Firmware-M
+******************
+
+* Synchronized Trusted-Firmware-M module to the upstream v1.2.0 release.
 
 Documentation
 *************

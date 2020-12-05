@@ -90,7 +90,7 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	uint32_t ready_delay_us;
 	uint32_t aux_offset_us;
 	uint32_t ticker_status;
-	struct pdu_adv_hdr *h;
+	struct pdu_adv_ext_hdr *h;
 	struct pdu_adv *pdu;
 	uint8_t aux_handle;
 	uint8_t *ptr;
@@ -187,12 +187,12 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 		goto ull_scan_aux_rx_flush;
 	}
 
-	h = (void *)p->ext_hdr_adi_adv_data;
+	h = (void *)p->ext_hdr_adv_data;
 	if (!h->aux_ptr && !sync) {
 		goto ull_scan_aux_rx_flush;
 	}
 
-	ptr = (uint8_t *)h + sizeof(*h);
+	ptr = h->data;
 
 	if (h->adv_addr) {
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)

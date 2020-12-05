@@ -28,9 +28,11 @@
 #include "hal/ccm.h"
 #include "ll_sw/pdu.h"
 #include "ll_sw/lll.h"
+#include "lll_adv.h"
 #include "ll_sw/lll_scan.h"
 #include "ll_sw/lll_sync.h"
 #include "ll_sw/lll_conn.h"
+#include "ll_sw/ull_adv_types.h"
 #include "ll_sw/ull_scan_types.h"
 #include "ll_sw/ull_sync_types.h"
 #include "ll_sw/ull_conn_types.h"
@@ -1384,12 +1386,26 @@ static void le_create_big(struct net_buf *buf, struct net_buf **evt)
 	uint32_t sdu_interval;
 	uint16_t max_sdu;
 	uint16_t max_latency;
+	uint8_t big_handle;
+	uint8_t adv_handle;
+
+	status = ll_adv_iso_by_hci_handle_new(cmd->big_handle, &big_handle);
+	if (status) {
+		*evt = cmd_status(status);
+		return;
+	}
+
+	status = ll_adv_set_by_hci_handle_get(cmd->adv_handle, &adv_handle);
+	if (status) {
+		*evt = cmd_status(status);
+		return;
+	}
 
 	sdu_interval = sys_get_le24(cmd->sdu_interval);
 	max_sdu = sys_le16_to_cpu(cmd->max_sdu);
 	max_latency = sys_le16_to_cpu(cmd->max_latency);
 
-	status = ll_big_create(cmd->big_handle, cmd->adv_handle, cmd->num_bis,
+	status = ll_big_create(big_handle, adv_handle, cmd->num_bis,
 			       sdu_interval, max_sdu, max_latency, cmd->rtn,
 			       cmd->phy, cmd->packing, cmd->framing,
 			       cmd->encryption, cmd->bcode);
@@ -4470,7 +4486,7 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 		uint8_t *adv_addr_curr = NULL;
 		uint8_t data_len_curr = 0U;
 		uint8_t *data_curr = NULL;
-		struct pdu_adv_hdr *h;
+		struct pdu_adv_ext_hdr *h;
 		uint8_t sec_phy_curr = 0U;
 		uint8_t evt_type_curr;
 		uint8_t hdr_len;
@@ -4488,7 +4504,7 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 		       adv->rx_addr, rssi);
 
 		p = (void *)&adv->adv_ext_ind;
-		h = (void *)p->ext_hdr_adi_adv_data;
+		h = (void *)p->ext_hdr_adv_data;
 		ptr = (void *)h;
 
 		BT_DBG("    Ext. adv mode= 0x%x, hdr len= %u", p->adv_mode,
@@ -4498,12 +4514,12 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 
 		if (!p->ext_hdr_len) {
 			hdr_len = offsetof(struct pdu_adv_com_ext_adv,
-					   ext_hdr_adi_adv_data);
+					   ext_hdr_adv_data);
 
 			goto no_ext_hdr;
 		}
 
-		ptr += sizeof(*h);
+		ptr = h->data;
 
 		if (h->adv_addr) {
 			bt_addr_le_t addr;
@@ -4589,22 +4605,22 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 
 		hdr_len = ptr - (uint8_t *)p;
 		if (hdr_len <= (offsetof(struct pdu_adv_com_ext_adv,
-					 ext_hdr_adi_adv_data) +
-				sizeof(struct pdu_adv_hdr))) {
+					 ext_hdr_adv_data) +
+				sizeof(struct pdu_adv_ext_hdr))) {
 			hdr_len = offsetof(struct pdu_adv_com_ext_adv,
-					   ext_hdr_adi_adv_data);
+					   ext_hdr_adv_data);
 			ptr = (uint8_t *)h;
 		}
 
 		if (hdr_len > (p->ext_hdr_len +
 			       offsetof(struct pdu_adv_com_ext_adv,
-					ext_hdr_adi_adv_data))) {
+					ext_hdr_adv_data))) {
 			BT_WARN("    Header length %u/%u, INVALID.", hdr_len,
 				p->ext_hdr_len);
 		} else {
 			uint8_t acad_len = p->ext_hdr_len +
 					   offsetof(struct pdu_adv_com_ext_adv,
-						    ext_hdr_adi_adv_data) -
+						    ext_hdr_adv_data) -
 					   hdr_len;
 
 			if (acad_len) {
@@ -4882,7 +4898,7 @@ static void le_per_adv_sync_report(struct pdu_data *pdu_data,
 		uint8_t data_len_curr = 0U;
 		uint8_t *data_curr = NULL;
 		uint8_t sec_phy_curr = 0U;
-		struct pdu_adv_hdr *h;
+		struct pdu_adv_ext_hdr *h;
 		uint8_t hdr_len;
 		uint8_t *ptr;
 
@@ -4892,7 +4908,7 @@ static void le_per_adv_sync_report(struct pdu_data *pdu_data,
 		BT_DBG("len = %u, rssi = %d", adv->len, rssi);
 
 		p = (void *)&adv->adv_ext_ind;
-		h = (void *)p->ext_hdr_adi_adv_data;
+		h = (void *)p->ext_hdr_adv_data;
 		ptr = (void *)h;
 
 		BT_DBG("    Ext. adv mode= 0x%x, hdr len= %u", p->adv_mode,
@@ -4939,22 +4955,22 @@ static void le_per_adv_sync_report(struct pdu_data *pdu_data,
 
 		hdr_len = ptr - (uint8_t *)p;
 		if (hdr_len <= (offsetof(struct pdu_adv_com_ext_adv,
-					 ext_hdr_adi_adv_data) +
-				sizeof(struct pdu_adv_hdr))) {
+					 ext_hdr_adv_data) +
+				sizeof(struct pdu_adv_ext_hdr))) {
 			hdr_len = offsetof(struct pdu_adv_com_ext_adv,
-					   ext_hdr_adi_adv_data);
+					   ext_hdr_adv_data);
 			ptr = (uint8_t *)h;
 		}
 
 		if (hdr_len > (p->ext_hdr_len +
 			       offsetof(struct pdu_adv_com_ext_adv,
-					ext_hdr_adi_adv_data))) {
+					ext_hdr_adv_data))) {
 			BT_WARN("    Header length %u/%u, INVALID.", hdr_len,
 				p->ext_hdr_len);
 		} else {
 			uint8_t acad_len = p->ext_hdr_len +
 					   offsetof(struct pdu_adv_com_ext_adv,
-						    ext_hdr_adi_adv_data) -
+						    ext_hdr_adv_data) -
 					   hdr_len;
 
 			if (acad_len) {
@@ -5068,6 +5084,48 @@ static void le_per_adv_sync_lost(struct pdu_data *pdu_data,
 	sep->handle = sys_cpu_to_le16(node_rx->hdr.handle);
 }
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
+#if defined(CONFIG_BT_CTLR_ADV_ISO)
+static void le_big_complete(struct pdu_data *pdu_data,
+			    struct node_rx_pdu *node_rx,
+			    struct net_buf *buf)
+{
+	struct bt_hci_evt_le_big_complete *sep;
+	struct ll_adv_iso *adv_iso;
+	struct node_rx_sync *se;
+	size_t evt_size;
+
+	adv_iso = node_rx->hdr.rx_ftr.param;
+
+	evt_size = sizeof(*sep) +
+			adv_iso->num_bis * sizeof(adv_iso->bis_handle);
+
+	adv_iso = node_rx->hdr.rx_ftr.param;
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_BIG_COMPLETE, evt_size);
+
+	se = (void *)pdu_data;
+	sep->status = se->status;
+	sep->big_handle = sys_cpu_to_le16(node_rx->hdr.handle);
+
+	if (sep->status) {
+		return;
+	}
+
+	/* TODO: Fill values */
+	sys_put_le24(0, sep->sync_delay);
+	sys_put_le24(0, sep->latency);
+	sep->phy = adv_iso->phy;
+	sep->nse = 0;
+	sep->bn = 0;
+	sep->pto = 0;
+	sep->irc = 0;
+	sep->max_pdu = 0;
+	sep->num_bis = adv_iso->num_bis;
+	/* TODO: Add support for multiple BIS per BIG */
+	LL_ASSERT(sep->num_bis == 1);
+	sep->handle[0] = sys_cpu_to_le16(adv_iso->bis_handle);
+}
+#endif /* CONFIG_BT_CTLR_ADV_ISO */
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 #endif /* CONFIG_BT_OBSERVER */
 
@@ -5086,7 +5144,7 @@ static void le_adv_ext_terminate(struct pdu_data *pdu_data,
 
 	sep = meta_evt(buf, BT_HCI_EVT_LE_ADV_SET_TERMINATED, sizeof(*sep));
 	sep->status = node_rx->hdr.rx_ftr.param_adv_term.status;
-	sep->adv_handle = node_rx->hdr.handle & 0xff;
+	sep->adv_handle = ll_adv_set_hci_handle_get(node_rx->hdr.handle & 0xff);
 	sep->conn_handle =
 		sys_cpu_to_le16(node_rx->hdr.rx_ftr.param_adv_term.conn_handle);
 	sep->num_completed_ext_adv_evts =
@@ -5113,7 +5171,7 @@ static void le_scan_req_received(struct pdu_data *pdu_data,
 		uint8_t handle;
 		int8_t rssi;
 
-		handle = node_rx->hdr.handle & 0xff;
+		handle = ll_adv_set_hci_handle_get(node_rx->hdr.handle & 0xff);
 		addr.type = adv->tx_addr;
 		memcpy(&addr.a.val[0], &adv->scan_req.scan_addr[0],
 		       sizeof(bt_addr_t));
@@ -5128,7 +5186,7 @@ static void le_scan_req_received(struct pdu_data *pdu_data,
 	}
 
 	sep = meta_evt(buf, BT_HCI_EVT_LE_SCAN_REQ_RECEIVED, sizeof(*sep));
-	sep->handle = node_rx->hdr.handle & 0xff;
+	sep->handle = ll_adv_set_hci_handle_get(node_rx->hdr.handle & 0xff);
 	sep->addr.type = adv->tx_addr;
 	memcpy(&sep->addr.a.val[0], &adv->scan_req.scan_addr[0],
 	       sizeof(bt_addr_t));
@@ -5438,6 +5496,10 @@ static void encode_control(struct node_rx_pdu *node_rx,
 		le_per_adv_sync_lost(pdu_data, node_rx, buf);
 		break;
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
+#if defined(CONFIG_BT_CTLR_ADV_ISO)
+	case NODE_RX_TYPE_BIG_COMPLETE:
+		le_big_complete(pdu_data, node_rx, buf);
+#endif /* CONFIG_BT_CTLR_ADV_ISO */
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 #endif /* CONFIG_BT_OBSERVER */
 

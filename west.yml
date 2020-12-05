@@ -56,7 +56,7 @@ manifest:
       revision: f1fa8241f8786198ba41155413243de36ed878a5
       path: modules/hal/infineon
     - name: hal_nordic
-      revision: d7b3b6e3cea622ecc93fcacd3f2cfddf83746aff
+      revision: 665cfbbb969f31d3514af0a5a1088dc424ae334d
       path: modules/hal/nordic
     - name: hal_openisa
       revision: 40d049f69c50b58ea20473bee14cf93f518bf262
@@ -139,7 +139,7 @@ manifest:
       revision: c39888ff74acf421eeff9a7514fa9b172c3373f7
     - name: trusted-firmware-m
       path: modules/tee/tfm
-      revision: dfc26a443c43514867090fee2ff82be809ae40b0
+      revision: f3476cc16053f567eb07886db11e32505c25d097
 
   self:
     path: zephyr

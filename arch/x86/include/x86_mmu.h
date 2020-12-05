@@ -56,6 +56,15 @@
 #define MMU_IGNORED1	BITL(10)
 #define MMU_IGNORED2	BITL(11)
 
+/* Page fault error code flags. See Chapter 4.7 of the Intel SDM vol. 3A. */
+#define PF_P		BIT(0)	/* 0 Non-present page  1 Protection violation */
+#define PF_WR		BIT(1)  /* 0 Read              1 Write */
+#define PF_US		BIT(2)  /* 0 Supervisor mode   1 User mode */
+#define PF_RSVD		BIT(3)  /* 1 reserved bit set */
+#define PF_ID		BIT(4)  /* 1 instruction fetch */
+#define PF_PK		BIT(5)  /* 1 protection-key violation */
+#define PF_SGX		BIT(15) /* 1 SGX-specific access control requirements */
+
 #ifdef CONFIG_EXCEPTION_DEBUG
 /**
  * Dump out page table entries for a particular virtual memory address
@@ -164,6 +173,21 @@ static inline uintptr_t z_x86_cr3_get(void)
 static inline pentry_t *z_x86_page_tables_get(void)
 {
 	return (pentry_t *)z_x86_cr3_get();
+}
+
+/* Return cr2 value, which contains the page fault linear address.
+ * See Section 6.15 of the IA32 Software Developer's Manual vol 3.
+ * Used by page fault handling code.
+ */
+static inline void *z_x86_cr2_get(void)
+{
+	void *cr2;
+#ifdef CONFIG_X86_64
+	__asm__ volatile("movq %%cr2, %0\n\t" : "=r" (cr2));
+#else
+	__asm__ volatile("movl %%cr2, %0\n\t" : "=r" (cr2));
+#endif
+	return cr2;
 }
 
 /* Kernel's page table. This is in CR3 for all supervisor threads.
