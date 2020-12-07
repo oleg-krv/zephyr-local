@@ -33,6 +33,9 @@ int bt_gatt_store_ccc(uint8_t id, const bt_addr_le_t *addr);
 
 int bt_gatt_clear(uint8_t id, const bt_addr_le_t *addr);
 
+void bt_gatt_set_appearance(uint16_t new_appearance);
+uint16_t bt_gatt_get_appearance(void);
+
 #if defined(CONFIG_BT_GATT_CLIENT)
 void bt_gatt_notification(struct bt_conn *conn, uint16_t handle,
 			  const void *data, uint16_t length);

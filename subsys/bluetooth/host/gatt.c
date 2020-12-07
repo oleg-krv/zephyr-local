@@ -72,7 +72,7 @@ struct gatt_sub {
 
 static struct gatt_sub subscriptions[SUB_MAX];
 
-static const uint16_t gap_appearance = CONFIG_BT_DEVICE_APPEARANCE;
+static uint16_t gap_appearance = CONFIG_BT_DEVICE_APPEARANCE;
 
 #if defined(CONFIG_BT_GATT_DYNAMIC_DB)
 static sys_slist_t db;
@@ -5105,4 +5105,12 @@ void bt_gatt_disconnected(struct bt_conn *conn)
 #if defined(CONFIG_BT_GATT_CACHING)
 	remove_cf_cfg(conn);
 #endif
+}
+
+void bt_gatt_set_appearance(uint16_t new_appearance) {
+    gap_appearance = new_appearance;
+}
+
+uint16_t bt_gatt_get_appearance(void) {
+    return gap_appearance;
 }
