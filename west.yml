@@ -56,7 +56,7 @@ manifest:
       revision: f1fa8241f8786198ba41155413243de36ed878a5
       path: modules/hal/infineon
     - name: hal_nordic
-      revision: 665cfbbb969f31d3514af0a5a1088dc424ae334d
+      revision: 7430036d4f18cdf1f49158e97e5d57aacb44fb92
       path: modules/hal/nordic
     - name: hal_openisa
       revision: 40d049f69c50b58ea20473bee14cf93f518bf262
@@ -96,10 +96,10 @@ manifest:
       revision: c71d2186077f9fd5f6d1aa53ee3f09dc41ce78f6
       path: bootloader/mcuboot
     - name: mcumgr
-      revision: f28a637db12c4b12fb2b18bddc6b2a0deaa95251
+      revision: 697e145d5ee5e4b400e9d7bceaec79f6ac29df7c
       path: modules/lib/mcumgr
     - name: net-tools
-      revision: dcfa04f4aaf30ae7c2dbf34a05a569ca1c04b2ce
+      revision: 41132e9220f8bc1223084975350c5e5f3b492afe
       path: tools/net-tools
     - name: hal_nxp
       revision: 56915d2942a3af7205b3c4991a8b87e915de7f59
@@ -139,7 +139,7 @@ manifest:
       revision: c39888ff74acf421eeff9a7514fa9b172c3373f7
     - name: trusted-firmware-m
       path: modules/tee/tfm
-      revision: f3476cc16053f567eb07886db11e32505c25d097
+      revision: 4544ab9fc4d5305ae5de97c73a9356ef0f342f7a
 
   self:
     path: zephyr

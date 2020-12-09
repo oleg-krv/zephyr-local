@@ -405,7 +405,7 @@ struct k_thread {
 	void *switch_handle;
 #endif
 	/** resource pool */
-	struct k_mem_pool *resource_pool;
+	struct k_heap *resource_pool;
 
 #if defined(CONFIG_THREAD_LOCAL_STORAGE)
 	/* Pointer to arch-specific TLS area */
@@ -652,13 +652,13 @@ extern FUNC_NORETURN void k_thread_user_mode_enter(k_thread_entry_t entry,
  * previous pool.
  *
  * @param thread Target thread to assign a memory pool for resource requests.
- * @param pool Memory pool to use for resources,
+ * @param heap Heap object to use for resources,
  *             or NULL if the thread should no longer have a memory pool.
  */
-static inline void k_thread_resource_pool_assign(struct k_thread *thread,
-						 struct k_mem_pool *pool)
+static inline void k_thread_heap_assign(struct k_thread *thread,
+					struct k_heap *heap)
 {
-	thread->resource_pool = pool;
+	thread->resource_pool = heap;
 }
 
 #if defined(CONFIG_INIT_STACKS) && defined(CONFIG_THREAD_STACK_INFO)
@@ -690,7 +690,7 @@ __syscall int k_thread_stack_space_get(const struct k_thread *thread,
 /**
  * @brief Assign the system heap as a thread's resource pool
  *
- * Similar to k_thread_resource_pool_assign(), but the thread will use
+ * Similar to z_thread_resource_pool_assign(), but the thread will use
  * the kernel heap to draw memory.
  *
  * Use with caution, as a malicious thread could perform DoS attacks on the
@@ -4043,41 +4043,6 @@ extern int k_mbox_get(struct k_mbox *mbox, struct k_mbox_msg *rx_msg,
  */
 extern void k_mbox_data_get(struct k_mbox_msg *rx_msg, void *buffer);
 
-/**
- * @brief Retrieve mailbox message data into a memory pool block.
- *
- * This routine completes the processing of a received message by retrieving
- * its data into a memory pool block, then disposing of the message.
- * The memory pool block that results from successful retrieval must be
- * returned to the pool once the data has been processed, even in cases
- * where zero bytes of data are retrieved.
- *
- * Alternatively, this routine can be used to dispose of a received message
- * without retrieving its data. In this case there is no need to return a
- * memory pool block to the pool.
- *
- * This routine allocates a new memory pool block for the data only if the
- * data is not already in one. If a new block cannot be allocated, the routine
- * returns a failure code and the received message is left unchanged. This
- * permits the caller to reattempt data retrieval at a later time or to dispose
- * of the received message without retrieving its data.
- *
- * @param rx_msg Address of a receive message descriptor.
- * @param pool Address of memory pool, or NULL to discard data.
- * @param block Address of the area to hold memory pool block info.
- * @param timeout Time to wait for a memory pool block,
- *                or one of the special values K_NO_WAIT
- *                and K_FOREVER.
- *
- * @retval 0 Data retrieved.
- * @retval -ENOMEM Returned without waiting.
- * @retval -EAGAIN Waiting period timed out.
- */
-extern int k_mbox_data_block_get(struct k_mbox_msg *rx_msg,
-				 struct k_mem_pool *pool,
-				 struct k_mem_block *block,
-				 k_timeout_t timeout);
-
 /** @} */
 
 /**
@@ -4458,7 +4423,7 @@ static inline uint32_t k_mem_slab_num_free_get(struct k_mem_slab *slab)
 /** @} */
 
 /**
- * @addtogroup mem_pool_apis
+ * @addtogroup heap_apis
  * @{
  */
 
@@ -4485,6 +4450,25 @@ struct k_heap {
  */
 void k_heap_init(struct k_heap *h, void *mem, size_t bytes);
 
+/** @brief Allocate aligned memory from a k_heap
+ *
+ * Behaves in all ways like k_heap_alloc(), except that the returned
+ * memory (if available) will have a starting address in memory which
+ * is a multiple of the specified power-of-two alignment value in
+ * bytes.  The resulting memory can be returned to the heap using
+ * k_heap_free().
+ *
+ * @note Can be called by ISRs, but @a timeout must be set to K_NO_WAIT.
+ *
+ * @param h Heap from which to allocate
+ * @param align Alignment in bytes, must be a power of two
+ * @param bytes Number of bytes requested
+ * @param timeout How long to wait, or K_NO_WAIT
+ * @return Pointer to memory the caller can now use
+ */
+void *k_heap_aligned_alloc(struct k_heap *h, size_t align, size_t bytes,
+			k_timeout_t timeout);
+
 /**
  * @brief Allocate memory from a k_heap
  *
@@ -4502,7 +4486,11 @@ void k_heap_init(struct k_heap *h, void *mem, size_t bytes);
  * @param timeout How long to wait, or K_NO_WAIT
  * @return A pointer to valid heap memory, or NULL
  */
-void *k_heap_alloc(struct k_heap *h, size_t bytes, k_timeout_t timeout);
+static inline void *k_heap_alloc(struct k_heap *h, size_t bytes,
+				 k_timeout_t timeout)
+{
+	return k_heap_aligned_alloc(h, sizeof(void *), bytes, timeout);
+}
 
 /**
  * @brief Free memory allocated by k_heap_alloc()
@@ -4535,99 +4523,18 @@ void k_heap_free(struct k_heap *h, void *mem);
 		 },						\
 	}
 
-/**
- * @brief Statically define and initialize a memory pool.
- *
- * The memory pool's buffer contains @a n_max blocks that are @a max_size bytes
- * long. The memory pool allows blocks to be repeatedly partitioned into
- * quarters, down to blocks of @a min_size bytes long. The buffer is aligned
- * to a @a align -byte boundary.
- *
- * If the pool is to be accessed outside the module where it is defined, it
- * can be declared via
- *
- * @note When @option{CONFIG_MEM_POOL_HEAP_BACKEND} is enabled, the k_mem_pool
- * API is implemented on top of a k_heap, which is a more general
- * purpose allocator which does not make the same promises about
- * splitting or alignment detailed above.  Blocks will be aligned only
- * to the 8 byte chunk stride of the underlying heap and may point
- * anywhere within the heap; they are not split into four as
- * described.
- *
- * @code extern struct k_mem_pool <name>; @endcode
- *
- * @param name Name of the memory pool.
- * @param minsz Size of the smallest blocks in the pool (in bytes).
- * @param maxsz Size of the largest blocks in the pool (in bytes).
- * @param nmax Number of maximum sized blocks in the pool.
- * @param align Alignment of the pool's buffer (power of 2).
- */
-#define K_MEM_POOL_DEFINE(name, minsz, maxsz, nmax, align) \
-	Z_MEM_POOL_DEFINE(name, minsz, maxsz, nmax, align)
-
-/**
- * @brief Allocate memory from a memory pool.
- *
- * This routine allocates a memory block from a memory pool.
- *
- * @note Can be called by ISRs, but @a timeout must be set to K_NO_WAIT.
- *
- * @param pool Address of the memory pool.
- * @param block Pointer to block descriptor for the allocated memory.
- * @param size Amount of memory to allocate (in bytes).
- * @param timeout Waiting period to wait for operation to complete.
- *        Use K_NO_WAIT to return without waiting,
- *        or K_FOREVER to wait as long as necessary.
- *
- * @retval 0 Memory allocated. The @a data field of the block descriptor
- *         is set to the starting address of the memory block.
- * @retval -ENOMEM Returned without waiting.
- * @retval -EAGAIN Waiting period timed out.
- */
-extern int k_mem_pool_alloc(struct k_mem_pool *pool, struct k_mem_block *block,
+extern int z_mem_pool_alloc(struct k_mem_pool *pool, struct k_mem_block *block,
 			    size_t size, k_timeout_t timeout);
-
-/**
- * @brief Allocate memory from a memory pool with malloc() semantics
- *
- * Such memory must be released using k_free().
- *
- * @param pool Address of the memory pool.
- * @param size Amount of memory to allocate (in bytes).
- * @return Address of the allocated memory if successful, otherwise NULL
- */
-extern void *k_mem_pool_malloc(struct k_mem_pool *pool, size_t size);
-
-/**
- * @brief Free memory allocated from a memory pool.
- *
- * This routine releases a previously allocated memory block back to its
- * memory pool.
- *
- * @param block Pointer to block descriptor for the allocated memory.
- *
- * @return N/A
- */
-extern void k_mem_pool_free(struct k_mem_block *block);
-
-/**
- * @brief Free memory allocated from a memory pool.
- *
- * This routine releases a previously allocated memory block back to its
- * memory pool
- *
- * @param id Memory block identifier.
- *
- * @return N/A
- */
-extern void k_mem_pool_free_id(struct k_mem_block_id *id);
+extern void *z_mem_pool_malloc(struct k_mem_pool *pool, size_t size);
+extern void z_mem_pool_free(struct k_mem_block *block);
+extern void z_mem_pool_free_id(struct k_mem_block_id *id);
 
 /**
  * @}
  */
 
 /**
- * @defgroup heap_apis Heap Memory Pool APIs
+ * @defgroup heap_apis Heap APIs
  * @ingroup kernel_apis
  * @{
  */
