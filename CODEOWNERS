@@ -55,7 +55,7 @@
 /soc/arm/ti_simplelink/msp432p4xx/        @Mani-Sadhasivam
 /soc/arm/xilinx_zynqmp/                   @stephanosio
 /soc/xtensa/intel_s1000/                  @sathishkuttan @dcpleung
-/arch/x86/                                @andrewboie @jenmwms @aasthagr
+/arch/x86/                                @jhedberg @andrewboie @jenmwms @aasthagr
 /arch/nios2/                              @andrewboie @wentongwu
 /arch/posix/                              @aescolar @daor-oti
 /arch/riscv/                              @kgugala @pgielda @nategraff-sifive
@@ -324,6 +324,7 @@
 /dts/arm/armv7-r.dtsi                     @bbolen @stephanosio
 /dts/arm/armv8-a.dtsi                     @carlocaione
 /dts/arm/xilinx/                          @bbolen @stephanosio
+/dts/x86/                                 @jhedberg
 /dts/xtensa/xtensa.dtsi                   @ydamigos
 /dts/xtensa/intel/                        @dcpleung
 /dts/sparc/                               @martin-aberg
@@ -478,7 +479,8 @@
 /scripts/coccinelle/                      @himanshujha199640 @JuliaLawall
 /scripts/coredump/                        @dcpleung
 /scripts/kconfig/                         @ulfalizer
-/scripts/sanity_chk/expr_parser.py        @nashif
+/scripts/pylib/twister/expr_parser.py     @nashif
+/scripts/schemas/twister/                 @nashif
 /scripts/gen_app_partitions.py            @andrewboie
 /scripts/get_maintainer.py                @nashif
 /scripts/dts/                             @mbolivar-nordic @galak
@@ -492,11 +494,11 @@
 /scripts/process_gperf.py                 @andrewboie
 /scripts/gen_relocate_app.py              @wentongwu
 /scripts/requirements*.txt                @mbolivar-nordic @galak @nashif
-/scripts/tests/sanitycheck/               @aasthagr
+/scripts/tests/twister/                   @aasthagr
 /scripts/tests/build/test_subfolder_list.py @rmstoi
 /scripts/tracing/                         @wentongwu
-/scripts/sanity_chk/                      @nashif
-/scripts/sanitycheck                      @nashif
+/scripts/pylib/twister/                   @nashif
+/scripts/twister                          @nashif
 /scripts/series-push-hook.sh              @erwango
 /scripts/west_commands/                   @mbolivar-nordic
 /scripts/west-commands.yml                @mbolivar-nordic
@@ -560,6 +562,7 @@
 /subsys/testsuite/                        @nashif
 /subsys/timing/                           @nashif @dcpleung
 /subsys/usb/                              @jfischer-no @finikorg
+/subsys/usb/class/usb_dfu.c               @nvlsianpu
 /tests/                                   @nashif
 /tests/application_development/libcxx/    @pabigot
 /tests/arch/arm/                          @ioannisg @stephanosio

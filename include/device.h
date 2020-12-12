@@ -173,6 +173,19 @@ extern "C" {
 			data_ptr, cfg_ptr, level, prio, api_ptr)
 
 /**
+ * @def DEVICE_DT_INST_DEFINE
+ *
+ * @brief Like DEVICE_DT_DEFINE for an instance of a DT_DRV_COMPAT compatible
+ *
+ * @param inst instance number.  This is replaced by
+ * <tt>DT_DRV_COMPAT(inst)</tt> in the call to DEVICE_DT_DEFINE.
+ *
+ * @param ... other parameters as expected by DEVICE_DT_DEFINE.
+ */
+#define DEVICE_DT_INST_DEFINE(inst, ...) \
+	DEVICE_DT_DEFINE(DT_DRV_INST(inst), __VA_ARGS__)
+
+/**
  * @def DEVICE_DT_NAME_GET
  *
  * @brief The name of the struct device object for @p node_id
@@ -209,6 +222,15 @@ extern "C" {
  */
 #define DEVICE_DT_GET(node_id) (&DEVICE_DT_NAME_GET(node_id))
 
+/** @def DEVICE_DT_INST_GET
+ *
+ * @brief Obtain a pointer to a device object for an instance of a
+ *        DT_DRV_COMPAT compatible
+ *
+ * @param inst instance number
+ */
+#define DEVICE_DT_INST_GET(inst) DEVICE_DT_GET(DT_DRV_INST(inst))
+
 /** @def DEVICE_DT_DECLARE
  *
  * @brief Declare a device object associated with @p node_id
@@ -235,6 +257,15 @@ extern "C" {
  */
 #define DEVICE_DT_DECLARE(node_id)			\
 	extern const struct device DEVICE_DT_NAME_GET(node_id)
+
+/** @def DEVICE_DT_INST_DECLARE
+ *
+ * @brief Declare a device object associated for an instance of a
+ *        DT_DRV_COMPAT compatible
+ *
+ * @param inst instance number
+ */
+#define DEVICE_DT_INST_DECLARE(inst) DEVICE_DT_DECLARE(DT_DRV_INST(inst))
 
 /**
  * @def DEVICE_GET
@@ -304,7 +335,7 @@ struct device {
 	const void *api;
 	/** Address of the device instance private data */
 	void * const data;
-#ifdef CONFIG_DEVICE_POWER_MANAGEMENT
+#ifdef CONFIG_PM_DEVICE
 	/** Power Management function */
 	int (*device_pm_control)(const struct device *dev, uint32_t command,
 				 void *context, device_pm_cb cb, void *arg);
@@ -378,7 +409,7 @@ static inline bool z_impl_device_is_ready(const struct device *dev)
  * @{
  */
 
-#ifdef CONFIG_DEVICE_POWER_MANAGEMENT
+#ifdef CONFIG_PM_DEVICE
 
 /** @def DEVICE_PM_ACTIVE_STATE
  *
@@ -433,7 +464,7 @@ static inline bool z_impl_device_is_ready(const struct device *dev)
 #define DEVICE_PM_SET_POWER_STATE       1
 #define DEVICE_PM_GET_POWER_STATE       2
 
-#endif /* CONFIG_DEVICE_POWER_MANAGEMENT */
+#endif /* CONFIG_PM_DEVICE */
 
 /**
  * @brief Get name of device PM state
@@ -461,7 +492,7 @@ void device_busy_set(const struct device *busy_dev);
  */
 void device_busy_clear(const struct device *busy_dev);
 
-#ifdef CONFIG_DEVICE_POWER_MANAGEMENT
+#ifdef CONFIG_PM_DEVICE
 /*
  * Device PM functions
  */
@@ -584,14 +615,14 @@ int device_any_busy_check(void);
  */
 int device_busy_check(const struct device *chk_dev);
 
-#ifdef CONFIG_DEVICE_IDLE_PM
+#ifdef CONFIG_PM_DEVICE_IDLE
 
-/* Device PM FSM states */
-enum device_pm_fsm_state {
-	DEVICE_PM_FSM_STATE_ACTIVE = 1,
-	DEVICE_PM_FSM_STATE_SUSPENDED,
-	DEVICE_PM_FSM_STATE_SUSPENDING,
-	DEVICE_PM_FSM_STATE_RESUMING,
+/* Device PM states */
+enum device_pm_state {
+	DEVICE_PM_STATE_ACTIVE = 1,
+	DEVICE_PM_STATE_SUSPENDED,
+	DEVICE_PM_STATE_SUSPENDING,
+	DEVICE_PM_STATE_RESUMING,
 };
 
 /**
@@ -710,7 +741,7 @@ static inline int device_pm_put_sync(const struct device *dev) { return -ENOTSUP
 	Z_INIT_ENTRY_DEFINE(_CONCAT(__device_, dev_name), init_fn,	\
 			    (&_CONCAT(__device_, dev_name)), level, prio)
 
-#ifdef CONFIG_DEVICE_POWER_MANAGEMENT
+#ifdef CONFIG_PM_DEVICE
 #define Z_DEVICE_DEFINE_PM(dev_name)					\
 	static struct device_pm _CONCAT(__pm_, dev_name) __used  = {	\
 		.usage = ATOMIC_INIT(0),				\

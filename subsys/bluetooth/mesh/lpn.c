@@ -52,11 +52,13 @@
 
 #define POLL_TIMEOUT_INIT         (CONFIG_BT_MESH_LPN_INIT_POLL_TIMEOUT * 100)
 
+#define POLL_TIMEOUT              (CONFIG_BT_MESH_LPN_POLL_TIMEOUT * 100)
+
 #define REQ_ATTEMPTS_MAX          6
 #define REQ_ATTEMPTS(lpn)         MIN(REQ_ATTEMPTS_MAX, \
-			  POLL_TIMEOUT_INIT / REQ_RETRY_DURATION(lpn))
+			  POLL_TIMEOUT / REQ_RETRY_DURATION(lpn))
 
-#define POLL_TIMEOUT_MAX(lpn)     (POLL_TIMEOUT_INIT - \
+#define POLL_TIMEOUT_MAX(lpn)     (POLL_TIMEOUT - \
 			  (REQ_ATTEMPTS(lpn) * REQ_RETRY_DURATION(lpn)))
 
 #define CLEAR_ATTEMPTS            3
@@ -934,7 +936,9 @@ int bt_mesh_lpn_friend_sub_cfm(struct bt_mesh_net_rx *rx,
 	}
 
 	if (!lpn->sent_req) {
-		k_delayed_work_submit(&lpn->timer, K_MSEC(poll_timeout(lpn)));
+		int32_t timeout = poll_timeout(lpn);
+
+		k_delayed_work_submit(&lpn->timer, K_MSEC(timeout));
 	}
 
 	return 0;
@@ -1023,7 +1027,9 @@ int bt_mesh_lpn_friend_update(struct bt_mesh_net_rx *rx,
 	}
 
 	if (!lpn->sent_req) {
-		k_delayed_work_submit(&lpn->timer, K_MSEC(poll_timeout(lpn)));
+		int32_t timeout = poll_timeout(lpn);
+
+		k_delayed_work_submit(&lpn->timer, K_MSEC(timeout));
 	}
 
 	return 0;

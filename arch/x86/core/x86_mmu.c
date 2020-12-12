@@ -45,7 +45,7 @@ LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
 /* Bit position which is always zero in a PTE. We'll use the PAT bit.
  * This helps disambiguate PTEs that do not have the Present bit set (MMU_P):
  * - If the entire entry is zero, it's an un-mapped virtual page
- * - If MMU_PTE_ZERO is set, we flipped this page due to KPTI
+ * - If PTE_ZERO is set, we flipped this page due to KPTI
  * - Otherwise, this was a page-out
  */
 #define PTE_ZERO	MMU_PAT
@@ -172,6 +172,7 @@ static const struct paging_level paging_levels[] = {
 };
 
 #define NUM_LEVELS	ARRAY_SIZE(paging_levels)
+#define PTE_LEVEL	(NUM_LEVELS - 1)
 
 /*
  * Macros for reserving space for page tables
@@ -331,12 +332,33 @@ static inline size_t get_table_scope(int level)
  */
 static inline bool is_leaf(int level, pentry_t entry)
 {
-	if (level == NUM_LEVELS - 1) {
+	if (level == PTE_LEVEL) {
 		/* Always true for PTE */
 		return true;
 	}
 
 	return ((entry & MMU_PS) != 0U);
+}
+
+/* This does NOT (by design) un-flip KPTI PTEs, it's just the raw PTE value */
+static inline void pentry_get(int *paging_level, pentry_t *val,
+			      pentry_t *ptables, void *virt)
+{
+	pentry_t *table = ptables;
+
+	for (int level = 0; level < NUM_LEVELS; level++) {
+		pentry_t entry = get_entry(table, virt, level);
+
+		if ((entry & MMU_P) == 0 || is_leaf(level, entry)) {
+			*val = entry;
+			if (paging_level != NULL) {
+				*paging_level = level;
+			}
+			break;
+		} else {
+			table = next_table(entry, level);
+		}
+	}
 }
 
 static inline void tlb_flush_page(void *addr)
@@ -347,8 +369,6 @@ static inline void tlb_flush_page(void *addr)
 	char *page = (char *)addr;
 
 	__asm__ ("invlpg %0" :: "m" (*page));
-
-	/* TODO: Need to implement TLB shootdown for SMP */
 }
 
 #ifdef CONFIG_X86_KPTI
@@ -388,6 +408,9 @@ void z_x86_tlb_ipi(const void *arg)
 	z_x86_cr3_set(ptables);
 }
 
+/* NOTE: This is not synchronous and the actual flush takes place some short
+ * time after this exits.
+ */
 static inline void tlb_shootdown(void)
 {
 	z_loapic_ipi(0, LOAPIC_ICR_IPI_OTHERS, CONFIG_TLB_IPI_VECTOR);
@@ -443,7 +466,8 @@ static char get_entry_code(pentry_t value)
 {
 	char ret;
 
-	if ((value & MMU_P) == 0U) {
+	if (value == 0U) {
+		/* Unmapped entry */
 		ret = '.';
 	} else {
 		if ((value & MMU_RW) != 0U) {
@@ -496,10 +520,36 @@ static void print_entries(pentry_t entries_array[], uint8_t *base, int level,
 					COLOR(GREEN);
 				}
 			} else {
+				/* Intermediate entry */
 				COLOR(MAGENTA);
 			}
 		} else {
-			COLOR(GREY);
+			if (is_leaf(level, entry)) {
+				if (entry == 0U) {
+					/* Unmapped */
+					COLOR(GREY);
+#ifdef CONFIG_X86_KPTI
+				} else if (is_flipped_pte(entry)) {
+					/* KPTI, un-flip it */
+					COLOR(BLUE);
+					entry = ~entry;
+					phys = get_entry_phys(entry, level);
+					if (phys == virt) {
+						/* Identity mapped */
+						COLOR(CYAN);
+					} else {
+						/* Non-identity mapped */
+						COLOR(BLUE);
+					}
+#endif
+				} else {
+					/* Paged out */
+					COLOR(RED);
+				}
+			} else {
+				/* Un-mapped intermediate entry */
+				COLOR(GREY);
+			}
 		}
 
 		printk("%c", get_entry_code(entry));
@@ -539,7 +589,7 @@ static void dump_ptables(pentry_t *table, uint8_t *base, int level)
 	print_entries(table, base, level, info->entries);
 
 	/* Check if we're a page table */
-	if (level == (NUM_LEVELS - 1)) {
+	if (level == PTE_LEVEL) {
 		return;
 	}
 
@@ -566,7 +616,7 @@ void z_x86_dump_page_tables(pentry_t *ptables)
 }
 
 /* Enable to dump out the kernel's page table right before main() starts,
- * sometimes useful for deep debugging. May overwhelm sanitycheck.
+ * sometimes useful for deep debugging. May overwhelm twister.
  */
 #define DUMP_PAGE_TABLES 0
 
@@ -627,19 +677,7 @@ static void dump_entry(int level, void *virt, pentry_t entry)
 void z_x86_pentry_get(int *paging_level, pentry_t *val, pentry_t *ptables,
 		      void *virt)
 {
-	pentry_t *table = ptables;
-
-	for (int level = 0; level < NUM_LEVELS; level++) {
-		pentry_t entry = get_entry(table, virt, level);
-
-		if ((entry & MMU_P) == 0 || is_leaf(level, entry)) {
-			*val = entry;
-			*paging_level = level;
-			break;
-		} else {
-			table = next_table(entry, level);
-		}
-	}
+	pentry_get(paging_level, val, ptables, virt);
 }
 
 /*
@@ -648,10 +686,10 @@ void z_x86_pentry_get(int *paging_level, pentry_t *val, pentry_t *ptables,
  */
 void z_x86_dump_mmu_flags(pentry_t *ptables, void *virt)
 {
-	pentry_t entry;
-	int level;
+	pentry_t entry = 0;
+	int level = 0;
 
-	z_x86_pentry_get(&level, &entry, ptables, virt);
+	pentry_get(&level, &entry, ptables, virt);
 
 	if ((entry & MMU_P) == 0) {
 		LOG_ERR("%sE: not present", paging_levels[level].name);
@@ -741,7 +779,7 @@ static inline pentry_t pte_finalize_value(pentry_t val, bool user_table)
 			(uintptr_t)&z_shared_kernel_page_start;
 
 	if (user_table && (val & MMU_US) == 0 && (val & MMU_P) != 0 &&
-	    get_entry_phys(val, NUM_LEVELS - 1) != shared_phys_addr) {
+	    get_entry_phys(val, PTE_LEVEL) != shared_phys_addr) {
 		val = ~val;
 	}
 #endif
@@ -861,6 +899,13 @@ static inline pentry_t pte_atomic_update(pentry_t *pte, pentry_t update_val,
 		new_val = pte_finalize_value(new_val, user_table);
 	} while (atomic_pte_cas(pte, old_val, new_val) == false);
 
+#ifdef CONFIG_X86_KPTI
+	if (is_flipped_pte(old_val)) {
+		/* Page was flipped for KPTI. Un-flip it */
+		old_val = ~old_val;
+	}
+#endif /* CONFIG_X86_KPTI */
+
 	return old_val;
 }
 
@@ -912,7 +957,7 @@ static int page_map_set(pentry_t *ptables, void *virt, pentry_t entry_val,
 		entryp = &table[index];
 
 		/* Check if we're a PTE */
-		if (level == (NUM_LEVELS - 1)) {
+		if (level == PTE_LEVEL) {
 			pentry_t old_val = pte_atomic_update(entryp, entry_val,
 							     mask, options);
 			if (old_val_ptr != NULL) {
@@ -1052,7 +1097,6 @@ static int range_map_ptables(pentry_t *ptables, void *virt, uintptr_t phys,
 static int range_map(void *virt, uintptr_t phys, size_t size,
 		     pentry_t entry_flags, pentry_t mask, uint32_t options)
 {
-	k_spinlock_key_t key;
 	int ret = 0;
 
 	LOG_DBG("%s: %p -> %p (%zu) flags " PRI_ENTRY " mask "
@@ -1078,7 +1122,6 @@ static int range_map(void *virt, uintptr_t phys, size_t size,
 	 *
 	 * Any new mappings need to be applied to all page tables.
 	 */
-	key = k_spin_lock(&x86_mmu_lock);
 #if defined(CONFIG_USERSPACE) && !defined(CONFIG_X86_COMMON_PAGE_TABLE)
 	sys_snode_t *node;
 
@@ -1106,13 +1149,26 @@ out_unlock:
 		LOG_DBG("page pool pages free: %u / %u", pages_free(),
 			CONFIG_X86_MMU_PAGE_POOL_PAGES);
 	}
-	k_spin_unlock(&x86_mmu_lock, key);
 
 #ifdef CONFIG_SMP
 	if ((options & OPTION_FLUSH) != 0U) {
 		tlb_shootdown();
 	}
 #endif /* CONFIG_SMP */
+	return ret;
+}
+
+static inline int range_map_unlocked(void *virt, uintptr_t phys, size_t size,
+				     pentry_t entry_flags, pentry_t mask,
+				     uint32_t options)
+{
+	int ret;
+	k_spinlock_key_t key;
+
+	key = k_spin_lock(&x86_mmu_lock);
+	ret = range_map(virt, phys, size, entry_flags, mask, options);
+	k_spin_unlock(&x86_mmu_lock, key);
+
 	return ret;
 }
 
@@ -1157,8 +1213,8 @@ static pentry_t flags_to_entry(uint32_t flags)
 /* map new region virt..virt+size to phys with provided arch-neutral flags */
 int arch_mem_map(void *virt, uintptr_t phys, size_t size, uint32_t flags)
 {
-	return range_map(virt, phys, size, flags_to_entry(flags), MASK_ALL,
-			 OPTION_ALLOC);
+	return range_map_unlocked(virt, phys, size, flags_to_entry(flags),
+				  MASK_ALL, OPTION_ALLOC);
 }
 
 #if CONFIG_X86_STACK_PROTECTION
@@ -1172,8 +1228,8 @@ void z_x86_set_stack_guard(k_thread_stack_t *stack)
 	 * Guard page is always the first page of the stack object for both
 	 * kernel and thread stacks.
 	 */
-	(void)range_map(stack, 0, CONFIG_MMU_PAGE_SIZE, MMU_P | ENTRY_XD,
-			MASK_PERM, OPTION_FLUSH);
+	(void)range_map_unlocked(stack, 0, CONFIG_MMU_PAGE_SIZE,
+				 MMU_P | ENTRY_XD, MASK_PERM, OPTION_FLUSH);
 }
 #endif /* CONFIG_X86_STACK_PROTECTION */
 
@@ -1275,13 +1331,14 @@ int arch_buffer_validate(void *addr, size_t size, int write)
 
 static inline void reset_region(uintptr_t start, size_t size)
 {
-	(void)range_map((void *)start, 0, size, 0, 0,
-			OPTION_FLUSH | OPTION_RESET);
+	(void)range_map_unlocked((void *)start, 0, size, 0, 0,
+				 OPTION_FLUSH | OPTION_RESET);
 }
 
 static inline void apply_region(uintptr_t start, size_t size, pentry_t attr)
 {
-	(void)range_map((void *)start, 0, size, attr, MASK_PERM, OPTION_FLUSH);
+	(void)range_map_unlocked((void *)start, 0, size, attr, MASK_PERM,
+				 OPTION_FLUSH);
 }
 
 /* Cache of the current memory domain applied to the common page tables and
@@ -1425,7 +1482,7 @@ void arch_mem_domain_destroy(struct k_mem_domain *domain)
  */
 static int copy_page_table(pentry_t *dst, pentry_t *src, int level)
 {
-	if (level == (NUM_LEVELS - 1)) {
+	if (level == PTE_LEVEL) {
 		/* Base case: leaf page table */
 		for (int i = 0; i < get_num_entries(level); i++) {
 			dst[i] = pte_finalize_value(reset_pte(src[i]), true);

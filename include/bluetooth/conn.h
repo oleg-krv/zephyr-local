@@ -370,6 +370,32 @@ struct bt_conn_remote_info {
 	};
 };
 
+enum bt_conn_le_tx_power_phy {
+	/** Convenience macro for when no PHY is set. */
+	BT_CONN_LE_TX_POWER_PHY_NONE,
+	/** LE 1M PHY */
+	BT_CONN_LE_TX_POWER_PHY_1M,
+	 /** LE 2M PHY */
+	BT_CONN_LE_TX_POWER_PHY_2M,
+	/** LE Coded PHY using S=8 coding. */
+	BT_CONN_LE_TX_POWER_PHY_CODED_S8,
+	/** LE Coded PHY using S=2 coding. */
+	BT_CONN_LE_TX_POWER_PHY_CODED_S2,
+};
+
+/** LE Transmit Power Level Structure */
+struct bt_conn_le_tx_power {
+
+	/** Input: 1M, 2M, Coded S2 or Coded S8 */
+	uint8_t phy;
+
+	/** Output: current transmit power level */
+	int8_t current_level;
+
+	/** Output: maximum transmit power level */
+	int8_t max_level;
+};
+
 /** @brief Get connection info
  *
  *  @param conn Connection object.
@@ -396,6 +422,17 @@ int bt_conn_get_info(const struct bt_conn *conn, struct bt_conn_info *info);
  */
 int bt_conn_get_remote_info(struct bt_conn *conn,
 			    struct bt_conn_remote_info *remote_info);
+
+/** @brief Get connection transmit power level.
+ *
+ *  @param conn           Connection object.
+ *  @param tx_power_level Transmit power level descriptor.
+ *
+ *  @return Zero on success or (negative) error code on failure.
+ *  @return -ENOBUFS HCI command buffer is not available.
+ */
+int bt_conn_le_get_tx_power_level(struct bt_conn *conn,
+				  struct bt_conn_le_tx_power *tx_power_level);
 
 /** @brief Update the connection parameters.
  *
