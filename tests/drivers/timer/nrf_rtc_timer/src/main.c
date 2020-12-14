@@ -15,6 +15,8 @@ struct test_data {
 	int err;
 };
 
+static int timeout_handler_cnt;
+
 ISR_DIRECT_DECLARE(timer0_isr_wrapper)
 {
 	nrf_timer_event_clear(NRF_TIMER0, NRF_TIMER_EVENT_COMPARE0);
@@ -35,7 +37,9 @@ static void init_zli_timer0(void)
 				NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK);
 
 	IRQ_DIRECT_CONNECT(TIMER0_IRQn, 0,
-			   timer0_isr_wrapper, IRQ_ZERO_LATENCY);
+			   timer0_isr_wrapper,
+			   COND_CODE_1(CONFIG_ZERO_LATENCY_IRQS,
+				   (IRQ_ZERO_LATENCY), (0)));
 	irq_enable(TIMER0_IRQn);
 }
 
@@ -63,6 +67,7 @@ static void timeout_handler(uint32_t id, uint32_t cc_value, void *user_data)
 	    (cc_value <= (data->cc_val + data->window))) {
 		data->err = 0;
 	}
+	timeout_handler_cnt++;
 }
 
 static void test_timeout(uint32_t chan, k_timeout_t t, bool ext_window)
@@ -77,8 +82,8 @@ static void test_timeout(uint32_t chan, k_timeout_t t, bool ext_window)
 
 	z_nrf_rtc_timer_compare_set(chan, cc_val, timeout_handler, &test_data);
 
-	/* wait at least 2 ticks. */
-	k_busy_wait(60);
+	/* wait additional arbitrary time. */
+	k_busy_wait(1000);
 	k_sleep(t);
 
 	zassert_equal(test_data.err, 0, "Unexpected err: %d", test_data.err);
@@ -149,6 +154,7 @@ static void test_int_disable_enabled(void)
 	zassert_equal(data.err, -EINVAL, "Unexpected err: %d", data.err);
 
 	z_nrf_rtc_timer_compare_int_unlock(chan, key);
+	k_busy_wait(100);
 	zassert_equal(data.err, 0, "Unexpected err: %d", data.err);
 
 	z_nrf_rtc_timer_chan_free(chan);
@@ -283,6 +289,49 @@ static void test_stress(void)
 	z_nrf_rtc_timer_chan_free(chan);
 }
 
+static void test_reseting_cc(void)
+{
+	uint32_t start = k_uptime_get_32();
+	uint32_t test_time = 1000;
+	int chan = z_nrf_rtc_timer_chan_alloc();
+	int i = 0;
+	int cnt = 0;
+
+	timeout_handler_cnt = 0;
+
+	do {
+		uint32_t now = z_nrf_rtc_timer_read();
+		struct test_data test_data = {
+			.cc_val = now + 5,
+			.window = 0,
+			.delay = 0,
+			.err = -EINVAL
+		};
+
+		/* Set compare but expect that it will never expire because
+		 * it will be later on reset.
+		 */
+		z_nrf_rtc_timer_compare_set(chan, now + 2,
+					    timeout_handler, &test_data);
+
+		/* Arbitrary variable delay to reset CC before expiring first
+		 * request but very close.
+		 */
+		k_busy_wait(i);
+		i = (i + 1) % 20;
+
+		z_nrf_rtc_timer_compare_set(chan, now + 5,
+					    timeout_handler, &test_data);
+		k_busy_wait((5 + 1)*31);
+		cnt++;
+	} while ((k_uptime_get_32() - start) < test_time);
+
+	zassert_equal(timeout_handler_cnt, cnt,
+		      "Unexpected timeout count %d (exp: %d)",
+		      timeout_handler_cnt, cnt);
+	z_nrf_rtc_timer_chan_free(chan);
+}
+
 void test_main(void)
 {
 	init_zli_timer0();
@@ -294,7 +343,8 @@ void test_main(void)
 		ztest_unit_test(test_get_ticks),
 		ztest_unit_test(test_absolute_scheduling),
 		ztest_unit_test(test_alloc_free),
-		ztest_unit_test(test_stress)
+		ztest_unit_test(test_stress),
+		ztest_unit_test(test_reseting_cc)
 			 );
 	ztest_run_test_suite(test_nrf_rtc_timer);
 }

@@ -141,8 +141,9 @@ int z_nrf_rtc_timer_get_ticks(k_timeout_t t)
 
 	/* absolute timeout */
 	result = abs_ticks - curr_tick;
+
 	if ((result > COUNTER_HALF_SPAN) ||
-		(result < -COUNTER_HALF_SPAN)) {
+	    (result < -(int64_t)COUNTER_HALF_SPAN)) {
 		return -EINVAL;
 	}
 
@@ -160,12 +161,11 @@ static void set_absolute_alarm(uint32_t chan, uint32_t abs_val)
 	uint32_t cc_val = abs_val & COUNTER_MAX;
 	uint32_t prev_cc = get_comparator(chan);
 
-
 	do {
 		now = counter();
 
 		/* Handle case when previous event may generate an event.
-		 * It is handled by setting CC to now (that's furtherst future),
+		 * It is handled by setting CC to now (far in the future),
 		 * in case previous event was set for next tick wait for half
 		 * LF tick and clear event that may have been generated.
 		 */
@@ -173,6 +173,7 @@ static void set_absolute_alarm(uint32_t chan, uint32_t abs_val)
 		if (counter_sub(prev_cc, now) == 1) {
 			k_busy_wait(15);
 		}
+
 
 		/* If requested cc_val is in the past or next tick, set to 2
 		 * ticks from now. RTC may not generate event if CC is set for
@@ -182,6 +183,7 @@ static void set_absolute_alarm(uint32_t chan, uint32_t abs_val)
 			cc_val = now + 2;
 		}
 
+		event_clear(chan);
 		event_enable(chan);
 		set_comparator(chan, cc_val);
 		now2 = counter();
@@ -232,7 +234,7 @@ static void sys_clock_timeout_handler(uint32_t chan,
 		/* protection is not needed because we are in the RTC interrupt
 		 * so it won't get preempted by the interrupt.
 		 */
-		z_nrf_rtc_timer_compare_set(chan, last_count + CYC_PER_TICK,
+		compare_set(chan, last_count + CYC_PER_TICK,
 					  sys_clock_timeout_handler, NULL);
 	}
 
