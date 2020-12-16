@@ -15,7 +15,8 @@
 
 #define STM32F2X_SECTOR_MASK		((uint32_t) 0xFFFFFF07)
 
-bool flash_stm32_valid_range(const struct device *dev, off_t offset, uint32_t len,
+bool flash_stm32_valid_range(const struct device *dev, off_t offset,
+			     uint32_t len,
 			     bool write)
 {
 	ARG_UNUSED(write);
@@ -50,7 +51,7 @@ static int write_byte(const struct device *dev, off_t offset, uint8_t val)
 		return rc;
 	}
 
-	regs->CR &= ~CR_PSIZE_MASK;
+	regs->CR &= CR_PSIZE_MASK;
 	regs->CR |= FLASH_PSIZE_BYTE;
 	regs->CR |= FLASH_CR_PG;
 
@@ -105,7 +106,8 @@ static int erase_sector(const struct device *dev, uint32_t sector)
 	return rc;
 }
 
-int flash_stm32_block_erase_loop(const struct device *dev, unsigned int offset,
+int flash_stm32_block_erase_loop(const struct device *dev,
+				 unsigned int offset,
 				 unsigned int len)
 {
 	struct flash_pages_info info;

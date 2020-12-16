@@ -34,7 +34,7 @@ config SOC_FLASH_STM32
 	help
   	  Enable STM32F0x, STM32F2x, STM32F1x, STM32F3x, STM32F4x, STM32F7x, STM32L0x,
 	  STM32L1x, STM32L4x, STM32WBx, STM32G0x, STM32G4x or STM3H7x series
-      flash driver.
+	  flash driver.
 
 config SOC_FLASH_STM32_V1
 	bool
