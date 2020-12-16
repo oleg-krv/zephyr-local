@@ -18,7 +18,10 @@ zephyr_library_sources_ifdef(CONFIG_SOC_FLASH_GECKO flash_gecko.c)
 zephyr_library_sources_ifdef(CONFIG_SOC_FLASH_RV32M1 soc_flash_rv32m1.c)
 
 if(CONFIG_SOC_FLASH_STM32)
-  zephyr_sources(flash_stm32.c)
+  if(CONFIG_SOC_SERIES_STM32H7X)
+    zephyr_sources_ifdef(CONFIG_SOC_SERIES_STM32H7X flash_stm32h7x.c)
+  else()
+    zephyr_sources(flash_stm32.c)
 
   zephyr_sources_ifdef(CONFIG_SOC_FLASH_STM32_V1 flash_stm32_v1.c)
   zephyr_sources_ifdef(CONFIG_SOC_SERIES_STM32F2X flash_stm32f2x.c)
