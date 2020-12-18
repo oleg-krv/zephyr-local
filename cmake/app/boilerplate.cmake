@@ -190,67 +190,32 @@ add_custom_target(
 # Dummy add to generate files.
 zephyr_linker_sources(SECTIONS)
 
-# The BOARD can be set by 3 sources. Through environment variables,
-# through the cmake CLI, and through CMakeLists.txt.
-#
-# CLI has the highest precedence, then comes environment variables,
-# and then finally CMakeLists.txt.
-#
-# A user can ignore all the precedence rules if he simply always uses
-# the same source. E.g. always specifies -DBOARD= on the command line,
-# always has an environment variable set, or always has a set(BOARD
-# foo) line in his CMakeLists.txt and avoids mixing sources.
-#
-# The selected BOARD can be accessed through the variable 'BOARD'.
+# 'BOARD_ROOT' is a prioritized list of directories where boards may
+# be found. It always includes ${ZEPHYR_BASE} at the lowest priority.
+zephyr_file(APPLICATION_ROOT BOARD_ROOT)
+list(APPEND BOARD_ROOT ${ZEPHYR_BASE})
 
-# Read out the cached board value if present
-get_property(cached_board_value CACHE BOARD PROPERTY VALUE)
+# 'SOC_ROOT' is a prioritized list of directories where socs may be
+# found. It always includes ${ZEPHYR_BASE}/soc at the lowest priority.
+zephyr_file(APPLICATION_ROOT SOC_ROOT)
+list(APPEND SOC_ROOT ${ZEPHYR_BASE})
 
-# There are actually 4 sources, the three user input sources, and the
-# previously used value (CACHED_BOARD). The previously used value has
-# precedence, and if we detect that the user is trying to change the
-# value we give him a warning about needing to clean the build
-# directory to be able to change boards.
+# 'ARCH_ROOT' is a prioritized list of directories where archs may be
+# found. It always includes ${ZEPHYR_BASE} at the lowest priority.
+zephyr_file(APPLICATION_ROOT ARCH_ROOT)
+list(APPEND ARCH_ROOT ${ZEPHYR_BASE})
 
-set(board_cli_argument ${cached_board_value}) # Either new or old
-if(board_cli_argument STREQUAL CACHED_BOARD)
-  # We already have a CACHED_BOARD so there is no new input on the CLI
-  unset(board_cli_argument)
+# Check that BOARD has been provided, and that it has not changed.
+zephyr_check_cache(BOARD REQUIRED)
+
+string(FIND "${BOARD}" "@" REVISION_SEPARATOR_INDEX)
+if(NOT (REVISION_SEPARATOR_INDEX EQUAL -1))
+  math(EXPR BOARD_REVISION_INDEX "${REVISION_SEPARATOR_INDEX} + 1")
+  string(SUBSTRING ${BOARD} ${BOARD_REVISION_INDEX} -1 BOARD_REVISION)
+  string(SUBSTRING ${BOARD} 0 ${REVISION_SEPARATOR_INDEX} BOARD)
 endif()
 
-set(board_app_cmake_lists ${BOARD})
-if(cached_board_value STREQUAL BOARD)
-  # The app build scripts did not set a default, The BOARD we are
-  # reading is the cached value from the CLI
-  unset(board_app_cmake_lists)
-endif()
-
-if(CACHED_BOARD)
-  # Warn the user if it looks like he is trying to change the board
-  # without cleaning first
-  if(board_cli_argument)
-    if(NOT ((CACHED_BOARD STREQUAL board_cli_argument) OR (BOARD_DEPRECATED STREQUAL board_cli_argument)))
-      message(WARNING "The build directory must be cleaned pristinely when changing boards")
-      # TODO: Support changing boards without requiring a clean build
-    endif()
-  endif()
-
-  set(BOARD ${CACHED_BOARD})
-elseif(board_cli_argument)
-  set(BOARD ${board_cli_argument})
-
-elseif(DEFINED ENV{BOARD})
-  set(BOARD $ENV{BOARD})
-
-elseif(board_app_cmake_lists)
-  set(BOARD ${board_app_cmake_lists})
-
-else()
-  message(FATAL_ERROR "BOARD is not being defined on the CMake command-line in the environment or by the app.")
-endif()
-
-assert(BOARD "BOARD not set")
-message(STATUS "Board: ${BOARD}")
+set(BOARD_MESSAGE "Board: ${BOARD}")
 
 if(DEFINED ENV{ZEPHYR_BOARD_ALIASES})
   include($ENV{ZEPHYR_BOARD_ALIASES})
@@ -267,93 +232,6 @@ if(${BOARD}_DEPRECATED)
   message(WARNING "Deprecated BOARD=${BOARD_DEPRECATED} name specified, board automatically changed to: ${BOARD}.")
 endif()
 
-# Store the selected board in the cache
-set(CACHED_BOARD ${BOARD} CACHE STRING "Selected board")
-
-# The SHIELD can be set by 3 sources. Through environment variables,
-# through the cmake CLI, and through CMakeLists.txt.
-#
-# CLI has the highest precedence, then comes environment variables,
-# and then finally CMakeLists.txt.
-#
-# A user can ignore all the precedence rules if he simply always uses
-# the same source. E.g. always specifies -DSHIELD= on the command line,
-# always has an environment variable set, or always has a set(SHIELD
-# foo) line in his CMakeLists.txt and avoids mixing sources.
-#
-# The selected SHIELD can be accessed through the variable 'SHIELD'.
-
-# Read out the cached shield value if present
-get_property(cached_shield_value CACHE SHIELD PROPERTY VALUE)
-
-# There are actually 4 sources, the three user input sources, and the
-# previously used value (CACHED_SHIELD). The previously used value has
-# precedence, and if we detect that the user is trying to change the
-# value we give him a warning about needing to clean the build
-# directory to be able to change shields.
-
-set(shield_cli_argument ${cached_shield_value}) # Either new or old
-if(shield_cli_argument STREQUAL CACHED_SHIELD)
-  # We already have a CACHED_SHIELD so there is no new input on the CLI
-  unset(shield_cli_argument)
-endif()
-
-set(shield_app_cmake_lists ${SHIELD})
-if(cached_shield_value STREQUAL SHIELD)
-  # The app build scripts did not set a default, The SHIELD we are
-  # reading is the cached value from the CLI
-  unset(shield_app_cmake_lists)
-endif()
-
-if(CACHED_SHIELD)
-  # Warn the user if it looks like he is trying to change the shield
-  # without cleaning first
-  if(shield_cli_argument)
-    if(NOT (CACHED_SHIELD STREQUAL shield_cli_argument))
-      message(WARNING "The build directory must be cleaned pristinely when changing shields")
-      # TODO: Support changing shields without requiring a clean build
-    endif()
-  endif()
-
-  set(SHIELD ${CACHED_SHIELD})
-elseif(shield_cli_argument)
-  set(SHIELD ${shield_cli_argument})
-
-elseif(DEFINED ENV{SHIELD})
-  set(SHIELD $ENV{SHIELD})
-
-elseif(shield_app_cmake_lists)
-  set(SHIELD ${shield_app_cmake_lists})
-endif()
-
-# Store the selected shield in the cache
-set(CACHED_SHIELD ${SHIELD} CACHE STRING "Selected shield")
-
-# 'BOARD_ROOT' is a prioritized list of directories where boards may
-# be found. It always includes ${ZEPHYR_BASE} at the lowest priority.
-zephyr_file(APPLICATION_ROOT BOARD_ROOT)
-list(APPEND BOARD_ROOT ${ZEPHYR_BASE})
-
-# 'SOC_ROOT' is a prioritized list of directories where socs may be
-# found. It always includes ${ZEPHYR_BASE}/soc at the lowest priority.
-zephyr_file(APPLICATION_ROOT SOC_ROOT)
-list(APPEND SOC_ROOT ${ZEPHYR_BASE})
-
-# 'ARCH_ROOT' is a prioritized list of directories where archs may be
-# found. It always includes ${ZEPHYR_BASE} at the lowest priority.
-zephyr_file(APPLICATION_ROOT ARCH_ROOT)
-list(APPEND ARCH_ROOT ${ZEPHYR_BASE})
-
-if(DEFINED SHIELD)
-  string(REPLACE " " ";" SHIELD_AS_LIST "${SHIELD}")
-endif()
-# SHIELD-NOTFOUND is a real CMake list, from which valid shields can be popped.
-# After processing all shields, only invalid shields will be left in this list.
-set(SHIELD-NOTFOUND ${SHIELD_AS_LIST})
-
-# Use BOARD to search for a '_defconfig' file.
-# e.g. zephyr/boards/arm/96b_carbon_nrf51/96b_carbon_nrf51_defconfig.
-# When found, use that path to infer the ARCH we are building for.
 foreach(root ${BOARD_ROOT})
   # NB: find_path will return immediately if the output variable is
   # already set
@@ -375,7 +253,46 @@ foreach(root ${BOARD_ROOT})
   if(BOARD_DIR AND NOT (${root} STREQUAL ${ZEPHYR_BASE}))
     set(USING_OUT_OF_TREE_BOARD 1)
   endif()
+endforeach()
 
+if(EXISTS ${BOARD_DIR}/revision.cmake)
+  # Board provides revision handling.
+  include(${BOARD_DIR}/revision.cmake)
+elseif(BOARD_REVISION)
+  message(WARNING "Board revision ${BOARD_REVISION} specified for ${BOARD}, \
+                   but board has no revision so revision will be ignored.")
+endif()
+
+if(DEFINED BOARD_REVISION)
+  set(BOARD_MESSAGE "${BOARD_MESSAGE}, Revision: ${BOARD_REVISION}")
+  if(DEFINED ACTIVE_BOARD_REVISION)
+    set(BOARD_MESSAGE "${BOARD_MESSAGE} (Active: ${ACTIVE_BOARD_REVISION})")
+    set(BOARD_REVISION ${ACTIVE_BOARD_REVISION})
+  endif()
+
+  string(REPLACE "." "_" BOARD_REVISION_STRING ${BOARD_REVISION})
+endif()
+
+# Check that SHIELD has not changed.
+zephyr_check_cache(SHIELD)
+
+if(SHIELD)
+  set(BOARD_MESSAGE "${BOARD_MESSAGE}, Shield(s): ${SHIELD}")
+endif()
+
+message(STATUS "${BOARD_MESSAGE}")
+
+if(DEFINED SHIELD)
+  string(REPLACE " " ";" SHIELD_AS_LIST "${SHIELD}")
+endif()
+# SHIELD-NOTFOUND is a real CMake list, from which valid shields can be popped.
+# After processing all shields, only invalid shields will be left in this list.
+set(SHIELD-NOTFOUND ${SHIELD_AS_LIST})
+
+# Use BOARD to search for a '_defconfig' file.
+# e.g. zephyr/boards/arm/96b_carbon_nrf51/96b_carbon_nrf51_defconfig.
+# When found, use that path to infer the ARCH we are building for.
+foreach(root ${BOARD_ROOT})
   set(shield_dir ${root}/boards/shields)
   # Match the .overlay files in the shield directories to make sure we are
   # finding shields, e.g. x_nucleo_iks01a1/x_nucleo_iks01a1.overlay
@@ -412,28 +329,11 @@ foreach(root ${BOARD_ROOT})
         shield_dts_files
         ${shield_dir}/${s_path}
         )
+
       list(APPEND
         shield_dts_fixups
         ${shield_dir}/${s_dir}/dts_fixup.h
         )
-
-      # search for shield/boards/board.overlay file
-      if(EXISTS ${shield_dir}/${s_dir}/boards/${BOARD}.overlay)
-        # add shield/board overlay to the shield overlays list
-        list(APPEND
-          shield_dts_files
-          ${shield_dir}/${s_dir}/boards/${BOARD}.overlay
-          )
-      endif()
-
-      # search for shield/boards/shield/board.overlay file
-      if(EXISTS ${shield_dir}/${s_dir}/boards/${s}/${BOARD}.overlay)
-        # add shield/board overlay to the shield overlays list
-        list(APPEND
-          shield_dts_files
-          ${shield_dir}/${s_dir}/boards/${s}/${BOARD}.overlay
-          )
-      endif()
 
       # search for shield/shield.conf file
       if(EXISTS ${shield_dir}/${s_dir}/${s}.conf)
@@ -444,23 +344,14 @@ foreach(root ${BOARD_ROOT})
           )
       endif()
 
-      # search for shield/boards/board.conf file
-      if(EXISTS ${shield_dir}/${s_dir}/boards/${BOARD}.conf)
-        # add HW specific board.conf to the shield config list
-        list(APPEND
-          shield_conf_files
-          ${shield_dir}/${s_dir}/boards/${BOARD}.conf
-          )
-      endif()
-
-      # search for shield/boards/shield/board.conf file
-      if(EXISTS ${shield_dir}/${s_dir}/boards/${s}/${BOARD}.conf)
-        # add HW specific board.conf to the shield config list
-        list(APPEND
-          shield_conf_files
-          ${shield_dir}/${s_dir}/boards/${s}/${BOARD}.conf
-          )
-      endif()
+      zephyr_file(CONF_FILES ${shield_dir}/${s_dir}/boards
+                  DTS   shield_dts_files
+                  KCONF shield_conf_files
+      )
+      zephyr_file(CONF_FILES ${shield_dir}/${s_dir}/boards/${s}
+                  DTS   shield_dts_files
+                  KCONF shield_conf_files
+      )
     endforeach()
   endif()
 endforeach()
@@ -515,12 +406,12 @@ if(DEFINED CONF_FILE)
     # Need path in order to check if it is absolute.
     get_filename_component(CONF_FILE_NAME ${CONF_FILE} NAME)
     get_filename_component(CONF_FILE_DIR ${CONF_FILE} DIRECTORY)
-    if(${CONF_FILE} MATCHES "prj_(.*).conf")
+    if(${CONF_FILE_NAME} MATCHES "prj_(.*).conf")
+      set(CONF_FILE_BUILD_TYPE ${CMAKE_MATCH_1})
+      set(CONF_FILE_INCLUDE_FRAGMENTS true)
+
       if(NOT IS_ABSOLUTE ${CONF_FILE_DIR})
         set(CONF_FILE_DIR ${APPLICATION_SOURCE_DIR}/${CONF_FILE_DIR})
-      endif()
-      if(EXISTS ${CONF_FILE_DIR}/boards/${BOARD}_${CMAKE_MATCH_1}.conf)
-        list(APPEND CONF_FILE ${CONF_FILE_DIR}/boards/${BOARD}_${CMAKE_MATCH_1}.conf)
       endif()
     endif()
   endif()
@@ -539,11 +430,16 @@ elseif(COMMAND set_conf_file)
 elseif(EXISTS   ${APPLICATION_SOURCE_DIR}/prj_${BOARD}.conf)
   set(CONF_FILE ${APPLICATION_SOURCE_DIR}/prj_${BOARD}.conf)
 
-elseif(EXISTS   ${APPLICATION_SOURCE_DIR}/boards/${BOARD}.conf)
-  set(CONF_FILE ${APPLICATION_SOURCE_DIR}/prj.conf ${APPLICATION_SOURCE_DIR}/boards/${BOARD}.conf)
-
 elseif(EXISTS   ${APPLICATION_SOURCE_DIR}/prj.conf)
   set(CONF_FILE ${APPLICATION_SOURCE_DIR}/prj.conf)
+  set(CONF_FILE_INCLUDE_FRAGMENTS true)
+endif()
+
+if(CONF_FILE_INCLUDE_FRAGMENTS)
+  if(NOT CONF_FILE_DIR)
+     set(CONF_FILE_DIR ${APPLICATION_SOURCE_DIR})
+  endif()
+  zephyr_file(CONF_FILES ${CONF_FILE_DIR}/boards KCONF CONF_FILE BUILD ${CONF_FILE_BUILD_TYPE})
 endif()
 
 set(CACHED_CONF_FILE ${CONF_FILE} CACHE STRING "If desired, you can build the application using\
@@ -562,6 +458,9 @@ elseif(DEFINED ENV{DTC_OVERLAY_FILE})
   set(DTC_OVERLAY_FILE $ENV{DTC_OVERLAY_FILE})
 elseif(EXISTS          ${APPLICATION_SOURCE_DIR}/boards/${BOARD}.overlay)
   set(DTC_OVERLAY_FILE ${APPLICATION_SOURCE_DIR}/boards/${BOARD}.overlay)
+elseif((DEFINED BOARD_REVISION) AND
+       EXISTS          ${APPLICATION_SOURCE_DIR}/${BOARD}_${BOARD_REVISION_STRING}.overlay)
+  set(DTC_OVERLAY_FILE ${APPLICATION_SOURCE_DIR}/${BOARD}_${BOARD_REVISION_STRING}.overlay)
 elseif(EXISTS          ${APPLICATION_SOURCE_DIR}/${BOARD}.overlay)
   set(DTC_OVERLAY_FILE ${APPLICATION_SOURCE_DIR}/${BOARD}.overlay)
 elseif(EXISTS          ${APPLICATION_SOURCE_DIR}/app.overlay)
