@@ -72,6 +72,7 @@ LOG_MODULE_REGISTER(usb_dfu);
 
 static struct k_poll_event dfu_event;
 static struct k_poll_signal dfu_signal;
+static struct k_timer dfu_timer;
 
 static struct k_work dfu_work;
 
@@ -143,7 +144,8 @@ struct dev_dfu_mode_descriptor dfu_mode_desc = {
 		.bDeviceProtocol = 0,
 		.bMaxPacketSize0 = USB_MAX_CTRL_MPS,
 		.idVendor = sys_cpu_to_le16((uint16_t)CONFIG_USB_DEVICE_VID),
-		.idProduct = sys_cpu_to_le16((uint16_t)CONFIG_USB_DEVICE_PID),
+		.idProduct =
+			sys_cpu_to_le16((uint16_t)CONFIG_USB_DEVICE_DFU_PID),
 		.bcdDevice = sys_cpu_to_le16(BCDDEVICE_RELNUM),
 		.iManufacturer = 1,
 		.iProduct = 2,
@@ -381,6 +383,12 @@ static void dfu_flash_write(uint8_t *data, size_t len)
 	LOG_DBG("bytes written 0x%x", flash_img_bytes_written(&dfu_data.ctx));
 }
 
+static void dfu_timer_expired(struct k_timer *timer)
+{
+	if (dfu_data.state == appDETACH) {
+		dfu_data.state = appIDLE;
+	}
+}
 
 /**
  * @brief Handler called for DFU Class requests not handled by the USB stack.
@@ -396,6 +404,7 @@ static int dfu_class_handle_req(struct usb_setup_packet *pSetup,
 {
 	int ret;
 	uint32_t len, bytes_left;
+	uint16_t timeout;
 
 	switch (pSetup->bRequest) {
 	case DFU_GETSTATUS:
@@ -586,18 +595,9 @@ static int dfu_class_handle_req(struct usb_setup_packet *pSetup,
 		/* Move to appDETACH state */
 		dfu_data.state = appDETACH;
 
-		/* We should start a timer here but in order to
-		 * keep things simple and do not increase the size
-		 * we rely on the host to get us out of the appATTACHED
-		 * state if needed.
-		 */
-
-		/* Set the DFU mode descriptors to be used after reset */
-		dfu_config.usb_device_description = (uint8_t *) &dfu_mode_desc;
-		if (usb_set_config(dfu_config.usb_device_description) != 0) {
-			LOG_ERR("usb_set_config failed in DFU_DETACH");
-			return -EIO;
-		}
+		/* Begin detach timeout timer */
+		timeout = MIN(pSetup->wValue, CONFIG_USB_DFU_DETACH_TIMEOUT);
+		k_timer_start(&dfu_timer, K_MSEC(timeout), K_FOREVER);
 		break;
 	default:
 		LOG_WRN("DFU UNKNOWN STATE: %d", pSetup->bRequest);
@@ -628,8 +628,20 @@ static void dfu_status_cb(struct usb_cfg_data *cfg,
 		break;
 	case USB_DC_RESET:
 		LOG_DBG("USB device reset detected, state %d", dfu_data.state);
+		/* Stop the appDETACH timeout timer */
+		k_timer_stop(&dfu_timer);
 		if (dfu_data.state == appDETACH) {
 			dfu_data.state = dfuIDLE;
+
+			/* Set the DFU mode descriptors to be used after
+			 * reset
+			 */
+			dfu_config.usb_device_description =
+				(uint8_t *) &dfu_mode_desc;
+			if (usb_set_config(dfu_config.usb_device_description)) {
+				LOG_ERR("usb_set_config failed during USB "
+					"device reset");
+			}
 		}
 		break;
 	case USB_DC_CONNECTED:
@@ -785,6 +797,7 @@ static int usb_dfu_init(const struct device *dev)
 
 	k_work_init(&dfu_work, dfu_work_handler);
 	k_poll_signal_init(&dfu_signal);
+	k_timer_init(&dfu_timer, dfu_timer_expired, NULL);
 
 	if (flash_area_open(dfu_data.flash_area_id, &fa)) {
 		return -EIO;
