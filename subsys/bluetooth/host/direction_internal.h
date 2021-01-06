@@ -4,8 +4,5 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
-struct lll_sync_iso {
-	struct lll_hdr hdr;
-	uint8_t is_enabled:1;
-};
+/* Performs initialization of Direction Finding in Host */
+int le_df_init(void);

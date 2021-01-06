@@ -99,7 +99,7 @@ static enum power_states _handle_device_abort(enum power_states state)
 	return pm_state;
 }
 
-enum power_states pm_policy_mgr(int32_t ticks)
+static enum power_states pm_policy_mgr(int32_t ticks)
 {
 	bool deep_sleep;
 #if CONFIG_PM_DEVICE
@@ -162,7 +162,7 @@ enum power_states pm_policy_mgr(int32_t ticks)
 		/* clear forced_pm_state */
 		forced_pm_state = POWER_STATE_AUTO;
 		pm_notify_power_state_exit(pm_state);
-		_pm_power_state_exit_post_ops(pm_state);
+		pm_power_state_exit_post_ops(pm_state);
 	}
 
 	return pm_state;
@@ -194,7 +194,7 @@ void pm_system_resume(void)
 	if (!post_ops_done) {
 		post_ops_done = 1;
 		pm_notify_power_state_exit(pm_state);
-		_pm_power_state_exit_post_ops(pm_state);
+		pm_power_state_exit_post_ops(pm_state);
 	}
 }
 
