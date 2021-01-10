@@ -199,13 +199,25 @@ static struct {
 	uint8_t pool[sizeof(memq_link_t) * EVENT_DONE_MAX];
 } mem_link_done;
 
+/* Minimum number of node rx for ULL to LL/HCI thread per connection.
+ * Increasing this by times the max. simultaneous connection count will permit
+ * simultaneous parallel PHY update or Connection Update procedures amongst
+ * active connections.
+ */
 #if defined(CONFIG_BT_CTLR_PHY) && defined(CONFIG_BT_CTLR_DATA_LENGTH)
 #define LL_PDU_RX_CNT 3
 #else
 #define LL_PDU_RX_CNT 2
 #endif
 
+/* No. of node rx for LLL to ULL.
+ * Reserve 3, 1 for adv data, 1 for scan response and 1 for empty PDU reception.
+ */
 #define PDU_RX_CNT    (CONFIG_BT_CTLR_RX_BUFFERS + 3)
+
+/* Part sum of LLL to ULL and ULL to LL/HCI thread node rx count.
+ * Will be used below in allocating node rx pool.
+ */
 #define RX_CNT        (PDU_RX_CNT + LL_PDU_RX_CNT)
 
 static MFIFO_DEFINE(pdu_rx_free, sizeof(void *), PDU_RX_CNT);
@@ -1723,32 +1735,6 @@ static inline void rx_alloc(uint8_t max)
 {
 	uint8_t idx;
 
-#if defined(CONFIG_BT_CONN)
-	while (mem_link_rx.quota_pdu &&
-	       MFIFO_ENQUEUE_IDX_GET(ll_pdu_rx_free, &idx)) {
-		memq_link_t *link;
-		struct node_rx_hdr *rx;
-
-		link = mem_acquire(&mem_link_rx.free);
-		if (!link) {
-			break;
-		}
-
-		rx = mem_acquire(&mem_pdu_rx.free);
-		if (!rx) {
-			mem_release(link, &mem_link_rx.free);
-			break;
-		}
-
-		link->mem = NULL;
-		rx->link = link;
-
-		MFIFO_BY_IDX_ENQUEUE(ll_pdu_rx_free, idx, rx);
-
-		ll_rx_link_inc_quota(-1);
-	}
-#endif /* CONFIG_BT_CONN */
-
 	if (max > mem_link_rx.quota_pdu) {
 		max = mem_link_rx.quota_pdu;
 	}
@@ -1759,13 +1745,13 @@ static inline void rx_alloc(uint8_t max)
 
 		link = mem_acquire(&mem_link_rx.free);
 		if (!link) {
-			break;
+			return;
 		}
 
 		rx = mem_acquire(&mem_pdu_rx.free);
 		if (!rx) {
 			mem_release(link, &mem_link_rx.free);
-			break;
+			return;
 		}
 
 		rx->link = link;
@@ -1774,6 +1760,39 @@ static inline void rx_alloc(uint8_t max)
 
 		ll_rx_link_inc_quota(-1);
 	}
+
+#if defined(CONFIG_BT_CONN)
+	if (!max) {
+		return;
+	}
+
+	/* Replenish the ULL to LL/HCI free Rx PDU queue after LLL to ULL free
+	 * Rx PDU queue has been filled.
+	 */
+	while (mem_link_rx.quota_pdu &&
+	       MFIFO_ENQUEUE_IDX_GET(ll_pdu_rx_free, &idx)) {
+		memq_link_t *link;
+		struct node_rx_hdr *rx;
+
+		link = mem_acquire(&mem_link_rx.free);
+		if (!link) {
+			return;
+		}
+
+		rx = mem_acquire(&mem_pdu_rx.free);
+		if (!rx) {
+			mem_release(link, &mem_link_rx.free);
+			return;
+		}
+
+		link->mem = NULL;
+		rx->link = link;
+
+		MFIFO_BY_IDX_ENQUEUE(ll_pdu_rx_free, idx, rx);
+
+		ll_rx_link_inc_quota(-1);
+	}
+#endif /* CONFIG_BT_CONN */
 }
 
 static void rx_demux(void *param)
