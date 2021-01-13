@@ -42,7 +42,6 @@
 
 /* Only 4K granule is supported */
 #define PAGE_SIZE_SHIFT		12U
-#define PAGE_SIZE		(1U << PAGE_SIZE_SHIFT)
 
 /* 48-bit VA address */
 #define VA_SIZE_SHIFT_MAX	48U
@@ -89,12 +88,6 @@
 
 /* Level for the base XLAT */
 #define BASE_XLAT_LEVEL	GET_BASE_XLAT_LEVEL(CONFIG_ARM64_VA_BITS)
-
-#define GET_BASE_XLAT_NUM_ENTRIES(va_bits)	\
-	(1U << (va_bits - LEVEL_TO_VA_SIZE_SHIFT(BASE_XLAT_LEVEL)))
-
-/* Table size for the first level XLAT */
-#define BASE_XLAT_NUM_ENTRIES	GET_BASE_XLAT_NUM_ENTRIES(CONFIG_ARM64_VA_BITS)
 
 #if (CONFIG_ARM64_PA_BITS == 48)
 #define TCR_PS_BITS TCR_PS_BITS_256TB
