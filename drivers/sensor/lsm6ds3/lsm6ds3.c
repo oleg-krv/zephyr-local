@@ -832,6 +832,6 @@ static int lsm6ds3_init(const struct device *dev)
 
 static struct lsm6ds3_data lsm6ds3_data;
 
-DEVICE_AND_API_INIT(lsm6ds3, DT_INST_LABEL(0), lsm6ds3_init,
+DEVICE_DEFINE(lsm6ds3, DT_INST_LABEL(0), lsm6ds3_init, NULL,
 		    &lsm6ds3_data, &lsm6ds3_config, POST_KERNEL,
 		    CONFIG_SENSOR_INIT_PRIORITY, &lsm6ds3_api_funcs);

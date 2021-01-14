@@ -168,7 +168,6 @@ static void lsm6ds3_handle_interrupt(const struct device *dev)
 		.type = SENSOR_TRIG_DATA_READY,
 	};
 	const struct lsm6ds3_config *cfg = dev->config;
-	lsm6ds3_status_reg_t status;
 
 	while (1) {
 #if defined(CONFIG_LSM6DS3_ENABLE_FIFO)
@@ -186,6 +185,7 @@ static void lsm6ds3_handle_interrupt(const struct device *dev)
 		}
 
 #else
+		lsm6ds3_status_reg_t status;
 		if (lsm6ds3_status_reg_get(lsm6ds3->ctx, &status) < 0) {
 			LOG_ERR("failed reading status reg");
 			goto HI_EXIT;
