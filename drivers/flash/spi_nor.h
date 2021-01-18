@@ -8,6 +8,7 @@
 #define __SPI_NOR_H__
 
 #include <sys/util.h>
+#include "spi_nor_at25df321a.h"
 
 #define SPI_NOR_MAX_ID_LEN	3
 

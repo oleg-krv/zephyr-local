@@ -73,4 +73,7 @@ config SPI_NOR_IDLE_IN_DPD
 	  long periods, and when used the impact of waiting for mode
 	  enter and exit delays is acceptable.
 
+config SPI_NOR_AT25DF321A
+    bool "AT25DF321A - Adesto 32-Mbit FLASH"
+
 endif # SPI_NOR

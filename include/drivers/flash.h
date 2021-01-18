@@ -108,12 +108,18 @@ typedef int (*flash_api_sfdp_read)(const struct device *dev, off_t offset,
 				   void *data, size_t len);
 typedef int (*flash_api_read_jedec_id)(const struct device *dev, uint8_t *id);
 
+typedef int (*flash_api_reset)(const struct device *dev);
+
+typedef int (*flash_api_get_status)(const struct device *dev, void *data, size_t len);
+
 __subsystem struct flash_driver_api {
 	flash_api_read read;
 	flash_api_write write;
 	flash_api_erase erase;
 	flash_api_write_protection write_protection;
 	flash_api_get_parameters get_parameters;
+    flash_api_reset reset;
+    flash_api_get_status get_status;
 #if defined(CONFIG_FLASH_PAGE_LAYOUT)
 	flash_api_pages_layout page_layout;
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */

@@ -303,6 +303,8 @@ static int spi_nor_access(const struct device *const dev,
 	spi_nor_access(dev, opcode, false, 0, NULL, 0, true)
 #define spi_nor_cmd_addr_write(dev, opcode, addr, src, length) \
 	spi_nor_access(dev, opcode, true, addr, (void *)src, length, true)
+#define spi_nor_cmd_write_data(dev, opcode, dest) \
+	spi_nor_access(dev, opcode, false, 0, dest, 1, true)
 
 #if defined(CONFIG_SPI_NOR_SFDP_RUNTIME) || defined(CONFIG_FLASH_JESD216_API)
 /*
@@ -480,7 +482,10 @@ static int spi_nor_write(const struct device *dev, off_t addr,
 	}
 
 	acquire_device(dev);
-
+    uint8_t reg[2] = {0x00}; /* TMP OLEG */
+    do {
+        ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, reg, 1);
+    } while (!ret && (reg[0] & SPI_NOR_WEL_BIT));
 	while (size > 0) {
 		size_t to_write = size;
 
@@ -585,10 +590,8 @@ static int spi_nor_write_protection_set(const struct device *dev,
 
 	acquire_device(dev);
 
-	spi_nor_wait_until_ready(dev);
-
 	ret = spi_nor_cmd_write(dev, (write_protect) ?
-	      SPI_NOR_CMD_WRDI : SPI_NOR_CMD_WREN);
+                                 SPI_NOR_CMD_WRDI : SPI_NOR_CMD_WREN);
 
 	if (IS_ENABLED(DT_INST_PROP(0, requires_ulbpr))
 	    && (ret == 0)
@@ -819,6 +822,55 @@ static int setup_pages_layout(const struct device *dev)
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 
+static int spi_nor_reset(const struct device *dev) {
+    int ret = 0;
+    const struct spi_nor_config *cfg = dev->config;
+#ifdef SPI_NOR_AT25DF321A
+    uint8_t jdec_adesto[3] = {SPI_NOR_AT25DF321A_ID1, SPI_NOR_AT25DF321A_ID2, SPI_NOR_AT25DF321A_ID3};
+    if (memcmp(cfg->jedec_id, jdec_adesto, 3) == 0) {
+        acquire_device(dev);
+        spi_nor_wait_until_ready(dev);
+
+        uint8_t reg[2];
+        ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &reg, 2);
+        if (ret != 0) {
+            release_device(dev);
+            return ret;
+        }
+
+        reg[1] = reg[1] | SPI_NOR_SB2_RSTE_BIT;
+        ret = spi_nor_cmd_write_data(dev, SPI_NOR_CMD_WRSR2, &reg[1]);
+        if (ret != 0) {
+            release_device(dev);
+            return ret;
+        }
+
+        reg[1] = SPI_NOR_CMD_RST_CB;
+        ret = spi_nor_cmd_write_data(dev, SPI_NOR_CMD_WRSR2, &reg[1]);
+        release_device(dev);
+    }
+#endif
+    return ret;
+}
+
+static int spi_nor_get_status(const struct device *dev, void *data, size_t len) {
+    int ret;
+
+#ifdef SPI_NOR_STATUS_BIT2
+    if (len > 2) {
+        len = 2;
+    }
+#else
+    if (len > 1) {
+        len = 1;
+    }
+#endif
+
+    ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &data, len);
+
+    return ret;
+}
+
 /**
  * @brief Configure the flash
  *
@@ -972,6 +1024,8 @@ static const struct flash_driver_api spi_nor_api = {
 	.sfdp_read = spi_nor_sfdp_read,
 	.read_jedec_id = spi_nor_read_jedec_id,
 #endif
+    .reset = spi_nor_reset,
+    .get_status = spi_nor_get_status
 };
 
 #ifndef CONFIG_SPI_NOR_SFDP_RUNTIME
