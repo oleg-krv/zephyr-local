@@ -90,6 +90,7 @@ struct spi_nor_config {
 	const struct jesd216_bfp *bfp;
 #endif /* CONFIG_SPI_NOR_SFDP_DEVICETREE */
 #endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
+
 };
 
 /**
@@ -133,6 +134,8 @@ struct spi_nor_data {
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 #endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
+	/* Type device driver */
+	uint8_t type_device;
 };
 
 #ifdef CONFIG_SPI_NOR_SFDP_MINIMAL
@@ -482,10 +485,7 @@ static int spi_nor_write(const struct device *dev, off_t addr,
 	}
 
 	acquire_device(dev);
-    uint8_t reg[2] = {0x00}; /* TMP OLEG */
-    do {
-        ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, reg, 1);
-    } while (!ret && (reg[0] & SPI_NOR_WEL_BIT));
+
 	while (size > 0) {
 		size_t to_write = size;
 
@@ -590,9 +590,17 @@ static int spi_nor_write_protection_set(const struct device *dev,
 
 	acquire_device(dev);
 
-	ret = spi_nor_cmd_write(dev, (write_protect) ?
-                                 SPI_NOR_CMD_WRDI : SPI_NOR_CMD_WREN);
+	spi_nor_wait_until_ready(dev);
 
+	ret = spi_nor_cmd_write(dev, (write_protect) ?
+	      SPI_NOR_CMD_WRDI : SPI_NOR_CMD_WREN);
+
+//	if (!write_protect) {
+//		uint8_t reg;
+//		do {
+//			ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &reg, 1);
+//		} while (!ret && (reg & SPI_NOR_WEL_BIT));
+//	}
 	if (IS_ENABLED(DT_INST_PROP(0, requires_ulbpr))
 	    && (ret == 0)
 	    && !write_protect) {
@@ -822,54 +830,48 @@ static int setup_pages_layout(const struct device *dev)
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 
-static int spi_nor_reset(const struct device *dev) {
-    int ret = 0;
-    const struct spi_nor_config *cfg = dev->config;
+//static int spi_nor_get_status(const struct device *dev, void *data, size_t len) {
+//    int ret;
+//
+//#ifdef SPI_NOR_STATUS_BIT2
+//    /* device has two status bytes */
+//    if (len > 2) {
+//        len = 2;
+//    }
+//#else
+//    if (len > 1) {
+//        len = 1;
+//    }
+//#endif
+//
+//    ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, data, len);
+//
+//    return ret;
+//}
+
 #ifdef SPI_NOR_AT25DF321A
-    uint8_t jdec_adesto[3] = {SPI_NOR_AT25DF321A_ID1, SPI_NOR_AT25DF321A_ID2, SPI_NOR_AT25DF321A_ID3};
-    if (memcmp(cfg->jedec_id, jdec_adesto, 3) == 0) {
-        acquire_device(dev);
-        spi_nor_wait_until_ready(dev);
+static int spi_nor_unprotect_sectors(const struct device *dev) {
+	int ret;
+	const size_t flash_size = dev_flash_size(dev);
+	uint32_t addr = 0x01;
+	uint8_t status = 0x00;
+	while (addr < flash_size) {
 
-        uint8_t reg[2];
-        ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &reg, 2);
-        if (ret != 0) {
-            release_device(dev);
-            return ret;
-        }
-
-        reg[1] = reg[1] | SPI_NOR_SB2_RSTE_BIT;
-        ret = spi_nor_cmd_write_data(dev, SPI_NOR_CMD_WRSR2, &reg[1]);
-        if (ret != 0) {
-            release_device(dev);
-            return ret;
-        }
-
-        reg[1] = SPI_NOR_CMD_RST_CB;
-        ret = spi_nor_cmd_write_data(dev, SPI_NOR_CMD_WRSR2, &reg[1]);
-        release_device(dev);
-    }
-#endif
-    return ret;
+		do {
+			spi_nor_cmd_write(dev,SPI_NOR_CMD_WREN);
+			spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &status, 1);
+		} while (!(status & SPI_NOR_SB1_WEL_BIT));
+		ret = spi_nor_cmd_addr_write(dev, SPI_NOR_CMD_PSDI, addr, NULL, 0);
+		if (ret != 0) {
+			LOG_ERR("Can't unprotect sector 0x%lx : %u", (long)addr, ret);
+			return ret;
+		}
+		spi_nor_wait_until_ready(dev);
+		addr += 0X10000;
+	}
+	return 0;
 }
-
-static int spi_nor_get_status(const struct device *dev, void *data, size_t len) {
-    int ret;
-
-#ifdef SPI_NOR_STATUS_BIT2
-    if (len > 2) {
-        len = 2;
-    }
-#else
-    if (len > 1) {
-        len = 1;
-    }
 #endif
-
-    ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &data, len);
-
-    return ret;
-}
 
 /**
  * @brief Configure the flash
@@ -937,6 +939,15 @@ static int spi_nor_configure(const struct device *dev)
 	}
 #endif
 
+	/* Check type device driver */
+	data->type_device = SPI_NOR_TYPE_DEVICE_DEF;
+#ifdef SPI_NOR_AT25DF321A
+	uint8_t jdec_adesto_at25df321a[3] = {SPI_NOR_AT25DF321A_ID1, SPI_NOR_AT25DF321A_ID2, SPI_NOR_AT25DF321A_ID3};
+	if (memcmp(cfg->jedec_id, jdec_adesto_at25df321a, 3) == 0) {
+		data->type_device = SPI_NOR_TYPE_DEVICE_AT25DF321A;
+	}
+#endif
+
 #ifndef CONFIG_SPI_NOR_SFDP_MINIMAL
 	/* For devicetree and runtime we need to process BFP data and
 	 * set up or validate page layout.
@@ -960,6 +971,34 @@ static int spi_nor_configure(const struct device *dev)
 	    && (enter_dpd(dev) != 0)) {
 		return -ENODEV;
 	}
+#ifdef SPI_NOR_AT25DF321A
+	if (data->type_device == SPI_NOR_TYPE_DEVICE_AT25DF321A) {
+		/* Check device status */
+		uint8_t status;
+		rc = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &status, 1);
+		if (rc != 0) {
+			LOG_ERR("Status read failed: %d", rc);
+			return -ENODEV;
+		}
+		if (status & SPI_NOR_SB1_SPF_BIT) {
+			rc = spi_nor_unprotect_sectors(dev);
+			if (rc != 0) {
+				LOG_ERR("Unprotect failed: %d", rc);
+				return -ENODEV;
+			}
+		}
+//		k_sleep(K_SECONDS(1));
+//		rc = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &status, 1);
+//		if (rc != 0) {
+//			LOG_ERR("Status read failed: %d", rc);
+//			return -ENODEV;
+//		}
+		if (status & SPI_NOR_SB1_SPF_BIT) {
+			LOG_ERR("Unprotect failed (read): %d %d", rc, status);
+			return -ENODEV;
+		}
+	}
+#endif
 
 	return 0;
 }
@@ -1024,8 +1063,6 @@ static const struct flash_driver_api spi_nor_api = {
 	.sfdp_read = spi_nor_sfdp_read,
 	.read_jedec_id = spi_nor_read_jedec_id,
 #endif
-    .reset = spi_nor_reset,
-    .get_status = spi_nor_get_status
 };
 
 #ifndef CONFIG_SPI_NOR_SFDP_RUNTIME

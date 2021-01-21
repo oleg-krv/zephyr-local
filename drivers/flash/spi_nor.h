@@ -8,9 +8,11 @@
 #define __SPI_NOR_H__
 
 #include <sys/util.h>
-#include "spi_nor_at25df321a.h"
 
 #define SPI_NOR_MAX_ID_LEN	3
+
+#define SPI_NOR_TYPE_DEVICE_DEF				0U
+#define SPI_NOR_TYPE_DEVICE_AT25DF321A		1U
 
 /* Status register bits */
 #define SPI_NOR_WIP_BIT         BIT(0)  /* Write in progress */
@@ -40,5 +42,35 @@
 /* Test whether offset is aligned to a given number of bits. */
 #define SPI_NOR_IS_ALIGNED(_ofs, _bits) (((_ofs) & BIT_MASK(_bits)) == 0)
 #define SPI_NOR_IS_SECTOR_ALIGNED(_ofs) SPI_NOR_IS_ALIGNED(_ofs, 12)
+
+
+#if DT_HAS_COMPAT_STATUS_OKAY(adesto_at25df321a)
+
+#define SPI_NOR_AT25DF321A
+
+/* JEDEC ID */
+#define SPI_NOR_AT25DF321A_ID1      0x1f
+#define SPI_NOR_AT25DF321A_ID2      0x47
+#define SPI_NOR_AT25DF321A_ID3      0x01
+
+/* Status register bits */
+#define SPI_NOR_SB1_RDY_BIT         BIT(0)  /* Ready/Busy Status */
+#define SPI_NOR_SB1_WEL_BIT         BIT(1)  /* Write Enable Latch Status */
+#define SPI_NOR_SB1_SPF_BIT         (BIT(2) | BIT(3))  /* Software Protection Status */
+#define SPI_NOR_SB1_WPP_BIT         BIT(4)  /* Write Protect (WP) Pin Status */
+#define SPI_NOR_SB1_EPE_BIT         BIT(5)  /* Erase/Program Error */
+#define SPI_NOR_SB1_SPRL_BIT        BIT(7)  /* Sector Protection Registers Locked */
+
+#define SPI_NOR_SB2_RDY_BIT         BIT(0)  /* Ready/Busy Status */
+#define SPI_NOR_SB2_ES_BIT          BIT(1)  /* Erase Suspend Status */
+#define SPI_NOR_SB2_PS_BIT          BIT(2)  /* Program Suspend Status */
+#define SPI_NOR_SB2_SLE_BIT         BIT(3)  /* Sector Lockdown Enabled */
+#define SPI_NOR_SB2_RSTE_BIT        BIT(4)  /* Reset Enabled */
+
+/* Protection Commands */
+#define SPI_NOR_CMD_PSEN            0x36    /* Protect Sector */
+#define SPI_NOR_CMD_PSDI            0x39    /* Unprotect Sector */
+
+#endif
 
 #endif /*__SPI_NOR_H__*/
