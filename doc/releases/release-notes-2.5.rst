@@ -54,6 +54,14 @@ API Changes
 * The :c:func:`mqtt_keepalive_time_left` function now returns -1 if keep alive
   messages are disabled by setting ``CONFIG_MQTT_KEEPALIVE`` to 0.
 
+* The ``CONFIG_LEGACY_TIMEOUT_API`` mode has been removed.  All kernel
+  timeout usage must use the new-style k_timeout_t type and not the
+  legacy/deprecated millisecond counts.
+
+* The :c:func:`coap_pending_init` function now accepts an additional ``retries``
+  parameter, allowing to specify the maximum retransmission count of the
+  confirmable message.
+
 Deprecated in this release
 ==========================
 
@@ -163,6 +171,9 @@ Drivers and Sensors
 
 * Flash
 
+  * CONFIG_NORDIC_QSPI_NOR_QE_BIT has been removed.  The
+    quad-enable-requirements devicetree property should be used instead.
+
 * GPIO
 
 * Hardware Info
@@ -261,6 +272,10 @@ Libraries / Subsystems
   * MCUmgr
 
     * Added support for flash devices that have non-0xff erase value.
+    * Added optional verification, enabled via
+      :option:`CONFIG_IMG_MGMT_REJECT_DIRECT_XIP_MISMATCHED_SLOT`, of an uploaded
+      Direct-XIP binary, which will reject any binary that is not able to boot
+      from base address of offered upload slot.
 
   * updatehub
 
@@ -288,6 +303,12 @@ Libraries / Subsystems
 * Tracing
 
 * Debug
+
+* DFU
+
+ * boot: Reworked using MCUBoot's bootutil_public library which allow to use
+   API implementation already provided by MCUboot codebase and remove
+   zephyr's own implementations.
 
 HALs
 ****
@@ -327,6 +348,8 @@ MCUBoot
   * Configure logging to LOG_MINIMAL by default.
   * boot: cleanup NXP MPU configuration before boot.
   * Fix nokogiri<=1.11.0.rc4 vulnerability.
+  * bootutil_public library was extracted as code which is common API for
+    MCUboot and the DFU application, see ``CONFIG_MCUBOOT_BOOTUTIL_LIB``
 
 * imgtool
 

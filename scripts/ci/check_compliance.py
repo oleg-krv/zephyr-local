@@ -213,11 +213,7 @@ class CheckPatch(ComplianceTest):
 
         except subprocess.CalledProcessError as ex:
             output = ex.output.decode("utf-8")
-            if re.search("[1-9][0-9]* errors,", output):
-                self.add_failure(output)
-            else:
-                # No errors found, but warnings. Show them.
-                self.add_info(output)
+            self.add_failure(output)
 
 
 class KconfigCheck(ComplianceTest):
@@ -255,6 +251,21 @@ class KconfigCheck(ComplianceTest):
             _ = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as ex:
             self.error(ex.output)
+
+        modules_dir = ZEPHYR_BASE + '/modules'
+        modules = [name for name in os.listdir(modules_dir) if
+                   os.path.exists(os.path.join(modules_dir, name, 'Kconfig'))]
+
+        with open(modules_file, 'r') as fp_module_file:
+            content = fp_module_file.read()
+
+        with open(modules_file, 'w') as fp_module_file:
+            for module in modules:
+                fp_module_file.write("ZEPHYR_{}_KCONFIG = {}\n".format(
+                    re.sub('[^a-zA-Z0-9]', '_', module).upper(),
+                    modules_dir + '/' + module + '/Kconfig'
+                ))
+            fp_module_file.write(content)
 
     def write_kconfig_soc(self):
         """

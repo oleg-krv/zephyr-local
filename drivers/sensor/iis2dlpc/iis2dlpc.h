@@ -52,7 +52,7 @@ union axis3bit16_t {
  * @pm: Power mode (lis2dh_powermode).
  * @int_gpio_port: Pointer to GPIO PORT identifier.
  * @int_gpio_pin: GPIO pin number connecter to sensor int pin.
- * @int_pin: Sensor int pin (int1/int2).
+ * @drdy_int: Sensor drdy int (int1/int2).
  */
 struct iis2dlpc_device_config {
 	const char *bus_name;
@@ -62,14 +62,14 @@ struct iis2dlpc_device_config {
 	const char *int_gpio_port;
 	uint8_t int_gpio_pin;
 	uint8_t int_gpio_flags;
-	uint8_t int_pin;
-#ifdef CONFIG_IIS2DLPC_PULSE
-	uint8_t pulse_trigger;
-	uint8_t pulse_ths[3];
-	uint8_t pulse_shock;
-	uint8_t pulse_ltncy;
-	uint8_t pulse_quiet;
-#endif /* CONFIG_IIS2DLPC_PULSE */
+	uint8_t drdy_int;
+#ifdef CONFIG_IIS2DLPC_TAP
+	uint8_t tap_mode;
+	uint8_t tap_threshold[3];
+	uint8_t tap_shock;
+	uint8_t tap_latency;
+	uint8_t tap_quiet;
+#endif /* CONFIG_IIS2DLPC_TAP */
 #endif /* CONFIG_IIS2DLPC_TRIGGER */
 };
 
@@ -88,10 +88,10 @@ struct iis2dlpc_data {
 	uint8_t gpio_pin;
 	struct gpio_callback gpio_cb;
 	sensor_trigger_handler_t drdy_handler;
-#ifdef CONFIG_IIS2DLPC_PULSE
+#ifdef CONFIG_IIS2DLPC_TAP
 	sensor_trigger_handler_t tap_handler;
 	sensor_trigger_handler_t double_tap_handler;
-#endif /* CONFIG_IIS2DLPC_PULSE */
+#endif /* CONFIG_IIS2DLPC_TAP */
 #if defined(CONFIG_IIS2DLPC_TRIGGER_OWN_THREAD)
 	K_KERNEL_STACK_MEMBER(thread_stack, CONFIG_IIS2DLPC_THREAD_STACK_SIZE);
 	struct k_thread thread;
