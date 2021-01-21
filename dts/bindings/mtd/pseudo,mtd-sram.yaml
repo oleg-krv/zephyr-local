@@ -1,0 +1,33 @@
+# Copyright (c) 2021 Krivorot <oleg krivorot.oleg@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Properties supporting Zephyr pseudo sram driver (over the Zephyr SPI
+  API). Simulate mtd spi device.
+
+compatible: "pseudo,mtd-sram"
+
+include: [spi-device.yaml]
+
+properties:
+  mf-id:
+    type: uint8-array
+    required: true
+    description: MF ID.
+
+  size:
+    type: int
+    required: true
+    description: Flash capacity in bits.
+
+  read-not-wait-max-frequency:
+    type: int
+    required: false
+    default: 33000000
+    description: Maximum clock frequency of device's SPI interface in Hz for read not wait
+
+  tce-max-time:
+    type: int
+    required: false
+    default: 8
+    description: CE low pulse width (μs)
