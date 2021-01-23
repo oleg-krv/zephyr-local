@@ -144,31 +144,21 @@ struct esp_socket {
 	enum net_ip_protocol ip_proto;
 	struct sockaddr dst;
 
-	/* for +CIPRECVDATA */
-	size_t bytes_avail;
-
-	/* packets */
-	struct k_fifo fifo_rx_pkt;
-	struct net_pkt *tx_pkt;
-
 	/* sem */
 	struct k_sem sem_data_ready;
 
 	/* work */
 	struct k_work connect_work;
-	struct k_work send_work;
-	struct k_work recv_work;
 	struct k_work recvdata_work;
+	struct k_work close_work;
 
 	/* net context */
 	struct net_context *context;
 	net_context_connect_cb_t connect_cb;
-	net_context_send_cb_t send_cb;
 	net_context_recv_cb_t recv_cb;
 
 	/* callback data */
 	void *conn_user_data;
-	void *send_user_data;
 	void *recv_user_data;
 };
 
@@ -237,6 +227,8 @@ void esp_socket_close(struct esp_socket *sock);
 void esp_socket_rx(struct esp_socket *sock, struct net_buf *buf,
 		   size_t offset, size_t len);
 
+void esp_socket_workq_flush(struct esp_socket *sock);
+
 static inline struct esp_data *esp_socket_to_dev(struct esp_socket *sock)
 {
 	return CONTAINER_OF(sock - sock->idx, struct esp_data, sockets);
@@ -281,6 +273,11 @@ static inline int esp_cmd_send(struct esp_data *data,
 			      handlers, handlers_len, buf, &data->sem_response,
 			      timeout);
 }
+
+void esp_connect_work(struct k_work *work);
+void esp_recv_work(struct k_work *work);
+void esp_recvdata_work(struct k_work *work);
+void esp_close_work(struct k_work *work);
 
 #ifdef __cplusplus
 }

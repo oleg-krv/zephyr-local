@@ -14,6 +14,11 @@ LOG_MODULE_DECLARE(wifi_esp, CONFIG_WIFI_LOG_LEVEL);
 #define RX_NET_PKT_ALLOC_TIMEOUT				\
 	K_MSEC(CONFIG_WIFI_ESP_RX_NET_PKT_ALLOC_TIMEOUT)
 
+struct esp_workq_flush_data {
+	struct k_work work;
+	struct k_sem sem;
+};
+
 /* esp_data->mtx_sock should be held */
 struct esp_socket *esp_socket_get(struct esp_data *data)
 {
@@ -71,19 +76,22 @@ void esp_socket_init(struct esp_data *data)
 		sock->link_id = INVALID_LINK_ID;
 		sock->flags = 0;
 		k_sem_init(&sock->sem_data_ready, 0, 1);
-		k_fifo_init(&sock->fifo_rx_pkt);
+		k_work_init(&sock->connect_work, esp_connect_work);
+		k_work_init(&sock->recvdata_work, esp_recvdata_work);
+		k_work_init(&sock->close_work, esp_close_work);
 	}
 }
 
-static struct net_pkt *esp_prepare_pkt(struct esp_data *dev,
-				       struct net_buf *src,
-				       size_t offset, size_t len)
+static struct net_pkt *esp_socket_prepare_pkt(struct esp_socket *sock,
+					      struct net_buf *src,
+					      size_t offset, size_t len)
 {
+	struct esp_data *data = esp_socket_to_dev(sock);
 	struct net_buf *frag;
 	struct net_pkt *pkt;
 	size_t to_copy;
 
-	pkt = net_pkt_rx_alloc_with_buffer(dev->net_iface, len, AF_UNSPEC,
+	pkt = net_pkt_rx_alloc_with_buffer(data->net_iface, len, AF_UNSPEC,
 					   0, RX_NET_PKT_ALLOC_TIMEOUT);
 	if (!pkt) {
 		return NULL;
@@ -113,6 +121,7 @@ static struct net_pkt *esp_prepare_pkt(struct esp_data *dev,
 		offset = 0;
 	}
 
+	net_pkt_set_context(pkt, sock->context);
 	net_pkt_cursor_init(pkt);
 
 	return pkt;
@@ -130,19 +139,18 @@ void esp_socket_rx(struct esp_socket *sock, struct net_buf *buf,
 		return;
 	}
 
-	pkt = esp_prepare_pkt(data, buf, offset, len);
+	pkt = esp_socket_prepare_pkt(sock, buf, offset, len);
 	if (!pkt) {
 		LOG_ERR("Failed to get net_pkt: len %zu", len);
 		if (sock->type == SOCK_STREAM) {
 			sock->flags |= ESP_SOCK_CLOSE_PENDING;
+			k_work_submit_to_queue(&data->workq, &sock->close_work);
 		}
-		goto submit_work;
+		return;
 	}
 
-	k_fifo_put(&sock->fifo_rx_pkt, pkt);
-
-submit_work:
-	k_work_submit_to_queue(&data->workq, &sock->recv_work);
+	k_work_init(&pkt->work, esp_recv_work);
+	k_work_submit_to_queue(&data->workq, &pkt->work);
 }
 
 void esp_socket_close(struct esp_socket *sock)
@@ -162,4 +170,25 @@ void esp_socket_close(struct esp_socket *sock)
 		LOG_ERR("Failed to close link %d, ret %d",
 			sock->link_id, ret);
 	}
+}
+
+static void esp_workq_flush_work(struct k_work *work)
+{
+	struct esp_workq_flush_data *flush =
+		CONTAINER_OF(work, struct esp_workq_flush_data, work);
+
+	k_sem_give(&flush->sem);
+}
+
+void esp_socket_workq_flush(struct esp_socket *sock)
+{
+	struct esp_data *data = esp_socket_to_dev(sock);
+	struct esp_workq_flush_data flush;
+
+	k_work_init(&flush.work, esp_workq_flush_work);
+	k_sem_init(&flush.sem, 0, 1);
+
+	k_work_submit_to_queue(&data->workq, &flush.work);
+
+	k_sem_take(&flush.sem, K_FOREVER);
 }
