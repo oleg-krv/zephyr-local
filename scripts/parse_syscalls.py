@@ -75,7 +75,7 @@ def analyze_headers(multiple_directories):
                         path.endswith(os.path.join(os.sep, 'toolchain',
                                                    'common.h'))):
                     continue
-                print(path)
+
                 with open(path, "r", encoding="utf-8") as fp:
                     contents = fp.read()
 
