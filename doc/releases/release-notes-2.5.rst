@@ -65,6 +65,13 @@ API Changes
 * The ``CONFIG_BT_CTLR_CODED_PHY`` is now disabled by default for builds
   combining both Bluetooth host and controller.
 
+* The :c:func:`coap_packet_append_payload` function will now take a pointer to a
+  constant buffer as the ``payload`` argument instead of a pointer to a writable
+  buffer.
+
+* The :c:func:`coap_packet_init` function will now take a pointer to a constant
+  buffer as the ``token`` argument instead of a pointer to a writable buffer.
+
 Deprecated in this release
 ==========================
 
@@ -117,11 +124,15 @@ Boards & SoC Support
 
 * Added support for these SoC series:
 
+  * Cypress PSoC-63
+
 * Made these changes in other SoC series:
 
 * Changes for ARC boards:
 
 * Added support for these ARM boards:
+
+  * Cypress CY8CKIT_062_BLE board
 
 * Added support for these SPARC boards:
 
@@ -131,11 +142,17 @@ Boards & SoC Support
 
 * Made these changes in other boards:
 
+  * CY8CKIT_062_WIFI_BT_M0: was renamed to CY8CKIT_062_WIFI_BT.
+  * CY8CKIT_062_WIFI_BT_M4: was moved into CY8CKIT_062_WIFI_BT.
+  * CY8CKIT_062_WIFI_BT: Now M0+/M4 are at same common board.
   * nRF5340 DK: Selected TF-M as the default Secure Processing Element
     (SPE) when building Zephyr for the non-secure domain.
-
+  * SAM4E_XPRO: Added support to SAM-BA ROM bootloader.
+  * SAM4S_XPLAINED: Added support to SAM-BA ROM bootloader.
 
 * Added support for these following shields:
+
+  * Inventek es-WIFI shield
 
 Drivers and Sensors
 *******************
@@ -179,15 +196,24 @@ Drivers and Sensors
 
 * GPIO
 
+  * Added Cypress PSoC-6 driver.
+  * Added Atmel SAM4L driver.
+
 * Hardware Info
 
+  * Added Cypress PSoC-6 driver.
+
 * I2C
+
+  * Added Atmel SAM4L TWIM driver.
 
 * I2S
 
 * IEEE 802.15.4
 
 * Interrupt Controller
+
+  * Added Cypress PSoC-6 Cortex-M0+ interrupt multiplexer driver.
 
 * IPM
 
@@ -229,8 +255,12 @@ Drivers and Sensors
 
 * WiFi
 
+  * Added uart bus interface for eswifi driver.
+
 Networking
 **********
+
+  * Added TagoIO IoT Cloud HTTP post sample.
 
 Bluetooth
 *********
@@ -265,6 +295,13 @@ Build and Infrastructure
     documented in :ref:`dt-from-c`. Information on flash partitions has moved
     to :ref:`flash_map_api`.
 
+* West
+
+  * Improve bossac runner. It supports now native ROM bootloader for Atmel
+    MCUs and extended SAM-BA bootloader like Arduino and Adafruit UF2. The
+    devices supported depend on bossac version inside Zephyr SDK or in users
+    path. The recommended Zephyr SDK version is 0.12.0 or newer.
+
 Libraries / Subsystems
 **********************
 
@@ -281,6 +318,15 @@ Libraries / Subsystems
       from base address of offered upload slot.
 
   * updatehub
+
+    * Added support to Network Manager and interface overlays at UpdateHub
+      sample. Ethernet is the default interface configuration and overlays
+      can be used to change default configuration
+    * Added WIFI overlay
+    * Added MODEM overlay
+    * Added IEEE 802.15.4 overlay [experimental]
+    * Added BLE IPSP overlay as [experimental]
+    * Added OpenThread overlay as [experimental].
 
 * Settings
 

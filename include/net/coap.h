@@ -148,6 +148,8 @@ enum coap_response_code {
 
 #define COAP_CODE_EMPTY (0)
 
+#define COAP_TOKEN_MAX_LEN 8UL
+
 /**
  * @brief Set of Content-Format option values for CoAP.
  *
@@ -300,9 +302,10 @@ uint8_t coap_header_get_type(const struct coap_packet *cpkt);
  * @brief Returns the token (if any) in the CoAP packet.
  *
  * @param cpkt CoAP packet representation
- * @param token Where to store the token
+ * @param token Where to store the token, must point to a buffer containing
+ *              at least COAP_TOKEN_MAX_LEN bytes
  *
- * @return Token length in the CoAP packet.
+ * @return Token length in the CoAP packet (0 - COAP_TOKEN_MAX_LEN).
  */
 uint8_t coap_header_get_token(const struct coap_packet *cpkt, uint8_t *token);
 
@@ -369,7 +372,7 @@ int coap_packet_parse(struct coap_packet *cpkt, uint8_t *data, uint16_t len,
  */
 int coap_packet_init(struct coap_packet *cpkt, uint8_t *data, uint16_t max_len,
 		     uint8_t ver, uint8_t type, uint8_t token_len,
-		     uint8_t *token, uint8_t code, uint16_t id);
+		     const uint8_t *token, uint8_t code, uint16_t id);
 
 /**
  * @brief Returns a randomly generated array of 8 bytes, that can be
@@ -466,7 +469,7 @@ int coap_packet_append_payload_marker(struct coap_packet *cpkt);
  *
  * @return 0 in case of success or negative in case of error.
  */
-int coap_packet_append_payload(struct coap_packet *cpkt, uint8_t *payload,
+int coap_packet_append_payload(struct coap_packet *cpkt, const uint8_t *payload,
 			       uint16_t payload_len);
 
 /**

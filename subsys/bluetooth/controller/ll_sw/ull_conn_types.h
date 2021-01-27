@@ -72,8 +72,15 @@ struct ll_conn {
 #endif /* CONFIG_BT_CTLR_CONN_META */
 			uint8_t  latency_cancel:1;
 			uint8_t  sca:3;
+#if defined(CONFIG_BT_CTLR_LE_ENC)
+			uint8_t  llcp_type;
+#endif /* CONFIG_BT_CTLR_LE_ENC */
+#if defined(CONFIG_BT_CTLR_CONN_RANDOM_FORCE)
 			uint32_t force;
+#endif /* CONFIG_BT_CTLR_CONN_RANDOM_FORCE */
+#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
 			uint32_t ticks_to_offset;
+#endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 		} slave;
 #endif /* CONFIG_BT_PERIPHERAL */
 
@@ -90,30 +97,33 @@ struct ll_conn {
 
 	uint8_t llcp_req;
 	uint8_t llcp_ack;
+
 	uint8_t llcp_type;
 
-	union {
-		struct {
-			uint16_t instant;
-			uint16_t *pdu_win_offset;
-			uint32_t ticks_anchor;
-		} conn_upd;
+	struct {
+		union {
+			struct {
+				uint16_t instant;
+				uint16_t *pdu_win_offset;
+				uint32_t ticks_anchor;
+			} conn_upd;
 
-		struct {
-			uint8_t  initiate:1;
-			uint8_t  chm[5];
-			uint16_t instant;
-		} chan_map;
+			struct {
+				uint8_t  initiate:1;
+				uint8_t  chm[5];
+				uint16_t instant;
+			} chan_map;
 
 #if defined(CONFIG_BT_CTLR_PHY)
-		struct {
-			uint8_t initiate:1;
-			uint8_t cmd:1;
-			uint8_t tx:3;
-			uint8_t rx:3;
-			uint16_t instant;
-		} phy_upd_ind;
+			struct {
+				uint8_t initiate:1;
+				uint8_t cmd:1;
+				uint8_t tx:3;
+				uint8_t rx:3;
+				uint16_t instant;
+			} phy_upd_ind;
 #endif /* CONFIG_BT_CTLR_PHY */
+		};
 
 #if defined(CONFIG_BT_CTLR_LE_ENC)
 		struct {
