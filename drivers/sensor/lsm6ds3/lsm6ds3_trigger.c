@@ -242,6 +242,7 @@ static void lsm6ds3_gpio_callback(const struct device *dev,
 #ifdef CONFIG_LSM6DS3_TRIGGER_OWN_THREAD
 FUNC_NORETURN static void lsm6ds3_thread(struct lsm6ds3_data *lsm6ds3)
 {
+
 	while (1) {
 		k_sem_take(&lsm6ds3->gpio_sem, K_FOREVER);
 		lsm6ds3_handle_interrupt(lsm6ds3->dev);
@@ -281,6 +282,7 @@ int lsm6ds3_init_interrupt(const struct device *dev)
 			(k_thread_entry_t)lsm6ds3_thread, lsm6ds3,
 			NULL, NULL, K_PRIO_COOP(CONFIG_LSM6DS3_THREAD_PRIORITY),
 			0, K_NO_WAIT);
+	k_thread_name_set(&lsm6ds3->thread, "LSM6DS3_TRIGGER");
 #elif defined(CONFIG_LSM6DS3_TRIGGER_GLOBAL_THREAD)
 	lsm6ds3->work.handler = lsm6ds3_work_cb;
 #endif /* CONFIG_LSM6DS3_TRIGGER_OWN_THREAD */
