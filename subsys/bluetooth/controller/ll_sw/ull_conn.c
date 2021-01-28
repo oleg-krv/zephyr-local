@@ -2197,12 +2197,6 @@ static inline void event_conn_upd_init(struct ll_conn *conn,
 				       struct mayfly *mfy_sched_offset,
 				       void (*fp_mfy_select_or_use)(void *))
 {
-	/* move to in progress */
-	conn->llcp_cu.state = LLCP_CUI_STATE_INPROG;
-
-	/* set instant */
-	conn->llcp.conn_upd.instant = event_counter + conn->lll.latency + 6;
-
 	/* place the conn update req packet as next in tx queue */
 	pdu_ctrl_tx->ll_id = PDU_DATA_LLID_CTRL;
 	pdu_ctrl_tx->len = offsetof(struct pdu_data_llctrl, conn_update_ind) +
@@ -2218,10 +2212,11 @@ static inline void event_conn_upd_init(struct ll_conn *conn,
 		sys_cpu_to_le16(conn->llcp_cu.latency);
 	pdu_ctrl_tx->llctrl.conn_update_ind.timeout =
 		sys_cpu_to_le16(conn->llcp_cu.timeout);
-	pdu_ctrl_tx->llctrl.conn_update_ind.instant =
-		sys_cpu_to_le16(conn->llcp.conn_upd.instant);
 
 #if defined(CONFIG_BT_CTLR_SCHED_ADVANCED)
+	/* move to offset calculation requested state */
+	conn->llcp_cu.state = LLCP_CUI_STATE_OFFS_REQ;
+
 	{
 		uint32_t retval;
 
@@ -2257,6 +2252,9 @@ static inline void event_conn_upd_init(struct ll_conn *conn,
 	ARG_UNUSED(ticks_at_expire);
 	ARG_UNUSED(mfy_sched_offset);
 	ARG_UNUSED(fp_mfy_select_or_use);
+
+	/* move to in progress */
+	conn->llcp_cu.state = LLCP_CUI_STATE_INPROG;
 #endif /* !CONFIG_BT_CTLR_SCHED_ADVANCED */
 }
 
@@ -2281,15 +2279,69 @@ static inline int event_conn_upd_prep(struct ll_conn *conn, uint16_t lazy,
 	instant_latency = (event_counter - conn->llcp.conn_upd.instant) &
 			  0xffff;
 	if (conn->llcp_cu.state != LLCP_CUI_STATE_INPROG) {
+		struct pdu_data *pdu_ctrl_tx;
+		struct node_rx_pdu *rx;
+		struct node_tx *tx;
 #if defined(CONFIG_BT_CTLR_SCHED_ADVANCED)
 		static memq_link_t s_link;
 		static struct mayfly s_mfy_sched_offset = {0, 0,
 			&s_link, 0, 0 };
 		void (*fp_mfy_select_or_use)(void *) = NULL;
-#endif /* CONFIG_BT_CTLR_SCHED_ADVANCED */
-		struct pdu_data *pdu_ctrl_tx;
-		struct node_rx_pdu *rx;
-		struct node_tx *tx;
+
+		switch (conn->llcp_cu.state) {
+		case LLCP_CUI_STATE_USE:
+			fp_mfy_select_or_use = ull_sched_mfy_win_offset_use;
+			break;
+
+#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
+		case LLCP_CUI_STATE_SELECT:
+			fp_mfy_select_or_use = ull_sched_mfy_win_offset_select;
+			break;
+
+		case LLCP_CUI_STATE_REJECT:
+			/* procedure request acked */
+			conn->llcp_ack = conn->llcp_req;
+			conn->llcp_cu.ack = conn->llcp_cu.req;
+			conn->llcp_conn_param.ack = conn->llcp_conn_param.req;
+
+			/* reset mutex */
+			ull_conn_upd_curr_reset();
+
+			/* enqueue control PDU */
+			pdu_ctrl_tx =
+				CONTAINER_OF(conn->llcp.conn_upd.pdu_win_offset,
+					     struct pdu_data,
+					     llctrl.conn_update_ind.win_offset);
+			tx = CONTAINER_OF(pdu_ctrl_tx, struct node_tx, pdu);
+			ctrl_tx_enqueue(conn, tx);
+			return -ECANCELED;
+#endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
+
+		case LLCP_CUI_STATE_OFFS_REQ:
+			return -EBUSY;
+
+		case LLCP_CUI_STATE_OFFS_RDY:
+			/* set instant */
+			conn->llcp.conn_upd.instant = event_counter +
+						      conn->lll.latency + 6;
+			pdu_ctrl_tx =
+				CONTAINER_OF(conn->llcp.conn_upd.pdu_win_offset,
+					     struct pdu_data,
+					     llctrl.conn_update_ind.win_offset);
+			pdu_ctrl_tx->llctrl.conn_update_ind.instant =
+				sys_cpu_to_le16(conn->llcp.conn_upd.instant);
+			/* move to in progress */
+			conn->llcp_cu.state = LLCP_CUI_STATE_INPROG;
+			/* enqueue control PDU */
+			tx = CONTAINER_OF(pdu_ctrl_tx, struct node_tx, pdu);
+			ctrl_tx_enqueue(conn, tx);
+			return -EINPROGRESS;
+
+		default:
+			LL_ASSERT(0);
+			break;
+		}
+#endif /* !CONFIG_BT_CTLR_SCHED_ADVANCED */
 
 		rx = ll_pdu_rx_alloc_peek(1);
 		if (!rx) {
@@ -2308,32 +2360,20 @@ static inline int event_conn_upd_prep(struct ll_conn *conn, uint16_t lazy,
 		pdu_ctrl_tx = (void *)tx->pdu;
 
 #if defined(CONFIG_BT_CTLR_SCHED_ADVANCED)
-		switch (conn->llcp_cu.state) {
-		case LLCP_CUI_STATE_USE:
-			fp_mfy_select_or_use = ull_sched_mfy_win_offset_use;
-			break;
-
-#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
-		case LLCP_CUI_STATE_SELECT:
-			fp_mfy_select_or_use = ull_sched_mfy_win_offset_select;
-			break;
-#endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
-
-		default:
-			LL_ASSERT(0);
-			break;
-		}
-
 		event_conn_upd_init(conn, event_counter, ticks_at_expire,
 				    pdu_ctrl_tx, &s_mfy_sched_offset,
 				    fp_mfy_select_or_use);
 #else /* !CONFIG_BT_CTLR_SCHED_ADVANCED */
 		event_conn_upd_init(conn, event_counter, ticks_at_expire,
 				    pdu_ctrl_tx, NULL, NULL);
-#endif /* !CONFIG_BT_CTLR_SCHED_ADVANCED */
-
+		/* set instant */
+		conn->llcp.conn_upd.instant = event_counter +
+					      conn->lll.latency + 6;
+		pdu_ctrl_tx->llctrl.conn_update_ind.instant =
+			sys_cpu_to_le16(conn->llcp.conn_upd.instant);
+		/* enqueue control PDU */
 		ctrl_tx_enqueue(conn, tx);
-
+#endif /* !CONFIG_BT_CTLR_SCHED_ADVANCED */
 	} else if (instant_latency <= 0x7FFF) {
 		uint32_t ticks_win_offset = 0;
 		uint32_t ticks_slot_overhead;
@@ -2470,7 +2510,10 @@ static inline int event_conn_upd_prep(struct ll_conn *conn, uint16_t lazy,
 				(conn_interval_us >> 1) - EVENT_IFS_US;
 			lll->slave.window_size_prepare_us =
 				conn->llcp_cu.win_size * CONN_INT_UNIT_US;
+
+#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
 			conn->slave.ticks_to_offset = 0U;
+#endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 
 			lll->slave.window_widening_prepare_us +=
 				lll->slave.window_widening_periodic_us *
@@ -3031,9 +3074,6 @@ static inline void event_conn_param_req(struct ll_conn *conn,
 		return;
 	}
 
-	/* move to wait for conn_update/rsp/rej */
-	conn->llcp_conn_param.state = LLCP_CPR_STATE_RSP_WAIT;
-
 	/* place the conn param req packet as next in tx queue */
 	pdu_ctrl_tx = (void *)tx->pdu;
 	pdu_ctrl_tx->ll_id = PDU_DATA_LLID_CTRL;
@@ -3046,15 +3086,12 @@ static inline void event_conn_param_req(struct ll_conn *conn,
 	p->latency = sys_cpu_to_le16(conn->llcp_conn_param.latency);
 	p->timeout = sys_cpu_to_le16(conn->llcp_conn_param.timeout);
 	p->preferred_periodicity = 0U;
-	p->reference_conn_event_count = sys_cpu_to_le16(event_counter);
 	p->offset0 = sys_cpu_to_le16(0x0000);
 	p->offset1 = sys_cpu_to_le16(0xffff);
 	p->offset2 = sys_cpu_to_le16(0xffff);
 	p->offset3 = sys_cpu_to_le16(0xffff);
 	p->offset4 = sys_cpu_to_le16(0xffff);
 	p->offset5 = sys_cpu_to_le16(0xffff);
-
-	ctrl_tx_enqueue(conn, tx);
 
 	/* set CUI/CPR mutex */
 	conn_upd_curr = conn;
@@ -3065,6 +3102,9 @@ static inline void event_conn_param_req(struct ll_conn *conn,
 	conn->procedure_expire = conn->procedure_reload;
 
 #if defined(CONFIG_BT_CTLR_SCHED_ADVANCED)
+	/* move to wait for offset calculations */
+	conn->llcp_conn_param.state = LLCP_CPR_STATE_OFFS_REQ;
+
 	{
 		static memq_link_t s_link;
 		static struct mayfly s_mfy_sched_offset = {0, 0, &s_link, NULL,
@@ -3096,6 +3136,13 @@ static inline void event_conn_param_req(struct ll_conn *conn,
 	}
 #else /* !CONFIG_BT_CTLR_SCHED_ADVANCED */
 	ARG_UNUSED(ticks_at_expire);
+
+	/* set reference counter value */
+	p->reference_conn_event_count = sys_cpu_to_le16(event_counter);
+	/* move to wait for conn_update_rsp/rej */
+	conn->llcp_conn_param.state = LLCP_CPR_STATE_RSP_WAIT;
+	/* enqueue control PDU */
+	ctrl_tx_enqueue(conn, tx);
 #endif /* !CONFIG_BT_CTLR_SCHED_ADVANCED */
 }
 
@@ -3280,6 +3327,32 @@ static inline void event_conn_param_prep(struct ll_conn *conn,
 	case LLCP_CPR_STATE_UPD:
 		/* Do nothing */
 		break;
+
+#if defined(CONFIG_BT_CTLR_SCHED_ADVANCED)
+	case LLCP_CPR_STATE_OFFS_REQ:
+		/* Do nothing */
+		break;
+
+	case LLCP_CPR_STATE_OFFS_RDY:
+	{
+		struct pdu_data *pdu_ctrl_tx;
+		struct node_tx *tx;
+
+		/* set reference counter value */
+		pdu_ctrl_tx =
+			CONTAINER_OF(conn->llcp_conn_param.pdu_win_offset0,
+				     struct pdu_data,
+				     llctrl.conn_param_req.offset0);
+		pdu_ctrl_tx->llctrl.conn_param_req.reference_conn_event_count =
+			sys_cpu_to_le16(event_counter);
+		/* move to wait for conn_update_rsp/rej */
+		conn->llcp_conn_param.state = LLCP_CPR_STATE_RSP_WAIT;
+		/* enqueue control PDU */
+		tx = CONTAINER_OF(pdu_ctrl_tx, struct node_tx, pdu);
+		ctrl_tx_enqueue(conn, tx);
+	}
+	break;
+#endif /* CONFIG_BT_CTLR_SCHED_ADVANCED */
 
 	default:
 		LL_ASSERT(0);
@@ -4255,6 +4328,7 @@ static int feature_rsp_send(struct ll_conn *conn, struct node_rx_pdu *rx,
 	return 0;
 }
 
+#if defined(CONFIG_BT_CENTRAL) || defined(CONFIG_BT_CTLR_SLAVE_FEAT_REQ)
 static void feature_rsp_recv(struct ll_conn *conn, struct pdu_data *pdu_rx)
 {
 	struct pdu_data_llctrl_feature_rsp *rsp;
@@ -4278,6 +4352,7 @@ static void feature_rsp_recv(struct ll_conn *conn, struct pdu_data *pdu_rx)
 	conn->llcp_feature.ack = conn->llcp_feature.req;
 	conn->procedure_expire = 0U;
 }
+#endif /* CONFIG_BT_CENTRAL || CONFIG_BT_CTLR_SLAVE_FEAT_REQ */
 
 #if defined(CONFIG_BT_CTLR_LE_ENC)
 static int pause_enc_rsp_send(struct ll_conn *conn, struct node_rx_pdu *rx,

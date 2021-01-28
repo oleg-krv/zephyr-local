@@ -146,8 +146,11 @@ struct ll_conn {
 		enum {
 			LLCP_CUI_STATE_INPROG,
 			LLCP_CUI_STATE_USE,
-			LLCP_CUI_STATE_SELECT
-		} state:2 __packed;
+			LLCP_CUI_STATE_SELECT,
+			LLCP_CUI_STATE_OFFS_REQ,
+			LLCP_CUI_STATE_OFFS_RDY,
+			LLCP_CUI_STATE_REJECT,
+		} state:3 __packed;
 		uint8_t  cmd:1;
 		uint16_t interval;
 		uint16_t latency;
@@ -215,7 +218,9 @@ struct ll_conn {
 			LLCP_CPR_STATE_APP_REQ,
 			LLCP_CPR_STATE_APP_WAIT,
 			LLCP_CPR_STATE_RSP_WAIT,
-			LLCP_CPR_STATE_UPD
+			LLCP_CPR_STATE_UPD,
+			LLCP_CPR_STATE_OFFS_REQ,
+			LLCP_CPR_STATE_OFFS_RDY,
 		} state:3 __packed;
 		uint8_t  cmd:1;
 		uint8_t  disabled:1;
