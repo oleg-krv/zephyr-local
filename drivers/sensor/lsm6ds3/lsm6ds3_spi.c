@@ -98,8 +98,8 @@ int lsm6ds3_spi_init(const struct device *dev)
 {
 	struct lsm6ds3_data *data = dev->data;
 
-	data->ctx_spi.read_reg = (stmdev_read_ptr) lsm6ds3_spi_read,
-	data->ctx_spi.write_reg = (stmdev_write_ptr) lsm6ds3_spi_write,
+	data->ctx_spi.read_reg = (stmdev_read_ptr) lsm6ds3_spi_read;
+	data->ctx_spi.write_reg = (stmdev_write_ptr) lsm6ds3_spi_write;
 
 	data->ctx = &data->ctx_spi;
 	data->ctx->handle = data;

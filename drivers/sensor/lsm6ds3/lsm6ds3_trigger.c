@@ -282,7 +282,7 @@ int lsm6ds3_init_interrupt(const struct device *dev)
 			(k_thread_entry_t)lsm6ds3_thread, lsm6ds3,
 			NULL, NULL, K_PRIO_COOP(CONFIG_LSM6DS3_THREAD_PRIORITY),
 			0, K_NO_WAIT);
-	k_thread_name_set(&lsm6ds3->thread, "LSM6DS3_TRIGGER");
+	k_thread_name_set(&lsm6ds3->thread, "lsm6ds3 trigger");
 #elif defined(CONFIG_LSM6DS3_TRIGGER_GLOBAL_THREAD)
 	lsm6ds3->work.handler = lsm6ds3_work_cb;
 #endif /* CONFIG_LSM6DS3_TRIGGER_OWN_THREAD */
