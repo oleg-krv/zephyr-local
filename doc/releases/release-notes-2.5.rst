@@ -72,6 +72,13 @@ API Changes
 * The :c:func:`coap_packet_init` function will now take a pointer to a constant
   buffer as the ``token`` argument instead of a pointer to a writable buffer.
 
+* A new :ref:`regulator_api` API has been added to support controlling power
+  sources.  Regulators can also be associated with devicetree nodes, allowing
+  drivers to ensure the device they access has been powered up.  For simple
+  GPIO-only regulators a devicetree property ``supply-gpios`` is defined as a
+  standard way to identify the control signal in nodes that support power
+  control.
+
 Deprecated in this release
 ==========================
 
@@ -85,6 +92,30 @@ Deprecated in this release
 
 Removed APIs in this release
 ============================
+
+* Bluetooth
+
+  * The deprecated BT_LE_SCAN_FILTER_DUPLICATE define has been removed,
+    use BT_LE_SCAN_OPT_FILTER_DUPLICATE instead.
+  * The deprecated BT_LE_SCAN_FILTER_WHITELIST define has been removed,
+    use BT_LE_SCAN_OPT_FILTER_WHITELIST instead.
+  * The deprecated bt_le_scan_param::filter_dup argument has been removed,
+    use bt_le_scan_param::options instead.
+  * The deprecated bt_conn_create_le() function has been removed,
+    use bt_conn_le_create() instead.
+  * The deprecated bt_conn_create_auto_le() function has been removed,
+    use bt_conn_le_create_auto() instead.
+  * The deprecated bt_conn_create_slave_le() function has been removed,
+    use bt_le_adv_start() instead with bt_le_adv_param::peer set to the remote
+    peers address.
+  * The deprecated BT_LE_ADV_* macros have been removed,
+    use the BT_GAP_ADV_* enums instead.
+  * The deprecated bt_conn_security function has been removed,
+    use bt_conn_set_security instead.
+  * The deprecated BT_SECURITY_* defines NONE, LOW, MEDIUM, HIGH, FIPS have been
+    removed, use the L0, L1, L2, L3, L4 defines instead.
+  * The deprecated BT_HCI_ERR_AUTHENTICATION_FAIL define has been removed,
+    use BT_HCI_ERR_AUTH_FAIL instead.
 
 Stable API changes in this release
 ==================================
@@ -164,6 +195,26 @@ Drivers and Sensors
 * Bluetooth
 
 * CAN
+
+  * We reworked the configuration API.
+    A user can now specify the timing manually (define prop segment,
+    phase segment1, phase segment2, and prescaler) or use a newly introduced
+    algorithm to calculate optimal timing values from a bitrate and sample point.
+    The bitrate and sample point can be specified in the device tree too.
+    It is possible to change the timing values at runtime now.
+
+  * We reworked the zcan_frame struct due to undefined behavior.
+    The std_id (11-bit) and ext_id (29-bit) are merged to a single id
+    field (29-bit). The union of both IDs was removed.
+
+  * We made the CANbus API CAN-FD compatible.
+    The zcan_frame data-field can have a size of >8 bytes now.
+    A flag was introduced to mark a zcan_frame as CAN-FD frame.
+    A flag was introduced that enables a bitrate switch in CAN-FD frames.
+    The configuration API supports an additional timing parameter for the CAN-FD
+    data-phase.
+
+  * drivers are converted to use the new DEVICE_DT_* macros.
 
 * Clock Control
 
