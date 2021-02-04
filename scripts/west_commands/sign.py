@@ -7,6 +7,7 @@ import argparse
 import os
 import pathlib
 import pickle
+import platform
 import shutil
 import subprocess
 import sys
@@ -213,7 +214,7 @@ class ImgtoolSigner(Signer):
         args = command.args
         b = pathlib.Path(build_dir)
 
-        tool_path = self.find_imgtool(command, args)
+        imgtool = self.find_imgtool(command, args)
         # The vector table offset is set in Kconfig:
         vtoff = self.get_cfg(command, bcfg, 'CONFIG_ROM_START_OFFSET')
         # Flash device write alignment and the partition's slot size
@@ -259,11 +260,11 @@ class ImgtoolSigner(Signer):
         # We provide a default --version in case the user is just
         # messing around and doesn't want to set one. It will be
         # overridden if there is a --version in args.tool_args.
-        sign_base = [tool_path, 'sign',
-                     '--version', '0.0.0+0',
-                     '--align', str(align),
-                     '--header-size', str(vtoff),
-                     '--slot-size', str(size)]
+        sign_base = imgtool + ['sign',
+                               '--version', '0.0.0+0',
+                               '--align', str(align),
+                               '--header-size', str(vtoff),
+                               '--slot-size', str(size)]
         sign_base.extend(args.tool_args)
 
         if not args.quiet:
@@ -288,16 +289,25 @@ class ImgtoolSigner(Signer):
     @staticmethod
     def find_imgtool(command, args):
         if args.tool_path:
-            command.check_force(shutil.which(args.tool_path),
-                                '--tool-path {}: not an executable'.
-                                format(args.tool_path))
-            tool_path = args.tool_path
+            imgtool = args.tool_path
+            if not os.path.isfile(imgtool):
+                log.die(f'--tool-path {imgtool}: no such file')
         else:
-            tool_path = shutil.which('imgtool') or shutil.which('imgtool.py')
-            if not tool_path:
+            imgtool = shutil.which('imgtool') or shutil.which('imgtool.py')
+            if not imgtool:
                 log.die('imgtool not found; either install it',
                         '(e.g. "pip3 install imgtool") or provide --tool-path')
-        return tool_path
+
+        if platform.system() == 'Windows' and imgtool.endswith('.py'):
+            # Windows users may not be able to run .py files
+            # as executables in subprocesses, regardless of
+            # what the mode says. Always run imgtool as
+            # 'python path/to/imgtool.py' instead of
+            # 'path/to/imgtool.py' in these cases.
+            # https://github.com/zephyrproject-rtos/zephyr/issues/31876
+            return [sys.executable, imgtool]
+
+        return [imgtool]
 
     @staticmethod
     def get_cfg(command, bcfg, item):
