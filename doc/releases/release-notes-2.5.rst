@@ -192,6 +192,11 @@ Boards & SoC Support
   * Generic LEON3 board configuration for GRLIB FPGA reference designs
   * SPARC QEMU for emulating LEON3 processors and running kernel tests
 
+* Added support for these NXP boards:
+
+  * LPCXpresso55S28
+  * MIMXRT1024-EVK
+
 * Added support for these STM32 boards and SoCs :
 
   * Cortex-M Trace Reference Board V1.2 (SEGGER TRB STM32F407)
@@ -232,6 +237,12 @@ Boards & SoC Support
     (SPE) when building Zephyr for the non-secure domain.
   * SAM4E_XPRO: Added support to SAM-BA ROM bootloader.
   * SAM4S_XPLAINED: Added support to SAM-BA ROM bootloader.
+  * Extended LPCXpresso55S69 to support dual-core.
+  * Enhanced MIMXRT1064-EVK to support QSPI flash storage and LittleFS.
+  * Updated MIMXRT685-EVK to increase the core clock frequency.
+  * Updated NXP i.MX RT, Kinetis, and LPC boards to enable hardware stack
+    protection by default.
+  * Fixed Segger RTT and SystemView support on NXP i.MX RT boards.
 
 * Added support for these following shields:
 
@@ -271,6 +282,8 @@ Drivers and Sensors
 
 * Clock Control
 
+  * Added NXP LPC driver.
+
 * Console
 
 * Counter
@@ -298,6 +311,11 @@ Drivers and Sensors
 
 * Ethernet
 
+  * Added support for Distributed Switch Architecture (DSA) devices.
+    Currently only ip_k66f board supports DSA.
+  * Added support for w5500 Ethernet controller.
+  * Reworked the NXP MCUX driver to use DT_INST_FOREACH.
+
 * Flash
 
   * CONFIG_NORDIC_QSPI_NOR_QE_BIT has been removed.  The
@@ -305,6 +323,8 @@ Drivers and Sensors
   * MPU_ALLOW_FLASH_WRITE is now default on STM32 boards when MPU is enabled.
   * Add driver for STM32H7 and STM32L1 SoC series.
   * Add QSPI NOR Flash controller support for STM32 family.
+  * Added NXP LPC legacy flash driver.
+  * Added NXP FlexSPI flash driver for i.MX RT SoCs.
 
 * GPIO
 
@@ -322,6 +342,17 @@ Drivers and Sensors
 * I2S
 
 * IEEE 802.15.4
+
+  * nRF:
+
+    * Added IEEE 802.15.4 support for nRF5340.
+    * Added support for failed rx notification.
+
+  * cc13xx/cc26xx:
+
+    * Added multi-protocol radio support.
+    * Added sub-ghz support.
+    * Added raw mode support.
 
 * Interrupt Controller
 
@@ -343,6 +374,39 @@ Drivers and Sensors
 
 * Modem
 
+  * Improved RX with HW flow control in modem interface API.
+  * Improved reading from interface in command handler.
+  * Fixed race condition when waiting on cmd reply.
+  * Added support for Quectel bg95 modem.
+  * Constified modem command structures to reduce RAM usage.
+
+  * hl7800:
+
+    * Fixed buffer handling issues.
+    * Fixed setting DNS address.
+    * Fixed file open in fw update.
+    * Fixed cases where socket would not close.
+
+  * sara-r4:
+
+    * Added sanity timeout for @ prompt.
+    * Fixed redundant wait after sendto.
+    * Improved offload_sendmsg() support.
+    * Added Kconfig to configure RSSI work.
+    * Added direct CMD to catch @ when sending data.
+    * Sanitize send_socket_data() semaphore handling.
+
+  * bg96:
+
+    * Fixed UDP packet management.
+
+  * GSM:
+
+    * Added start/stop API support so that application can turn off
+      the GSM/PPP modem if needed to save power.
+    * Avoid wrapping each byte in muxing headers in PPP.
+    * Added support to remove PPP IPv4 ipcp address on network down.
+
 * PECI
 
 * Pinmux
@@ -356,11 +420,27 @@ Drivers and Sensors
 
 * Sensor
 
+  * Fixed current conversion to milliamps in the MAX17055 driver.
+  * Added multi-instance support to the FXOS8700, IIS2DLPC, and IIS2ICLX
+    drivers.
+  * Added Invensense ICM42605 driver.
+  * Added NXP MCUX ACMP driver.
+  * Fixed gyro units in the FXAS21002 driver.
+  * Fixed pressure and temperature registers in the DPS310 driver.
+  * Added I2C support to the BMI160 driver.
+  * Added IIS2ICLX driver.
+  * Aligned ST sensor drivers to stmemsc HAL i/f v1.03.
+  * Fixed temperature units in the IIS2MDC driver.
+  * Added emulator for Bosch BMI160 accelerometer.
+  * Added device power management support to the LIS2MDL driver.
+
 * Serial
 
   * Added ASYNC API support on STM32 family.
 
 * SPI
+
+  * Enhanced NXP MCUX Flexcomm driver to support DMA.
 
 * Timer
 
@@ -374,14 +454,145 @@ Drivers and Sensors
 
 * Watchdog
 
+  * Added NXP i.MX RT driver.
+
 * WiFi
 
-  * Added uart bus interface for eswifi driver.
+  * eswifi:
+
+    * Added uart bus interface. This enables all Inventek modules with
+      IWIN AT Commands firmware.
+
+  * esp:
+
+    * Fixed thread-safety access on esp_socket operations.
+    * Fixed scheduling each RX packet on separate work thread.
+    * Fixed initializing socket work structures only once.
+    * Reworked +IPD and +CIPRECVDATA handling.
+    * Stopped locking scheduler when sending data.
+    * Added DHCP/Static IP Support.
+    * Added support using DNS servers.
+    * Enhanced CWMODE support.
+    * Added support for configuring hostname.
+    * Added support for power-gpios to enable ESP module.
+    * Added support 32-bit length in +IPD.
+    * Added support for reconfiguring UART baudrate after initial communication.
+    * Improved packet allocation failure handling by closing stream sockets.
 
 Networking
 **********
 
+* CoAP:
+
+  * Fixed discovery response formatting according to RFC6690.
+  * Randomized initial ACK timeout.
+  * Reworked pending retransmission logic.
+  * Fixed long options encoding.
+
+* DHCPv4:
+
+  * Added start/bound/stop network management events for DHCPv4.
+  * Fixed timeout scheduling with multiple network interfaces.
+  * Fixed timeout on entry to bound state.
+  * Fixed invalid timeout on send failure.
+  * Fixed bounds checking in timeout.
+  * Fixed endian issue.
+  * Added randomization to message interval.
+  * Limited message interval to a maximum of 64 seconds.
+
+* DNS:
+
+  * Added resolving literal IP addresses even when DNS is disabled.
+  * Added support for DNS Service Discovery (dns-sd).
+  * Fixed getaddrinfo() to respect socket type hints.
+
+* HTTP:
+
+  * Added chunked encoding body support to HTTP client API.
+
+* IPv6:
+
+  * Tweaked IPv6 DAD and RS timeout handling.
+  * Fixed multiple endian issues.
+  * Fixed unaligned access to IPv6 address.
+
+* LwM2M:
+
+  * Added dimension discovery support.
+  * Implemented bootstrap discovery.
+  * Fixed message find based on pending/reply.
+  * Reworked bootstrap DELETE operation.
+  * Added path generation macro.
+  * Added a way to notify the application on network error.
+  * Added a callback to notify socket errors to applications.
+  * Send Registration Update on lifetime changes.
+  * Fixed PULL FW update in case of URI parse errors.
+  * Fixed separate response handling.
+  * Start notify sequence numbers on 0.
+  * Enhanced packing of TLV integers more efficiently.
+  * Improved token generation.
+  * Fixed the bootstrap to be optional.
+
+* Misc:
+
+  * Allow user to select pre-emptive or co-operative RX/TX threads.
+  * Refactored RX and TX thread priorities.
+  * Only start the network logging backend if the autostarting is enabled.
+  * Added support for simultaneous UDP/TCP and raw sockets in applications.
+  * Enabled solicit node multicast group registration for Bluetooth IPSP
+    connections.
+  * Added net_buf_remove API to manipulate data at the end of network buffers.
+  * Added checks to syslog-net that ensure immediate logging mode is not set as
+    the network logging is not compatible with it.
+  * Implemented SO_RCVTIMEO socket receive timeout option.
+  * Added support to update unique hostname on link address changes.
+  * Added locking to IPv6, CAN and packet socket bind calls.
+  * Added network management events monitor support.
+
+* MQTT:
+
+  * Reset client state before notifying application with MQTT_EVT_DISCONNECT event.
+
+* OpenThread:
+
+  * Added support for RCP (Radio Co-Processor) mode.
+  * Made radio workqueue stack size configurable.
+  * Added joining thread multicast addresses which are added to Zephyr.
+  * Added SRP Kconfig options.
+  * Enabled CSL and TREL config options.
+  * Added option to enable software CSMA backoff.
+  * Added support to configure platform info.
+  * Added Kconfigs to change values in Zephyr.
+  * Removed unused defines from platform configuration.
+
+* Samples:
+
   * Added TagoIO IoT Cloud HTTP post sample.
+  * Fixed the return code in MQTT Docker tests.
+  * Added support to allow DHCPv4 or manually set addresses in zperf sample.
+  * Use IPv4 instead of IPv6 in coap-server to support Docker based testing.
+  * Added connection manager support to dumb_http_server_mt sample.
+  * Added support for large file in dumb_http_server_mt sample.
+  * Added support for running the gptp sample X seconds to support Docker based testing.
+  * Added Docker based testing to http_client sample.
+  * Refractored code structure and reduced RAM usage of civetweb sample.
+  * Added suspend/resume shell commands to gsm_modem sample.
+  * Added Docker based testing support to network logging sample.
+
+* TCP:
+
+  * The new TCP stack is enabled by default. Legacy TCP stack is deprecated but
+    still available and scheduled for removal in next 2.6 release.
+  * Added support to queue received out-of-order TCP data.
+  * Added connection termination if the TCP handshake is not finalized.
+  * Enhanced received TCP RST packet handling.
+  * Fixed TCP connection from Windows 10.
+
+* TLS:
+
+  * Use Maximum Fragment Length (MFL) extension by default.
+  * Added ALPN extension option to TLS.
+  * Fixed TLS context leak on socket allocation failure.
 
 Bluetooth
 *********
