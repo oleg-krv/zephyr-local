@@ -142,22 +142,100 @@ Stable API changes in this release
 Kernel
 ******
 
+* Thread Local Storage (TLS)
+
+  * Introduced thread local storage support for the following architectures:
+
+    * ARC
+    * Arm Cortex-M
+    * Arm Cortex-R
+    * AArch64
+    * RISC-V
+    * Sparc
+    * x86 and x86_64
+    * Xtensa
+
+  * This allows variables declared with ``__thread`` keyword to be allocated
+    on a per-thread basis, and every thread has its own copy of these
+    variables.
+  * Enable via :option:`CONFIG_THREAD_LOCAL_STORAGE`.
+  * ``errno`` can be stored inside TLS if :option:`CONFIG_ERRNO_IN_TLS`
+    is enabled (together with :option:`CONFIG_ERRNO`). This allow user
+    threads to access the value of ``errno`` without making a system call.
+
+* Memory Management
+
+  * Added page frame management for physical memory to keep track of
+    the status of each page frame.
+  * Added :c:func:`k_mem_map` which allows applications to increase
+    the data space available via anonymous memory mappings.
+  * Added :c:func:`k_mem_free_get` which returns the amount of
+    physical anonymous memory remaining.
+  * Paging structure must now be pre-allocated so that there is no need
+    to do memory allocations when mapping memory. Because of this,
+    :c:func:`arch_mem_map` may no longer fail.
+
+* Demand Paging
+
+  * Introduced the framework for demand paging and infrastructure for
+    custom eviction algorithms and implementation of backing stores.
+  * Currently the whole kernel is pinned and remaining physical memory
+    can be used for paging.
+
 Architectures
 *************
 
 * ARC
+
+  * Fixed execution on ARC HS with one interrupt bank and fast interrupts (FIRQ)
+    enabled
+  * Hardened SMP support
+  * Improved mdb west runner to support simulation on SMP nSIM-based
+    configurations
+  * Improved mdb west runner to support nSIM-based configurations execution
+    on real HW (FPGA-based)
+  * Added documentation page with Zephyr support status on ARC processor
+  * Added coverage support for nSIM-based configurations
+  * Switched to upstream OpenOCD for ARC
+  * Various minor fixes/improvements for ARC MWDT toolchain infrastructure
 
 * ARM
 
   * AARCH32
 
     * Introduced the functionality for chain-loadable Zephyr
-      fimrmware images to force the initialization of internal
+      firmware images to force the initialization of internal
       architecture state during early system boot (Cortex-M).
     * Changed the default Floating Point Services mode to
       Shared FP registers mode.
+    * Enhanced Cortex-M Shared FP register mode by implementing
+      dynamic lazy FP register stacking in threads.
+    * Added preliminary support for Cortex-R7 variant.
+    * Fixed inline assembly code in Cortex-M system calls.
+    * Enhanced and fixed Cortex-M TCS support.
+    * Enabled interrupts before switching to main in single-thread
+      Cortex-M builds (CONFIG_MULTITHREADING=n).
+    * Fixed vector table relocation in non-XIP Cortex-M builds.
+    * Fixed exception exit routine for fatal error exceptions in
+      Cortex-R.
+    * Fixed interrupt nesting in ARMv7-R architecture.
+
 
   * AARCH64
+
+    * Fixed registers printing on error and beautified crash dump output
+    * Removed CONFIG_SWITCH_TO_EL1 symbol. By default the execution now drops
+      to EL1 at boot
+    * Deprecated booting from EL2
+    * Improved assembly code and errors catching in EL3 and EL1 during the
+      start routine
+    * Enabled support for EL0 in the page tables
+    * Fixed vector table alignment
+    * Introduced support to boot Zephyr in NS mode
+    * Fixed alignment fault in z_bss_zero
+    * Added PSCI driver
+    * Added ability to generate image header
+    * Improved MMU code and driver
 
 * POSIX
 
@@ -171,20 +249,44 @@ Architectures
 
 * x86
 
+  * ``CONFIG_X86_MMU_PAGE_POOL_PAGES`` is removed as paging structure
+    must now be pre-allocated.
+  * Mapping of physical memory has changed:
+
+    * This allows a smaller virtual address space thus requiring a smaller
+      paging structure.
+    * Only the kernel image is mapped when :option:`CONFIG_ACPI` is not enabled.
+    * When :option:`CONFIG_ACPI` is enabled, the previous behavior to map
+      all physical memory is retained as platforms with ACPI are usually not
+      memory constrained and can accommodate bigger paging structure.
+
+  * Page fault handler has been extended to support demand paging.
+
 Boards & SoC Support
 ********************
 
 * Added support for these SoC series:
 
   * Cypress PSoC-63
+  * Intel Elkhart Lake
 
 * Made these changes in other SoC series:
 
 * Changes for ARC boards:
 
+  * Added icount support for ARC QEMU boards
+  * Added MWDT compiler options for HSDK board
+  * Added missing taps into JTAG chain for the dual-core configuration of the
+    HSDK board
+
 * Added support for these ARM boards:
 
   * Cypress CY8CKIT_062_BLE board
+
+*  Added support for these x86 boards:
+
+  * Elkhart Lake CRB board
+  * ACRN configuration on Elkhart Lake CRB board
 
 * Added support for these SPARC boards:
 
@@ -217,7 +319,7 @@ Boards & SoC Support
 
 * Made these global changes in STM32 boards and SoC series:
 
-  * Pin control configuration is now done through device tree and existing
+  * Pin control configuration is now done through devicetree and existing
     macros to configure pins in pinmux.c files are tagged as deprecated.
     The new pin settings are provided thanks to .dtsi files distributed in
     hal_stm32 module.
@@ -243,6 +345,7 @@ Boards & SoC Support
   * Updated NXP i.MX RT, Kinetis, and LPC boards to enable hardware stack
     protection by default.
   * Fixed Segger RTT and SystemView support on NXP i.MX RT boards.
+  * Demand paging is turned on by default for ``qemu_x86_tiny``.
 
 * Added support for these following shields:
 
@@ -264,7 +367,7 @@ Drivers and Sensors
     A user can now specify the timing manually (define prop segment,
     phase segment1, phase segment2, and prescaler) or use a newly introduced
     algorithm to calculate optimal timing values from a bitrate and sample point.
-    The bitrate and sample point can be specified in the device tree too.
+    The bitrate and sample point can be specified in the devicetree too.
     It is possible to change the timing values at runtime now.
 
   * We reworked the zcan_frame struct due to undefined behavior.
@@ -291,6 +394,9 @@ Drivers and Sensors
 * Crypto
 
 * DAC
+
+  * STM32: Enabled support for G0 and H7 series.
+  * Added TI DACx3608 driver.
 
 * Debug
 
@@ -337,7 +443,11 @@ Drivers and Sensors
 
 * I2C
 
+  * Added driver support for lmx6x, it8xxx2, and npcx7 plaforms.
   * Added Atmel SAM4L TWIM driver.
+  * Added I2C slave support in the microchip i2c driver.
+  * Reversed 2.4 decision to downgrade I2C eeprom slave driver to a
+    test.  It's a driver again.
 
 * I2S
 
@@ -412,7 +522,7 @@ Drivers and Sensors
 * Pinmux
 
   * STM32 pinmux driver has been reworked to allow pin configuration using
-    device tree definitions. The previous C macros are now deprecated.
+    devicetree definitions. The previous C macros are now deprecated.
 
 * PS/2
 
@@ -620,7 +730,6 @@ Build and Infrastructure
 
 * Devicetree
 
-  * :c:macro:`DT_ENUM_IDX_OR`: new macro
   * Support for legacy devicetree macros via
     ``CONFIG_LEGACY_DEVICETREE_MACROS`` was removed. All devicetree-based code
     should be using the new devicetree API introduced in Zephyr 2.3 and
@@ -629,6 +738,36 @@ Build and Infrastructure
   * It is now possible to resolve at build time the device pointer associated
     with a device that is defined in devicetree, via ``DEVICE_DT_GET``.  See
     :ref:`dt-get-device`.
+  * Enhanced support for enumerated property values via new macros:
+
+    - :c:macro:`DT_ENUM_IDX_OR`
+    - :c:macro:`DT_ENUM_TOKEN`
+    - :c:macro:`DT_ENUM_UPPER_TOKEN`
+
+  * New hardware specific macros:
+
+    - :c:macro:`DT_GPIO_CTLR_BY_IDX`
+    - :c:macro:`DT_GPIO_CTLR`
+    - :c:macro:`DT_MTD_FROM_FIXED_PARTITION`
+
+  * Miscellaneous new node-related macros:
+
+    - :c:macro:`DT_GPARENT`
+    - :c:macro:`DT_INVALID_NODE`
+    - :c:macro:`DT_NODE_PATH`
+    - :c:macro:`DT_SAME_NODE`
+
+  * Property access macro changes:
+
+    - :c:macro:`DT_PROP_BY_PHANDLE_IDX_OR`: new macro
+    - :c:macro:`DT_PROP_HAS_IDX` now expands to a literal 0 or 1, not an
+      expression that evaluates to 0 or 1
+
+  * Dependencies between nodes are now exposed via new macros:
+
+    - :c:macro:`DT_DEP_ORD`, :c:macro:`DT_INST_DEP_ORD`
+    - :c:macro:`DT_REQUIRES_DEP_ORDS`, :c:macro:`DT_INST_REQUIRES_DEP_ORDS`
+    - :c:macro:`DT_SUPPORTS_DEP_ORDS`, :c:macro:`DT_INST_SUPPORTS_DEP_ORDS`
 
 * West
 
@@ -682,6 +821,14 @@ Libraries / Subsystems
 * POSIX subsystem
 
 * Power management
+
+  * Use a consistent naming convention using **pm_** namespace.
+  * Overhaul power states. New states :c:enum:`pm_state` are more
+    meaningful and ACPI alike.
+  * Move residency information and supported power states to devicetree
+    and remove related Kconfig options.
+  * New power state changes notification API :c:struct:`pm_notifier`
+  * Cleanup build options.
 
 * Logging
 
