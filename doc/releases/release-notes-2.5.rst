@@ -19,6 +19,10 @@ Security Vulnerability Related
 
 The following CVEs are addressed by this release:
 
+* CVE-2021-3323: Under embargo until 2021-04-14
+* CVE-2021-3321: Under embargo until 2021-04-14
+* CVE-2021-3320: Under embargo until 2021-04-14
+
 More detailed information can be found in:
 https://docs.zephyrproject.org/latest/security/vulnerabilities.html
 
@@ -81,6 +85,9 @@ API Changes
 
 * :c:type:`fs_tile_t` objects must now be initialized by calling
   :c:func:`fs_file_t_init` before their first use.
+
+* :c:type:`fs_dir_t` objects must now be initialized by calling
+  :c:func:`fs_dir_t_init` before their first use.
 
 Deprecated in this release
 ==========================
@@ -779,6 +786,8 @@ Build and Infrastructure
 Libraries / Subsystems
 **********************
 
+* Disk
+
 * File systems
 
   * API
@@ -786,9 +795,8 @@ Libraries / Subsystems
     * Added c:func:`fs_file_t_init` function for initialization of
       c:type:`fs_file_t` objects.
 
-* Disk
-
-* File Systems
+    * Added c:func:`fs_dir_t_init` function for initialization of
+      c:type:`fs_dir_t` objects.
 
   * :option:`CONFIG_FS_LITTLEFS_FC_MEM_POOL` has been deprecated and
     should be replaced by :option:`CONFIG_FS_LITTLEFS_FC_HEAP_SIZE`.
@@ -852,6 +860,10 @@ Libraries / Subsystems
  * boot: Reworked using MCUBoot's bootutil_public library which allow to use
    API implementation already provided by MCUboot codebase and remove
    zephyr's own implementations.
+
+* Crypto
+
+  * mbedTLS updated to 2.16.9
 
 HALs
 ****
