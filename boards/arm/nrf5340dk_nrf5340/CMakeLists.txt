@@ -1,8 +1,7 @@
 # Copyright (c) 2019 Nordic Semiconductor ASA.
 # SPDX-License-Identifier: Apache-2.0
 
-if (((CONFIG_BOARD_NRF5340PDK_NRF5340_CPUAPP OR CONFIG_BOARD_NRF5340PDK_NRF5340_CPUAPPNS)
-    OR (CONFIG_BOARD_NRF5340DK_NRF5340_CPUAPP OR CONFIG_BOARD_NRF5340DK_NRF5340_CPUAPPNS))
+if ((CONFIG_BOARD_NRF5340DK_NRF5340_CPUAPP OR CONFIG_BOARD_NRF5340DK_NRF5340_CPUAPPNS)
     AND CONFIG_BOARD_ENABLE_CPUNET)
 zephyr_library()
 zephyr_library_sources(nrf5340_cpunet_reset.c)
@@ -30,9 +29,7 @@ if (CONFIG_BUILD_WITH_TFM)
 		set(TFM_PUBLIC_KEY_FORMAT "full")
 	endif()
 
-	if(CONFIG_BOARD_NRF5340PDK_NRF5340_CPUAPPNS)
-		set(TFM_INSTALL_DIR ${CMAKE_BINARY_DIR}/tfm/install/outputs/NORDIC_NRF/NRF5340PDK_NRF5340_CPUAPP)
-	elseif(CONFIG_BOARD_NRF5340DK_NRF5340_CPUAPPNS)
+	if(CONFIG_BOARD_NRF5340DK_NRF5340_CPUAPPNS)
 		set(TFM_INSTALL_DIR ${CMAKE_BINARY_DIR}/tfm/install/outputs/NORDIC_NRF/NRF5340DK_NRF5340_CPUAPP)
 	endif()
 
@@ -46,13 +43,10 @@ if (CONFIG_BUILD_WITH_TFM)
 		# Merge tfm_s and zephyr (NS) image to a single binary.
 		set_property(GLOBAL APPEND PROPERTY extra_post_build_commands
 			COMMAND ${SREC_CAT}
-			ARGS ${CMAKE_BINARY_DIR}/tfm/bin/tfm_s.bin -Binary
+			ARGS $<TARGET_PROPERTY:tfm,TFM_S_BIN_FILE> -Binary
 				${CMAKE_BINARY_DIR}/zephyr/${KERNEL_BIN_NAME} -Binary
 				-offset ${CONFIG_FLASH_LOAD_OFFSET}
 				-o ${CMAKE_BINARY_DIR}/tfm_merged.hex -intel
-
-			# Copy tfm_sign.hex to zephyr
-			COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/tfm_merged.hex ${CMAKE_BINARY_DIR}/zephyr/${KERNEL_HEX_NAME}
 		)
 	else()
 		#Create and sign for concatenated binary image, should align with the TF-M BL2
@@ -102,9 +96,13 @@ if (CONFIG_BUILD_WITH_TFM)
 				-offset 0x10000
 				-o ${CMAKE_BINARY_DIR}/tfm_sign.hex
 				-intel
+		)
 
-			# Copy tfm_sign.hex to zephyr
-			COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/tfm_sign.hex ${CMAKE_BINARY_DIR}/zephyr/${KERNEL_HEX_NAME}
+		set_property(GLOBAL APPEND PROPERTY extra_post_build_byproducts
+			${CMAKE_BINARY_DIR}/tfm_s_signed.bin
+			${CMAKE_BINARY_DIR}/zephyr_ns_signed.bin
+			${CMAKE_BINARY_DIR}/tfm_sign.bin
+			${CMAKE_BINARY_DIR}/tfm_sign.hex
 		)
 	endif()
 endif()

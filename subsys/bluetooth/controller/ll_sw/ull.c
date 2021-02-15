@@ -262,8 +262,8 @@ static MFIFO_DEFINE(pdu_rx_free, sizeof(void *), PDU_RX_CNT);
 #define BT_CTLR_MAX_CONN        0
 #endif
 
-#if defined(CONFIG_BT_CTLR_SCAN_SYNC_SET)
-#define BT_CTLR_SCAN_SYNC_SET CONFIG_BT_CTLR_SCAN_SYNC_SET
+#if defined(CONFIG_BT_PER_ADV_SYNC_MAX)
+#define BT_CTLR_SCAN_SYNC_SET CONFIG_BT_PER_ADV_SYNC_MAX
 #else
 #define BT_CTLR_SCAN_SYNC_SET 0
 #endif
@@ -1893,6 +1893,24 @@ static void rx_demux_yield(void)
 {
 	static memq_link_t link;
 	static struct mayfly mfy = {0, 0, &link, NULL, rx_demux};
+	struct node_rx_hdr *rx;
+	memq_link_t *link_peek;
+
+	link_peek = memq_peek(memq_ull_rx.head, memq_ull_rx.tail, (void **)&rx);
+	if (!link_peek) {
+#if defined(CONFIG_BT_CONN)
+		struct node_tx *node_tx;
+		uint8_t ack_last;
+		uint16_t handle;
+
+		link_peek = ull_conn_ack_peek(&ack_last, &handle, &node_tx);
+		if (!link_peek) {
+			return;
+		}
+#else /* !CONFIG_BT_CONN */
+		return;
+#endif /* !CONFIG_BT_CONN */
+	}
 
 	/* Kick the ULL (using the mayfly, tailchain it) */
 	mayfly_enqueue(TICKER_USER_ID_ULL_HIGH, TICKER_USER_ID_ULL_HIGH, 1,

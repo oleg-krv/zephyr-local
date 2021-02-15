@@ -129,7 +129,7 @@ if NRF_802154_SER_RADIO
 
 config NRF_802154_SER_RADIO_INIT_PRIO
 	int "nRF52 IEEE 802.15.4 serialization initialization priority"
-	default 81
+	default 47
 	help
 	  Set the initialization priority number. Do not mess with it unless
 	  you know what you are doing.
@@ -148,14 +148,6 @@ config NRF_802154_SER_LOG
 	default n
 	help
 	  This option enable debug logs of 802.15.4 serialization module.
-
-config NRF_802154_SER_BUFFER_ALLOCATOR_THREAD_SAFE
-	bool
-	# Hidden option
-	default y
-	help
-	  This option specifies if buffers for 802.15.4 serialization are allocated
-	  in a thread-safe manner.
 
 config NRF_802154_SER_DEFAULT_RESPONSE_TIMEOUT
 	int "Default Spinel serialization response timeout in milliseconds"

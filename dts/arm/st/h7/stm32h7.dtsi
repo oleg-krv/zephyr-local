@@ -236,6 +236,15 @@
 			label = "UART_8";
 		};
 
+		lpuart1: serial@58000c00 {
+			compatible = "st,stm32-lpuart", "st,stm32-uart";
+			reg = <0x58000c00 0x400>;
+			clocks = <&rcc STM32_CLOCK_BUS_APB4 0x00000008>;
+			interrupts = <142 0>;
+			status = "disabled";
+			label = "LPUART_1";
+		};
+
 		rtc: rtc@58004000 {
 			compatible = "st,stm32-rtc";
 			reg = <0x58004000 0x400>;
@@ -725,6 +734,14 @@
 				label = "STM32_FMC_SDRAM";
 				status = "disabled";
 			};
+		};
+
+		backup_sram: memory@38800000 {
+			compatible = "st,stm32-backup-sram";
+			reg = <0x38800000 DT_SIZE_K(4)>;
+			clocks = <&rcc STM32_CLOCK_BUS_AHB4 0x10000000>;
+			label = "BACKUP_SRAM";
+			status = "disabled";
 		};
 	};
 };
