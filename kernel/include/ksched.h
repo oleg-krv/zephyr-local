@@ -66,6 +66,7 @@ void z_sched_start(struct k_thread *thread);
 void z_ready_thread(struct k_thread *thread);
 void z_thread_single_abort(struct k_thread *thread);
 FUNC_NORETURN void z_self_abort(void);
+void z_requeue_current(struct k_thread *curr);
 
 static inline void z_pend_curr_unlocked(_wait_q_t *wait_q, k_timeout_t timeout)
 {
@@ -187,16 +188,6 @@ static inline void z_reset_thread_states(struct k_thread *thread,
 					uint32_t states)
 {
 	thread->base.thread_state &= ~states;
-}
-
-static inline void z_mark_thread_as_queued(struct k_thread *thread)
-{
-	z_set_thread_states(thread, _THREAD_QUEUED);
-}
-
-static inline void z_mark_thread_as_not_queued(struct k_thread *thread)
-{
-	z_reset_thread_states(thread, _THREAD_QUEUED);
 }
 
 static inline bool z_is_under_prio_ceiling(int prio)

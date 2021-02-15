@@ -309,6 +309,32 @@ static void identity_resolved(struct bt_conn *conn, const bt_addr_le_t *rpa,
 #endif
 
 #if defined(CONFIG_BT_SMP) || defined(CONFIG_BT_BREDR)
+static const char *security_err_str(enum bt_security_err err)
+{
+	switch (err) {
+	case BT_SECURITY_ERR_SUCCESS:
+		return "Success";
+	case BT_SECURITY_ERR_AUTH_FAIL:
+		return "Authentication failure";
+	case BT_SECURITY_ERR_PIN_OR_KEY_MISSING:
+		return "PIN or key missing";
+	case BT_SECURITY_ERR_OOB_NOT_AVAILABLE:
+		return "OOB not available";
+	case BT_SECURITY_ERR_AUTH_REQUIREMENT:
+		return "Authentication requirements";
+	case BT_SECURITY_ERR_PAIR_NOT_SUPPORTED:
+		return "Pairing not supported";
+	case BT_SECURITY_ERR_PAIR_NOT_ALLOWED:
+		return "Pairing not allowed";
+	case BT_SECURITY_ERR_INVALID_PARAM:
+		return "Invalid parameters";
+	case BT_SECURITY_ERR_UNSPECIFIED:
+		return "Unspecified";
+	default:
+		return "Unknown";
+	}
+}
+
 static void security_changed(struct bt_conn *conn, bt_security_t level,
 			     enum bt_security_err err)
 {
@@ -320,8 +346,9 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
 		shell_print(ctx_shell, "Security changed: %s level %u", addr,
 			    level);
 	} else {
-		shell_print(ctx_shell, "Security failed: %s level %u reason %d",
-			    addr, level, err);
+		shell_print(ctx_shell, "Security failed: %s level %u "
+			    "reason: %s (%d)",
+			    addr, level, security_err_str(err), err);
 	}
 }
 #endif
@@ -2481,15 +2508,14 @@ static void auth_pairing_complete(struct bt_conn *conn, bool bonded)
 		    addr);
 }
 
-static void auth_pairing_failed(struct bt_conn *conn,
-				enum bt_security_err reason)
+static void auth_pairing_failed(struct bt_conn *conn, enum bt_security_err err)
 {
 	char addr[BT_ADDR_LE_STR_LEN];
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
-	shell_print(ctx_shell, "Pairing failed with %s reason %d", addr,
-		    reason);
+	shell_print(ctx_shell, "Pairing failed with %s reason: %s (%d)", addr,
+		    security_err_str(err), err);
 }
 
 #if defined(CONFIG_BT_BREDR)
@@ -2653,6 +2679,13 @@ static struct bt_conn_auth_cb auth_cb_oob = {
 	.bond_deleted = bond_deleted,
 };
 
+static struct bt_conn_auth_cb auth_cb_status = {
+	.pairing_failed = auth_pairing_failed,
+	.pairing_complete = auth_pairing_complete,
+#if defined(CONFIG_BT_SMP_APP_PAIRING_ACCEPT)
+	.pairing_accept = pairing_accept,
+#endif
+};
 
 static int cmd_auth(const struct shell *shell, size_t argc, char *argv[])
 {
@@ -2670,6 +2703,8 @@ static int cmd_auth(const struct shell *shell, size_t argc, char *argv[])
 		err = bt_conn_auth_cb_register(&auth_cb_confirm);
 	} else if (!strcmp(argv[1], "oob")) {
 		err = bt_conn_auth_cb_register(&auth_cb_oob);
+	} else if (!strcmp(argv[1], "status")) {
+		err = bt_conn_auth_cb_register(&auth_cb_status);
 	} else if (!strcmp(argv[1], "none")) {
 		err = bt_conn_auth_cb_register(NULL);
 	} else {
@@ -3031,7 +3066,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(bt_cmds,
 	SHELL_CMD_ARG(connections, NULL, HELP_NONE, cmd_connections, 1, 0),
 	SHELL_CMD_ARG(auth, NULL,
 		      "<method: all, input, display, yesno, confirm, "
-		      "oob, none>",
+		      "oob, status, none>",
 		      cmd_auth, 2, 0),
 	SHELL_CMD_ARG(auth-cancel, NULL, HELP_NONE, cmd_auth_cancel, 1, 0),
 	SHELL_CMD_ARG(auth-passkey, NULL, "<passkey>", cmd_auth_passkey, 2, 0),
