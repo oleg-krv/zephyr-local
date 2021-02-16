@@ -333,7 +333,7 @@ uint8_t ll_conn_update(uint16_t handle, uint8_t cmd, uint8_t status, uint16_t in
 		if (!conn->llcp_conn_param.disabled &&
 		    (!conn->common.fex_valid ||
 		     (conn->llcp_feature.features_conn &
-		      BIT(BT_LE_FEAT_BIT_CONN_PARAM_REQ)))) {
+		      BIT64(BT_LE_FEAT_BIT_CONN_PARAM_REQ)))) {
 			cmd++;
 		} else if (conn->lll.role) {
 			return BT_HCI_ERR_UNSUPP_REMOTE_FEATURE;
@@ -523,7 +523,7 @@ uint32_t ll_length_req_send(uint16_t handle, uint16_t tx_octets, uint16_t tx_tim
 
 	if (conn->llcp_length.disabled ||
 	    (conn->common.fex_valid &&
-	     !(conn->llcp_feature.features_conn & BIT(BT_LE_FEAT_BIT_DLE)))) {
+	     !(conn->llcp_feature.features_conn & BIT64(BT_LE_FEAT_BIT_DLE)))) {
 		return BT_HCI_ERR_UNSUPP_REMOTE_FEATURE;
 	}
 
@@ -634,9 +634,9 @@ uint8_t ll_phy_req_send(uint16_t handle, uint8_t tx, uint8_t flags, uint8_t rx)
 
 	if (conn->llcp_phy.disabled ||
 	    (conn->common.fex_valid &&
-	     !(conn->llcp_feature.features_conn & BIT(BT_LE_FEAT_BIT_PHY_2M)) &&
+	     !(conn->llcp_feature.features_conn & BIT64(BT_LE_FEAT_BIT_PHY_2M)) &&
 	     !(conn->llcp_feature.features_conn &
-	       BIT(BT_LE_FEAT_BIT_PHY_CODED)))) {
+	       BIT64(BT_LE_FEAT_BIT_PHY_CODED)))) {
 		return BT_HCI_ERR_UNSUPP_REMOTE_FEATURE;
 	}
 
@@ -2709,7 +2709,7 @@ static inline void event_enc_reject_prep(struct ll_conn *conn,
 
 	if (conn->common.fex_valid &&
 	    (conn->llcp_feature.features_conn &
-	     BIT(BT_LE_FEAT_BIT_EXT_REJ_IND))) {
+	     BIT64(BT_LE_FEAT_BIT_EXT_REJ_IND))) {
 		struct pdu_data_llctrl_reject_ext_ind *p;
 
 		pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_REJECT_EXT_IND;
@@ -2937,7 +2937,7 @@ static inline void event_fex_prep(struct ll_conn *conn)
 		pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_FEATURE_RSP;
 		(void)memset(&pdu->llctrl.feature_rsp.features[0], 0x00,
 			sizeof(pdu->llctrl.feature_rsp.features));
-		sys_put_le24(conn->llcp_feature.features_peer,
+		sys_put_le64(conn->llcp_feature.features_peer,
 			     pdu->llctrl.feature_req.features);
 
 		/* enqueue feature rsp structure into rx queue */
@@ -2967,7 +2967,7 @@ static inline void event_fex_prep(struct ll_conn *conn)
 		(void)memset(&pdu->llctrl.feature_req.features[0],
 			     0x00,
 			     sizeof(pdu->llctrl.feature_req.features));
-		sys_put_le24(conn->llcp_feature.features_conn,
+		sys_put_le64(conn->llcp_feature.features_conn,
 			     pdu->llctrl.feature_req.features);
 
 		ctrl_tx_enqueue(conn, tx);
@@ -3395,22 +3395,22 @@ static inline void event_ping_prep(struct ll_conn *conn)
 static inline void dle_max_time_get(const struct ll_conn *conn,
 				    uint16_t *max_rx_time, uint16_t *max_tx_time)
 {
-	uint32_t feature_coded_phy = 0;
-	uint32_t feature_phy_2m = 0;
+	uint64_t feature_coded_phy = 0;
+	uint64_t feature_phy_2m = 0;
 	uint16_t rx_time = 0;
 	uint16_t tx_time = 0;
 
 #if defined(CONFIG_BT_CTLR_PHY)
 #if defined(CONFIG_BT_CTLR_PHY_CODED)
 	feature_coded_phy = (conn->llcp_feature.features_conn &
-			     BIT(BT_LE_FEAT_BIT_PHY_CODED));
+			     BIT64(BT_LE_FEAT_BIT_PHY_CODED));
 #else
 	feature_coded_phy = 0;
 #endif
 
 #if defined(CONFIG_BT_CTLR_PHY_2M)
 	feature_phy_2m = (conn->llcp_feature.features_conn &
-			  BIT(BT_LE_FEAT_BIT_PHY_2M));
+			  BIT64(BT_LE_FEAT_BIT_PHY_2M));
 #else
 	feature_phy_2m = 0;
 #endif
@@ -4252,12 +4252,11 @@ static int unknown_rsp_send(struct ll_conn *conn, struct node_rx_pdu *rx,
 	return 0;
 }
 
-static inline uint32_t feat_get(uint8_t *features)
+static inline uint64_t feat_get(uint8_t *features)
 {
-	uint32_t feat;
+	uint64_t feat;
 
-	feat = ~LL_FEAT_BIT_MASK_VALID | features[0] |
-	       (features[1] << 8) | (features[2] << 16);
+	feat = ~LL_FEAT_BIT_MASK_VALID | sys_get_le64(features);
 	feat &= LL_FEAT_BIT_MASK;
 
 	return feat;
@@ -4267,9 +4266,9 @@ static inline uint32_t feat_get(uint8_t *features)
  * Perform a logical and on octet0 and keep the remaining bits of the
  * first input parameter
  */
-static inline uint32_t feat_land_octet0(uint32_t feat_to_keep, uint32_t feat_octet0)
+static inline uint64_t feat_land_octet0(uint64_t feat_to_keep, uint64_t feat_octet0)
 {
-	uint32_t feat_result;
+	uint64_t feat_result;
 
 	feat_result = feat_to_keep & feat_octet0;
 	feat_result &= 0xFF;
@@ -4284,7 +4283,7 @@ static int feature_rsp_send(struct ll_conn *conn, struct node_rx_pdu *rx,
 	struct pdu_data_llctrl_feature_req *req;
 	struct node_tx *tx;
 	struct pdu_data *pdu_tx;
-	uint32_t feat;
+	uint64_t feat;
 
 	/* acquire tx mem */
 	tx = mem_acquire(&mem_conn_tx_ctrl.free);
@@ -4319,7 +4318,7 @@ static int feature_rsp_send(struct ll_conn *conn, struct node_rx_pdu *rx,
 	 * See BTCore V5.2 VOl 6 Part B, chapter 5.1.4
 	 */
 	feat = feat_land_octet0(LL_FEAT, conn->llcp_feature.features_conn);
-	sys_put_le24(feat, pdu_tx->llctrl.feature_rsp.features);
+	sys_put_le64(feat, pdu_tx->llctrl.feature_rsp.features);
 
 	ctrl_tx_sec_enqueue(conn, tx);
 
@@ -5486,66 +5485,6 @@ static inline void ctrl_tx_ack(struct ll_conn *conn, struct node_tx **tx,
 	}
 }
 
-static inline bool pdu_len_cmp(uint8_t opcode, uint8_t len)
-{
-	const uint8_t ctrl_len_lut[] = {
-		(offsetof(struct pdu_data_llctrl, conn_update_ind) +
-		 sizeof(struct pdu_data_llctrl_conn_update_ind)),
-		(offsetof(struct pdu_data_llctrl, chan_map_ind) +
-		 sizeof(struct pdu_data_llctrl_chan_map_ind)),
-		(offsetof(struct pdu_data_llctrl, terminate_ind) +
-		 sizeof(struct pdu_data_llctrl_terminate_ind)),
-		(offsetof(struct pdu_data_llctrl, enc_req) +
-		 sizeof(struct pdu_data_llctrl_enc_req)),
-		(offsetof(struct pdu_data_llctrl, enc_rsp) +
-		 sizeof(struct pdu_data_llctrl_enc_rsp)),
-		(offsetof(struct pdu_data_llctrl, start_enc_req) +
-		 sizeof(struct pdu_data_llctrl_start_enc_req)),
-		(offsetof(struct pdu_data_llctrl, start_enc_rsp) +
-		 sizeof(struct pdu_data_llctrl_start_enc_rsp)),
-		(offsetof(struct pdu_data_llctrl, unknown_rsp) +
-		 sizeof(struct pdu_data_llctrl_unknown_rsp)),
-		(offsetof(struct pdu_data_llctrl, feature_req) +
-		 sizeof(struct pdu_data_llctrl_feature_req)),
-		(offsetof(struct pdu_data_llctrl, feature_rsp) +
-		 sizeof(struct pdu_data_llctrl_feature_rsp)),
-		(offsetof(struct pdu_data_llctrl, pause_enc_req) +
-		 sizeof(struct pdu_data_llctrl_pause_enc_req)),
-		(offsetof(struct pdu_data_llctrl, pause_enc_rsp) +
-		 sizeof(struct pdu_data_llctrl_pause_enc_rsp)),
-		(offsetof(struct pdu_data_llctrl, version_ind) +
-		 sizeof(struct pdu_data_llctrl_version_ind)),
-		(offsetof(struct pdu_data_llctrl, reject_ind) +
-		 sizeof(struct pdu_data_llctrl_reject_ind)),
-		(offsetof(struct pdu_data_llctrl, slave_feature_req) +
-		 sizeof(struct pdu_data_llctrl_slave_feature_req)),
-		(offsetof(struct pdu_data_llctrl, conn_param_req) +
-		 sizeof(struct pdu_data_llctrl_conn_param_req)),
-		(offsetof(struct pdu_data_llctrl, conn_param_rsp) +
-		 sizeof(struct pdu_data_llctrl_conn_param_rsp)),
-		(offsetof(struct pdu_data_llctrl, reject_ext_ind) +
-		 sizeof(struct pdu_data_llctrl_reject_ext_ind)),
-		(offsetof(struct pdu_data_llctrl, ping_req) +
-		 sizeof(struct pdu_data_llctrl_ping_req)),
-		(offsetof(struct pdu_data_llctrl, ping_rsp) +
-		 sizeof(struct pdu_data_llctrl_ping_rsp)),
-		(offsetof(struct pdu_data_llctrl, length_req) +
-		 sizeof(struct pdu_data_llctrl_length_req)),
-		(offsetof(struct pdu_data_llctrl, length_rsp) +
-		 sizeof(struct pdu_data_llctrl_length_rsp)),
-		(offsetof(struct pdu_data_llctrl, phy_req) +
-		 sizeof(struct pdu_data_llctrl_phy_req)),
-		(offsetof(struct pdu_data_llctrl, phy_rsp) +
-		 sizeof(struct pdu_data_llctrl_phy_rsp)),
-		(offsetof(struct pdu_data_llctrl, phy_upd_ind) +
-		 sizeof(struct pdu_data_llctrl_phy_upd_ind)),
-		(offsetof(struct pdu_data_llctrl, min_used_chans_ind) +
-		 sizeof(struct pdu_data_llctrl_min_used_chans_ind)),
-	};
-
-	return ctrl_len_lut[opcode] == len;
-}
-
 static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 			  struct pdu_data *pdu_rx, struct ll_conn *conn)
 {
@@ -5574,8 +5513,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 		uint8_t err;
 
 		if (!conn->lll.role ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_CONN_UPDATE_IND,
-				 pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(conn_update_ind) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5596,8 +5534,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 		uint8_t err;
 
 		if (!conn->lll.role ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_CHAN_MAP_IND,
-				 pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(chan_map_ind) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5610,8 +5547,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #endif /* CONFIG_BT_PERIPHERAL */
 
 	case PDU_DATA_LLCTRL_TYPE_TERMINATE_IND:
-		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_TERMINATE_IND,
-				 pdu_rx->len)) {
+		if (PDU_DATA_LLCTRL_LEN(terminate_ind) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5622,7 +5558,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #if defined(CONFIG_BT_PERIPHERAL)
 	case PDU_DATA_LLCTRL_TYPE_ENC_REQ:
 		if (!conn->lll.role ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_ENC_REQ, pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(enc_req) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5693,7 +5629,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #if defined(CONFIG_BT_CENTRAL)
 	case PDU_DATA_LLCTRL_TYPE_ENC_RSP:
 		if (conn->lll.role ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_ENC_RSP, pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(enc_rsp) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5714,8 +5650,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 	case PDU_DATA_LLCTRL_TYPE_START_ENC_REQ:
 		if (conn->lll.role || (conn->llcp_req == conn->llcp_ack) ||
 		    (conn->llcp_type != LLCP_ENCRYPTION) ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_START_ENC_REQ,
-				 pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(start_enc_req) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5729,8 +5664,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #endif /* CONFIG_BT_CENTRAL */
 
 	case PDU_DATA_LLCTRL_TYPE_START_ENC_RSP:
-		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_START_ENC_RSP,
-				 pdu_rx->len)) {
+		if (PDU_DATA_LLCTRL_LEN(start_enc_rsp) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5782,8 +5716,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #if defined(CONFIG_BT_PERIPHERAL)
 	case PDU_DATA_LLCTRL_TYPE_FEATURE_REQ:
 		if (!conn->lll.role ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_FEATURE_REQ,
-				 pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(feature_req) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5794,8 +5727,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #if defined(CONFIG_BT_CENTRAL) && defined(CONFIG_BT_CTLR_SLAVE_FEAT_REQ)
 	case PDU_DATA_LLCTRL_TYPE_SLAVE_FEATURE_REQ:
 		if (conn->lll.role ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_SLAVE_FEATURE_REQ,
-				 pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(slave_feature_req) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5807,8 +5739,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 	case PDU_DATA_LLCTRL_TYPE_FEATURE_RSP:
 		if ((!IS_ENABLED(CONFIG_BT_CTLR_SLAVE_FEAT_REQ) &&
 		     conn->lll.role) ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_FEATURE_RSP,
-				 pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(feature_rsp) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5820,8 +5751,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #if defined(CONFIG_BT_PERIPHERAL)
 	case PDU_DATA_LLCTRL_TYPE_PAUSE_ENC_REQ:
 		if (!conn->lll.role ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_PAUSE_ENC_REQ,
-				 pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(pause_enc_req) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5830,8 +5760,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #endif /* CONFIG_BT_PERIPHERAL */
 
 	case PDU_DATA_LLCTRL_TYPE_PAUSE_ENC_RSP:
-		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_PAUSE_ENC_RSP,
-				 pdu_rx->len)) {
+		if (PDU_DATA_LLCTRL_LEN(pause_enc_rsp) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5840,8 +5769,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #endif /* CONFIG_BT_CTLR_LE_ENC */
 
 	case PDU_DATA_LLCTRL_TYPE_VERSION_IND:
-		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_VERSION_IND,
-				 pdu_rx->len)) {
+		if (PDU_DATA_LLCTRL_LEN(version_ind) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5850,7 +5778,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 
 #if defined(CONFIG_BT_CTLR_LE_ENC)
 	case PDU_DATA_LLCTRL_TYPE_REJECT_IND:
-		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_REJECT_IND, pdu_rx->len)) {
+		if (PDU_DATA_LLCTRL_LEN(reject_ind) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -5860,8 +5788,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 
 #if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
 	case PDU_DATA_LLCTRL_TYPE_CONN_PARAM_REQ:
-		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_CONN_PARAM_REQ,
-				 pdu_rx->len)) {
+		if (PDU_DATA_LLCTRL_LEN(conn_param_req) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -6114,8 +6041,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #if defined(CONFIG_BT_CENTRAL)
 	case PDU_DATA_LLCTRL_TYPE_CONN_PARAM_RSP:
 		if (conn->lll.role ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_CONN_PARAM_RSP,
-				 pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(conn_param_rsp) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -6188,8 +6114,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 
 	case PDU_DATA_LLCTRL_TYPE_REJECT_EXT_IND:
-		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_REJECT_EXT_IND,
-				 pdu_rx->len)) {
+		if (PDU_DATA_LLCTRL_LEN(reject_ext_ind) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -6198,7 +6123,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 
 #if defined(CONFIG_BT_CTLR_LE_PING)
 	case PDU_DATA_LLCTRL_TYPE_PING_REQ:
-		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_PING_REQ, pdu_rx->len)) {
+		if (PDU_DATA_LLCTRL_LEN(ping_req) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -6206,7 +6131,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 		break;
 
 	case PDU_DATA_LLCTRL_TYPE_PING_RSP:
-		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_PING_RSP, pdu_rx->len)) {
+		if (PDU_DATA_LLCTRL_LEN(ping_rsp) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -6220,8 +6145,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #endif /* CONFIG_BT_CTLR_LE_PING */
 
 	case PDU_DATA_LLCTRL_TYPE_UNKNOWN_RSP:
-		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_UNKNOWN_RSP,
-				 pdu_rx->len)) {
+		if (PDU_DATA_LLCTRL_LEN(unknown_rsp) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -6370,8 +6294,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 	case PDU_DATA_LLCTRL_TYPE_LENGTH_RSP:
 	case PDU_DATA_LLCTRL_TYPE_LENGTH_REQ:
-		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_LENGTH_REQ,
-				 pdu_rx->len)) {
+		if (PDU_DATA_LLCTRL_LEN(length_req) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -6381,7 +6304,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 
 #if defined(CONFIG_BT_CTLR_PHY)
 	case PDU_DATA_LLCTRL_TYPE_PHY_REQ:
-		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_PHY_REQ, pdu_rx->len)) {
+		if (PDU_DATA_LLCTRL_LEN(phy_req) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -6469,7 +6392,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #if defined(CONFIG_BT_CENTRAL)
 	case PDU_DATA_LLCTRL_TYPE_PHY_RSP:
 		if (conn->lll.role ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_PHY_RSP, pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(phy_rsp) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -6508,8 +6431,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 		uint8_t err;
 
 		if (!conn->lll.role ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_PHY_UPD_IND,
-				 pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(phy_upd_ind) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
@@ -6526,8 +6448,7 @@ static inline int ctrl_rx(memq_link_t *link, struct node_rx_pdu **rx,
 #if defined(CONFIG_BT_CENTRAL)
 	case PDU_DATA_LLCTRL_TYPE_MIN_USED_CHAN_IND:
 		if (conn->lll.role ||
-		    !pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_MIN_USED_CHAN_IND,
-				 pdu_rx->len)) {
+		    PDU_DATA_LLCTRL_LEN(min_used_chans_ind) != pdu_rx->len) {
 			goto ull_conn_rx_unknown_rsp_send;
 		}
 
