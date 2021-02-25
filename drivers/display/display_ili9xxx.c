@@ -410,6 +410,9 @@ static int ili9xxx_init(const struct device *dev)
 	}
 
 	ili9xxx_hw_reset(dev);
+	k_sleep(K_MSEC(2000));
+
+	ili9xxx_hw_reset(dev);
 
 	r = ili9xxx_configure(dev);
 	if (r < 0) {
@@ -496,6 +499,11 @@ static const struct display_driver_api ili9xxx_api = {
 #ifdef CONFIG_ILI9340
 #include "display_ili9340.h"
 DT_INST_FOREACH_ILI9XXX_STATUS_OKAY(9340);
+#endif
+
+#ifdef CONFIG_ILI9341
+#include "display_ili9341.h"
+DT_INST_FOREACH_ILI9XXX_STATUS_OKAY(9341);
 #endif
 
 #ifdef CONFIG_ILI9488
