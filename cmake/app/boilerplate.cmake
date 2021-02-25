@@ -199,9 +199,6 @@ add_custom_target(
 # Dummy add to generate files.
 zephyr_linker_sources(SECTIONS)
 
-zephyr_file(APPLICATION_ROOT BOARD_ROOT)
-list(APPEND BOARD_ROOT ${ZEPHYR_BASE})
-
 # 'BOARD_ROOT' is a prioritized list of directories where boards may
 # be found. It always includes ${ZEPHYR_BASE} at the lowest priority.
 zephyr_file(APPLICATION_ROOT BOARD_ROOT)
@@ -344,6 +341,11 @@ foreach(root ${BOARD_ROOT})
       list(APPEND
         shield_dts_fixups
         ${SHIELD_DIR_${s}}/dts_fixup.h
+        )
+
+      list(APPEND
+        SHIELD_DIRS
+        ${SHIELD_DIR_${s}}
         )
 
       # search for shield/shield.conf file
@@ -583,6 +585,7 @@ set(KERNEL_NAME ${CONFIG_KERNEL_BIN_NAME})
 set(KERNEL_ELF_NAME   ${KERNEL_NAME}.elf)
 set(KERNEL_BIN_NAME   ${KERNEL_NAME}.bin)
 set(KERNEL_HEX_NAME   ${KERNEL_NAME}.hex)
+set(KERNEL_UF2_NAME   ${KERNEL_NAME}.uf2)
 set(KERNEL_MAP_NAME   ${KERNEL_NAME}.map)
 set(KERNEL_LST_NAME   ${KERNEL_NAME}.lst)
 set(KERNEL_S19_NAME   ${KERNEL_NAME}.s19)

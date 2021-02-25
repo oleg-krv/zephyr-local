@@ -810,6 +810,15 @@ struct bt_hci_cp_le_set_random_address {
 #define BT_HCI_ADV_DIRECT_IND_LOW_DUTY          0x04
 #define BT_HCI_ADV_SCAN_RSP                     0x04
 
+#define BT_LE_ADV_INTERVAL_MIN                  0x0020
+#define BT_LE_ADV_INTERVAL_MAX                  0x4000
+#define BT_LE_ADV_INTERVAL_DEFAULT              0x0800
+
+#define BT_LE_ADV_CHAN_MAP_CHAN_37              0x01
+#define BT_LE_ADV_CHAN_MAP_CHAN_38              0x02
+#define BT_LE_ADV_CHAN_MAP_CHAN_39              0x04
+#define BT_LE_ADV_CHAN_MAP_ALL                  0x07
+
 #define BT_LE_ADV_FP_NO_WHITELIST               0x00
 #define BT_LE_ADV_FP_WHITELIST_SCAN_REQ         0x01
 #define BT_LE_ADV_FP_WHITELIST_CONN_IND         0x02
@@ -1073,6 +1082,18 @@ struct bt_hci_cp_le_write_default_data_len {
 struct bt_hci_cp_le_generate_dhkey {
 	uint8_t key[64];
 } __packed;
+
+
+#define BT_HCI_OP_LE_GENERATE_DHKEY_V2          BT_OP(BT_OGF_LE, 0x005e)
+
+#define BT_HCI_LE_KEY_TYPE_GENERATED            0x00
+#define BT_HCI_LE_KEY_TYPE_DEBUG                0x01
+
+struct bt_hci_cp_le_generate_dhkey_v2 {
+	uint8_t key[64];
+	uint8_t key_type;
+} __packed;
+
 
 #define BT_HCI_OP_LE_ADD_DEV_TO_RL              BT_OP(BT_OGF_LE, 0x0027)
 struct bt_hci_cp_le_add_dev_to_rl {

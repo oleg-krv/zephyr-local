@@ -3,6 +3,17 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+# List of all partitions supported by TF-M
+# Name must match name in 'trusted-firmware-m/config/config_default.cmake'
+set(TFM_VALID_PARTITIONS
+  TFM_PARTITION_PROTECTED_STORAGE
+  TFM_PARTITION_INTERNAL_TRUSTED_STORAGE
+  TFM_PARTITION_CRYPTO
+  TFM_PARTITION_INITIAL_ATTESTATION
+  TFM_PARTITION_PLATFORM
+  TFM_PARTITION_AUDIT_LOG
+  )
+
 # Adds trusted-firmware-m as an external project.
 # Also creates a target called 'tfm_api'
 # which can be linked into the app.
@@ -18,6 +29,7 @@
 # ISOLATION_LEVEL: The TF-M isolation level to use
 # REGRESSION: Boolean if TF-M build includes building the TF-M regression tests
 # BL2: Boolean if the TF-M build uses MCUboot. Default: True
+# ENABLED_PARTITIONS: List of TFM partitions to enable.
 #
 # Example usage:
 #
@@ -27,19 +39,27 @@
 #                        IPC
 #                        ISOLATION_LEVEL 2
 #                        REGRESSION
-#                        BL2 True
-#                        BUILD_PROFILE profile_small)
+#                        BL2
+#                        BUILD_PROFILE profile_small
+#                        ENABLED_PARTITIONS TFM_PARTITION_PLATFORM TFM_PARTITION_CRYPTO)
 function(trusted_firmware_build)
-  set(options IPC REGRESSION)
-  set(oneValueArgs BINARY_DIR BOARD BL2 ISOLATION_LEVEL CMAKE_BUILD_TYPE BUILD_PROFILE)
-  cmake_parse_arguments(TFM "${options}" "${oneValueArgs}" "" ${ARGN})
+  set(options IPC REGRESSION BL2)
+  set(oneValueArgs BINARY_DIR BOARD ISOLATION_LEVEL CMAKE_BUILD_TYPE BUILD_PROFILE
+    MCUBOOT_IMAGE_NUMBER)
+  set(multiValueArgs ENABLED_PARTITIONS)
+  cmake_parse_arguments(TFM "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-  if(NOT DEFINED TFM_BL2)
-    set(TFM_BL2 True)
-  endif()
-  set(TFM_BL2_ARG "-DBL2=${TFM_BL2}")
+  foreach(partition ${TFM_VALID_PARTITIONS})
+    list(FIND TFM_ENABLED_PARTITIONS ${partition} idx)
+    if (idx EQUAL -1)
+      set(val "OFF")
+    else()
+      set(val "ON")
+    endif()
+    list(APPEND TFM_PARTITIONS_ARGS -D${partition}=${val})
+  endforeach()
 
-  if(DEFINED TFM_IPC)
+  if(TFM_IPC)
     set(TFM_IPC_ARG -DTFM_PSA_API=ON)
     # PSA API awareness for the Non-Secure application
     target_compile_definitions(app PRIVATE "TFM_PSA_API")
@@ -49,7 +69,7 @@ function(trusted_firmware_build)
     set(TFM_ISOLATION_LEVEL_ARG -DTFM_ISOLATION_LEVEL=${TFM_ISOLATION_LEVEL})
   endif()
 
-  if(DEFINED TFM_REGRESSION)
+  if(TFM_REGRESSION)
     set(TFM_REGRESSION_ARG -DTEST_S=ON)
   endif()
 
@@ -63,6 +83,9 @@ function(trusted_firmware_build)
     set(TFM_PROFILE_ARG -DTFM_PROFILE=${TFM_BUILD_PROFILE})
   endif()
 
+  if(DEFINED TFM_MCUBOOT_IMAGE_NUMBER)
+    set(MCUBOOT_IMAGE_NUM_ARG -DMCUBOOT_IMAGE_NUMBER=${TFM_MCUBOOT_IMAGE_NUMBER})
+  endif()
 
   set(VENEERS_FILE ${TFM_BINARY_DIR}/secure_fw/s_veneers.o)
   set(PSA_API_NS_PATH ${TFM_BINARY_DIR}/interface/libpsa_api_ns.a)
@@ -120,13 +143,15 @@ function(trusted_firmware_build)
                -DTFM_PLATFORM=${TFM_BOARD}
                -DCROSS_COMPILE=${TFM_TOOLCHAIN_PATH}/${TFM_TOOLCHAIN_PREFIX}
                ${TFM_CMAKE_BUILD_TYPE_ARG}
-               ${TFM_BL2_ARG}
+               -DBL2=${TFM_BL2}
                ${TFM_IPC_ARG}
                ${TFM_ISOLATION_LEVEL_ARG}
                ${TFM_REGRESSION_ARG}
                ${TFM_PROFILE_ARG}
+               ${MCUBOOT_IMAGE_NUM_ARG}
                -DTFM_TEST_REPO_PATH=${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/tf-m-tests
                -DMCUBOOT_PATH=${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/../tfm-mcuboot
+               ${TFM_PARTITIONS_ARGS}
     BUILD_ALWAYS True
     USES_TERMINAL_BUILD True
     BUILD_BYPRODUCTS ${BUILD_BYPRODUCTS}
@@ -187,10 +212,8 @@ if (CONFIG_BUILD_WITH_TFM)
   if (CONFIG_TFM_REGRESSION)
     set(TFM_REGRESSION_ARG REGRESSION)
   endif()
-  if (CONFIG_TFM_BL2_TRUE)
-    set(TFM_BL2_ARG BL2 True)
-  elseif (CONFIG_TFM_BL2_FALSE)
-    set(TFM_BL2_ARG BL2 False)
+  if (CONFIG_TFM_BL2)
+    set(TFM_BL2_ARG BL2)
   endif()
   if (CONFIG_TFM_ISOLATION_LEVEL)
     set(TFM_ISOLATION_LEVEL_ARG ISOLATION_LEVEL ${CONFIG_TFM_ISOLATION_LEVEL})
@@ -198,16 +221,145 @@ if (CONFIG_BUILD_WITH_TFM)
   if (CONFIG_TFM_PROFILE)
     set(TFM_PROFILE_ARG BUILD_PROFILE ${CONFIG_TFM_PROFILE})
   endif()
+  if (CONFIG_TFM_CMAKE_BUILD_TYPE_RELEASE)
+    set(TFM_CMAKE_BUILD_TYPE "Release")
+  elseif (CONFIG_TFM_CMAKE_BUILD_TYPE_MINSIZEREL)
+    set(TFM_CMAKE_BUILD_TYPE "MinSizeRel")
+  elseif (CONFIG_TFM_CMAKE_BUILD_TYPE_DEBUG)
+    set(TFM_CMAKE_BUILD_TYPE "Debug")
+  elseif (CONFIG_TFM_CMAKE_BUILD_TYPE_RELWITHDEBINFO)
+    set(TFM_CMAKE_BUILD_TYPE "RelWithDebInfo")
+  endif()
+  if (DEFINED CONFIG_TFM_MCUBOOT_IMAGE_NUMBER)
+    set(TFM_IMAGE_NUMBER_ARG
+        MCUBOOT_IMAGE_NUMBER ${CONFIG_TFM_MCUBOOT_IMAGE_NUMBER})
+  endif()
+
+  # Enable TFM partitions as specified in Kconfig
+  foreach(partition ${TFM_VALID_PARTITIONS})
+    if (CONFIG_${partition})
+      list(APPEND TFM_ENABLED_PARTITIONS_ARG ${partition})
+    endif()
+  endforeach()
 
   trusted_firmware_build(
     BINARY_DIR ${CMAKE_BINARY_DIR}/tfm
     BOARD ${CONFIG_TFM_BOARD}
     ${TFM_ISOLATION_LEVEL_ARG}
     ${TFM_PROFILE_ARG}
+    ${TFM_IMAGE_NUMBER_ARG}
     ${TFM_BL2_ARG}
     ${TFM_IPC_ARG}
     ${TFM_REGRESSION_ARG}
+    ENABLED_PARTITIONS ${TFM_ENABLED_PARTITIONS_ARG}
+    CMAKE_BUILD_TYPE ${TFM_CMAKE_BUILD_TYPE}
   )
 
   zephyr_link_libraries(tfm_api)
+
+  # Set default image versions if not defined elsewhere
+  if (NOT DEFINED TFM_IMAGE_VERSION_S)
+    set(TFM_IMAGE_VERSION_S 0.0.0+0)
+  endif()
+
+  if (NOT DEFINED TFM_IMAGE_VERSION_NS)
+    set(TFM_IMAGE_VERSION_NS 0.0.0+0)
+  endif()
+
+  if (CONFIG_TFM_BL2)
+    set(PREPROCESSED_FILE_S "${CMAKE_BINARY_DIR}/tfm/bl2/ext/mcuboot/CMakeFiles/signing_layout_s.dir/signing_layout_s.o")
+    set(PREPROCESSED_FILE_NS "${CMAKE_BINARY_DIR}/tfm/bl2/ext/mcuboot/CMakeFiles/signing_layout_ns.dir/signing_layout_ns.o")
+    set(TFM_MCUBOOT_DIR "${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/trusted-firmware-m/bl2/ext/mcuboot")
+  endif()
+
+  # Configure which format (full or hash) to include the public key in
+  # the image manifest
+  if(NOT DEFINED TFM_PUBLIC_KEY_FORMAT)
+    set(TFM_PUBLIC_KEY_FORMAT "full")
+  endif()
+
+  function(tfm_sign OUT_ARG SUFFIX PAD INPUT_FILE OUTPUT_FILE)
+    if(PAD)
+      set(pad_args --pad --pad-header)
+    endif()
+    set (${OUT_ARG}
+      ${PYTHON_EXECUTABLE} ${TFM_MCUBOOT_DIR}/scripts/wrapper/wrapper.py
+      --layout ${PREPROCESSED_FILE_${SUFFIX}}
+      -k ${CONFIG_TFM_KEY_FILE_${SUFFIX}}
+      --public-key-format ${TFM_PUBLIC_KEY_FORMAT}
+      --align 1
+      -v ${TFM_IMAGE_VERSION_${SUFFIX}}
+      ${pad_args}
+      ${ADD_${SUFFIX}_IMAGE_MIN_VER}
+      -s auto
+      -H ${CONFIG_ROM_START_OFFSET}
+      ${INPUT_FILE}
+      ${OUTPUT_FILE}
+      PARENT_SCOPE)
+  endfunction()
+
+  set(MERGED_FILE ${CMAKE_BINARY_DIR}/tfm_merged.hex)
+  set(S_NS_FILE ${CMAKE_BINARY_DIR}/tfm_s_zephyr_ns.hex)
+  set(S_NS_SIGNED_FILE ${CMAKE_BINARY_DIR}/tfm_s_zephyr_ns_signed.hex)
+  set(NS_SIGNED_FILE ${CMAKE_BINARY_DIR}/zephyr_ns_signed.hex)
+  set(S_SIGNED_FILE ${CMAKE_BINARY_DIR}/tfm_s_signed.hex)
+
+  if (NOT CONFIG_TFM_BL2)
+    # Merge tfm_s and zephyr (NS) image to a single binary.
+    set_property(GLOBAL APPEND PROPERTY extra_post_build_commands
+      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/mergehex.py
+        -o ${MERGED_FILE}
+        $<TARGET_PROPERTY:tfm,TFM_S_HEX_FILE>
+        ${CMAKE_BINARY_DIR}/zephyr/${KERNEL_HEX_NAME}
+    )
+
+    set_property(GLOBAL APPEND PROPERTY extra_post_build_byproducts
+      ${MERGED_FILE}
+    )
+
+  elseif(CONFIG_TFM_MCUBOOT_IMAGE_NUMBER STREQUAL "1")
+    tfm_sign(sign_cmd NS TRUE ${S_NS_FILE} ${S_NS_SIGNED_FILE})
+
+    set_property(GLOBAL APPEND PROPERTY extra_post_build_commands
+      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/mergehex.py
+        -o ${S_NS_FILE}
+        $<TARGET_PROPERTY:tfm,TFM_S_HEX_FILE>
+        ${CMAKE_BINARY_DIR}/zephyr/${KERNEL_HEX_NAME}
+
+      COMMAND ${sign_cmd}
+
+      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/mergehex.py
+        -o ${MERGED_FILE}
+        $<TARGET_PROPERTY:tfm,BL2_HEX_FILE>
+        ${S_NS_SIGNED_FILE}
+    )
+
+    set_property(GLOBAL APPEND PROPERTY extra_post_build_byproducts
+      ${S_NS_FILE}
+      ${S_NS_SIGNED_FILE}
+      ${MERGED_FILE}
+    )
+
+  else()
+    tfm_sign(sign_cmd_ns NS FALSE ${CMAKE_BINARY_DIR}/zephyr/${KERNEL_HEX_NAME} ${NS_SIGNED_FILE})
+    tfm_sign(sign_cmd_s S TRUE $<TARGET_PROPERTY:tfm,TFM_S_HEX_FILE> ${S_SIGNED_FILE})
+
+    #Create and sign for concatenated binary image, should align with the TF-M BL2
+    set_property(GLOBAL APPEND PROPERTY extra_post_build_commands
+      COMMAND ${sign_cmd_ns}
+      COMMAND ${sign_cmd_s}
+
+      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/mergehex.py
+        -o ${MERGED_FILE}
+        $<TARGET_PROPERTY:tfm,BL2_HEX_FILE>
+        ${S_SIGNED_FILE}
+        ${NS_SIGNED_FILE}
+    )
+
+    set_property(GLOBAL APPEND PROPERTY extra_post_build_byproducts
+      ${S_SIGNED_FILE}
+      ${NS_SIGNED_FILE}
+      ${MERGED_FILE}
+    )
+  endif()
 endif()

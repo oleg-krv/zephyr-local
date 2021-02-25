@@ -166,9 +166,9 @@ void test_UTIL_LISTIFY(void)
 {
 	int i = 0;
 
-#define INC(x, _)		\
+#define INC(x, n, m)		\
 	do {			\
-		i += x;		\
+		i += (x + n + m);\
 	} while (0);
 
 #define DEFINE(x, y) int a##x = x * y;
@@ -177,9 +177,9 @@ void test_UTIL_LISTIFY(void)
 	UTIL_LISTIFY(4, DEFINE, 2)
 	UTIL_LISTIFY(4, MARK_UNUSED, _)
 
-	UTIL_LISTIFY(4, INC, _)
+	UTIL_LISTIFY(4, INC, 1, 2)
 
-	zassert_equal(i, 0 + 1 + 2 + 3, NULL);
+	zassert_equal(i, 0 + 1 + 2 + 3 + 4 * (1 + 2), NULL);
 	zassert_equal(a0, 0, NULL);
 	zassert_equal(a1, 2, NULL);
 	zassert_equal(a2, 4, NULL);
@@ -442,6 +442,15 @@ static void test_mixing_GET_ARG_and_FOR_EACH(void)
 	zassert_equal(a[4], 5, NULL);
 }
 
+static void test_REVERSE_ARGS(void)
+{
+	int y[] = {REVERSE_ARGS(1, 2, 3)};
+
+	zassert_equal(y[0], 3, NULL);
+	zassert_equal(y[1], 2, NULL);
+	zassert_equal(y[2], 1, NULL);
+}
+
 #if __cplusplus
 extern "C" void test_cxx(void);
 void test_cxx(void)
@@ -470,7 +479,8 @@ void test_cc(void)
 			 ztest_unit_test(test_nested_FOR_EACH),
 			 ztest_unit_test(test_GET_ARG_N),
 			 ztest_unit_test(test_GET_ARGS_LESS_N),
-			 ztest_unit_test(test_mixing_GET_ARG_and_FOR_EACH)
+			 ztest_unit_test(test_mixing_GET_ARG_and_FOR_EACH),
+			 ztest_unit_test(test_REVERSE_ARGS)
 	);
 
 	ztest_run_test_suite(test_lib_sys_util_tests);
