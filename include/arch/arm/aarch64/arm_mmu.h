@@ -46,7 +46,7 @@
 #define MT_P_EXECUTE_SHIFT	5U
 #define MT_U_EXECUTE_SHIFT	6U
 #define MT_RW_AP_SHIFT		7U
-#define MT_OVERWRITE_SHIFT	8U
+#define MT_NO_OVERWRITE_SHIFT	8U
 
 #define MT_RO			(0U << MT_PERM_SHIFT)
 #define MT_RW			(1U << MT_PERM_SHIFT)
@@ -63,7 +63,7 @@
 #define MT_U_EXECUTE		(0U << MT_U_EXECUTE_SHIFT)
 #define MT_U_EXECUTE_NEVER	(1U << MT_U_EXECUTE_SHIFT)
 
-#define MT_OVERWRITE		(1U << MT_OVERWRITE_SHIFT)
+#define MT_NO_OVERWRITE		(1U << MT_NO_OVERWRITE_SHIFT)
 
 #define MT_P_RW_U_RW		(MT_RW | MT_RW_AP_ELx | MT_P_EXECUTE_NEVER | MT_U_EXECUTE_NEVER)
 #define MT_P_RW_U_NA		(MT_RW | MT_RW_AP_EL_HIGHER  | MT_P_EXECUTE_NEVER | MT_U_EXECUTE_NEVER)
@@ -165,8 +165,7 @@ struct arm_mmu_config {
 };
 
 struct arm_mmu_ptables {
-	uint64_t *xlat_tables;
-	unsigned int next_table;
+	uint64_t *base_xlat_table;
 };
 
 /* Convenience macros to represent the ARMv8-A-specific

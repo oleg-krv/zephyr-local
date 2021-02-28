@@ -122,6 +122,19 @@ struct lorawan_join_config {
 int lorawan_set_battery_level_callback(uint8_t (*battery_lvl_cb)(void));
 
 /**
+ * @brief Register a callback to be called when the datarate changes
+ *
+ * The callback is called once upon successfully joining a network and again
+ * each time the datarate changes due to ADR.
+ *
+ * The callback function takes one parameter:
+ *	- dr - updated datarate
+ *
+ * @param dr_cb Pointer to datarate update callback
+ */
+void lorawan_register_dr_changed_callback(void (*dr_cb)(enum lorawan_datarate));
+
+/**
  * @brief Join the LoRaWAN network
  *
  * Join the LoRaWAN network using OTAA or AWB.
@@ -204,6 +217,29 @@ void lorawan_enable_adr(bool enable);
  * @return 0 if successful, negative errno code if failure
  */
 int lorawan_set_datarate(enum lorawan_datarate dr);
+
+/**
+ * @brief Get the minimum possible datarate
+ *
+ * The minimum possible datarate may change in response to a TxParamSetupReq
+ * command from the network server.
+ *
+ * @return Minimum possible data rate
+ */
+enum lorawan_datarate lorawan_get_min_datarate(void);
+
+/**
+ * @brief Get the current payload sizes
+ *
+ * Query the current payload sizes. The maximum payload size varies with
+ * datarate, while the current payload size can be less due to MAC layer
+ * commands which are inserted into uplink packets.
+ *
+ * @param max_next_payload_size Maximum payload size for the next transmission
+ * @param max_payload_size Maximum payload size for this datarate
+ */
+void lorawan_get_payload_sizes(uint8_t *max_next_payload_size,
+			       uint8_t *max_payload_size);
 
 #ifdef __cplusplus
 }
