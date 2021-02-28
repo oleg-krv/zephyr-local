@@ -176,7 +176,7 @@ static void lsm6ds3_handle_interrupt(const struct device *dev)
 							   (uint8_t*)&lsm6ds3_fifo_status2, 1) < 0) {
 			LOG_ERR("failed reading FIFO status reg");
 			break;
-		};
+		}
 		if (lsm6ds3_fifo_status2.fth && (lsm6ds3->handler_drdy_acc != NULL)) {
 			lsm6ds3->handler_drdy_acc(dev, &drdy_trigger);
 			continue;
@@ -306,7 +306,7 @@ int lsm6ds3_init_interrupt(const struct device *dev)
 	/* enable interrupt on int1/int2 in pulse mode */
 	if (lsm6ds3_int_notification_set(lsm6ds3->ctx,
 					 //LSM6DS3_ALL_INT_PULSED) < 0) {
-									 LSM6DS3_INT_PULSED) <0) {
+					 LSM6DS3_INT_PULSED) <0) {
 		LOG_DBG("Could not set pulse mode");
 		return -EIO;
 	}
