@@ -109,6 +109,12 @@ config SHELL_VT100_COLORS
 	help
 	  If enabled VT100 colors are used in shell (e.g. print errors in red).
 
+config SHELL_GETOPT
+	bool "Enable getopt support"
+	select GETOPT
+	help
+	  Enables getopt support in the shell.
+
 config SHELL_METAKEYS
 	bool "Enable metakeys"
 	default y if !SHELL_MINIMAL
@@ -121,7 +127,17 @@ config SHELL_HELP
 	bool "Enable help message"
 	default y if !SHELL_MINIMAL
 	help
-	  Enables formatting help message when requested with '-h' or '--help'.
+	  Enables shell functions for printing formatted help message.
+
+config SHELL_HELP_OPT_PARSE
+	bool "Parse -h and --help options"
+	depends on SHELL_HELP
+	depends on !SHELL_GETOPT
+	default y
+	help
+	  Shell parses command to find '-h' or '--help' string. If the shell
+	  finds the string, it will automatically print a help message
+	  for a command.
 
 config SHELL_HELP_ON_WRONG_ARGUMENT_COUNT
 	bool "Enable printing help on wrong argument count"
