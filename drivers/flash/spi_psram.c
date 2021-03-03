@@ -84,8 +84,8 @@ static inline uint16_t dev_page_size(const struct device *dev)
 }
 
 static const struct flash_parameters spi_psram_parameters = {
-		.write_block_size = 1,
-		.erase_value = 0xff,
+	.write_block_size = 1,
+	.erase_value = 0xff,
 };
 
 /*
@@ -100,59 +100,48 @@ static const struct flash_parameters spi_psram_parameters = {
  * @param is_write A flag to define if it's a read or a write command
  * @return 0 on success, negative errno code otherwise
  */
-static int spi_psram_access(const struct device *const dev,
-						    uint8_t opcode, bool is_addressed, off_t addr,
-						    void *data, size_t length, bool is_write)
+static int spi_psram_access(const struct device *const dev, uint8_t opcode,
+			    bool is_addressed, off_t addr, void *data,
+			    size_t length, bool is_write)
 {
 	struct spi_psram_data *const driver_data = dev->data;
 
 	uint8_t buf[4] = {
-			opcode,
-			(addr & 0xFF0000) >> 16,
-			(addr & 0xFF00) >> 8,
-			(addr & 0xFF),
+		opcode,
+		(addr & 0xFF0000) >> 16,
+		(addr & 0xFF00) >> 8,
+		(addr & 0xFF),
 	};
 
-	struct spi_buf spi_buf[2] = {
-			{
-					.buf = buf,
-					.len = (is_addressed) ? 4 : 1,
-			},
-			{
-					.buf = data,
-					.len = length
-			}
-	};
-	const struct spi_buf_set tx_set = {
-			.buffers = spi_buf,
-			.count = (length) ? 2 : 1
-	};
+	struct spi_buf spi_buf[2] = { {
+					      .buf = buf,
+					      .len = (is_addressed) ? 4 : 1,
+				      },
+				      { .buf = data, .len = length } };
+	const struct spi_buf_set tx_set = { .buffers = spi_buf,
+					    .count = (length) ? 2 : 1 };
 
-	const struct spi_buf_set rx_set = {
-			.buffers = spi_buf,
-			.count = 2
-	};
+	const struct spi_buf_set rx_set = { .buffers = spi_buf, .count = 2 };
 
 	if (is_write) {
-		return spi_write(driver_data->spi,
-						 &driver_data->spi_cfg, &tx_set);
+		return spi_write(driver_data->spi, &driver_data->spi_cfg,
+				 &tx_set);
 	}
 
-	return spi_transceive(driver_data->spi,
-						  &driver_data->spi_cfg, &tx_set, &rx_set);
+	return spi_transceive(driver_data->spi, &driver_data->spi_cfg, &tx_set,
+			      &rx_set);
 }
 
-#define spi_psram_cmd_read(dev, opcode, dest, length) \
+#define spi_psram_cmd_read(dev, opcode, dest, length)                          \
 	spi_psram_access(dev, opcode, false, 0, dest, length, false)
-#define spi_psram_cmd_addr_read(dev, opcode, addr, dest, length) \
+#define spi_psram_cmd_addr_read(dev, opcode, addr, dest, length)               \
 	spi_psram_access(dev, opcode, true, addr, dest, length, false)
-#define spi_psram_cmd_addr_read_wait(dev, opcode, addr, dest, length) \
+#define spi_psram_cmd_addr_read_wait(dev, opcode, addr, dest, length)          \
 	spi_psram_access(dev, opcode, true, addr, dest, length, false)
-#define spi_psram_cmd_write(dev, opcode) \
+#define spi_psram_cmd_write(dev, opcode)                                       \
 	spi_psram_access(dev, opcode, false, 0, NULL, 0, true)
-#define spi_psram_cmd_addr_write(dev, opcode, addr, src, length) \
+#define spi_psram_cmd_addr_write(dev, opcode, addr, src, length)               \
 	spi_psram_access(dev, opcode, true, addr, (void *)src, length, true)
-
 
 /* Everything necessary to acquire owning access to the device.
  *
@@ -183,7 +172,7 @@ static void release_device(const struct device *dev)
 }
 
 static int spi_psram_read(const struct device *dev, off_t addr, void *dest,
-						  size_t size)
+			  size_t size)
 {
 	struct spi_psram_data *data = dev->data;
 	const size_t psram_size = dev_spi_psram_size(dev);
@@ -196,20 +185,21 @@ static int spi_psram_read(const struct device *dev, off_t addr, void *dest,
 	acquire_device(dev);
 
 	/* ToDo: realise wait read */
-	if (data->spi_cfg.frequency >= DT_INST_PROP(0, read_not_wait_max_frequency) ) {
+	if (data->spi_cfg.frequency >=
+	    DT_INST_PROP(0, read_not_wait_max_frequency)) {
 		LOG_ERR("Not realise wait read");
 		return -EINVAL;
 	}
 
-	int ret = spi_psram_cmd_addr_read(dev, SPI_PSRAM_CMD_READ, addr, dest, size);
+	int ret = spi_psram_cmd_addr_read(dev, SPI_PSRAM_CMD_READ, addr, dest,
+					  size);
 
 	release_device(dev);
 	return ret;
 }
 
 static int spi_psram_write(const struct device *dev, off_t addr,
-						   const void *src,
-						   size_t size)
+			   const void *src, size_t size)
 {
 	struct spi_psram_data *data = dev->data;
 	const size_t psram_size = dev_spi_psram_size(dev);
@@ -217,7 +207,8 @@ static int spi_psram_write(const struct device *dev, off_t addr,
 	int ret = 0;
 
 	/* should be between 0 and flash size */
-	if ((addr < 0) || ((size + addr) > psram_size) || data->write_protection) {
+	if ((addr < 0) || ((size + addr) > psram_size) ||
+	    data->write_protection) {
 		return -EINVAL;
 	}
 
@@ -230,8 +221,8 @@ static int spi_psram_write(const struct device *dev, off_t addr,
 			to_write = page_size;
 		}
 
-		ret = spi_psram_cmd_addr_write(dev, SPI_PSRAM_CMD_WR, addr,
-									   src, to_write);
+		ret = spi_psram_cmd_addr_write(dev, SPI_PSRAM_CMD_WR, addr, src,
+					       to_write);
 		if (ret != 0) {
 			goto out;
 		}
@@ -253,7 +244,8 @@ static int spi_psram_erase(const struct device *dev, off_t addr, size_t size)
 	int ret = 0;
 
 	/* should be between 0 and flash size */
-	if ((addr < 0) || ((size + addr) > psram_size) || data->write_protection) {
+	if ((addr < 0) || ((size + addr) > psram_size) ||
+	    data->write_protection) {
 		return -EINVAL;
 	}
 
@@ -261,7 +253,7 @@ static int spi_psram_erase(const struct device *dev, off_t addr, size_t size)
 }
 
 static int spi_psram_write_protection_set(const struct device *dev,
-										bool write_protect)
+					  bool write_protect)
 {
 	int ret = 0;
 	struct spi_psram_data *data = dev->data;
@@ -275,8 +267,8 @@ static int spi_psram_write_protection_set(const struct device *dev,
 	return ret;
 }
 
-static int spi_psram_read_id(const struct device *dev,
-							 uint8_t *mf_id, uint8_t *kgd, uint8_t *eid)
+static int spi_psram_read_id(const struct device *dev, uint8_t *mf_id,
+			     uint8_t *kgd, uint8_t *eid)
 {
 	if (mf_id == NULL) {
 		return -EINVAL;
@@ -285,7 +277,8 @@ static int spi_psram_read_id(const struct device *dev,
 
 	acquire_device(dev);
 
-	int ret = spi_psram_cmd_addr_read(dev, SPI_PSRAM_CMD_RDID, 0x000000U, data, SPI_PSRAM_MAX_READ_ID_LEN);
+	int ret = spi_psram_cmd_addr_read(dev, SPI_PSRAM_CMD_RDID, 0x000000U,
+					  data, SPI_PSRAM_MAX_READ_ID_LEN);
 
 	release_device(dev);
 
@@ -297,19 +290,19 @@ static int spi_psram_read_id(const struct device *dev,
 }
 
 #ifdef CONFIG_FLASH_JESD216_API
-static int spi_psram_read_jedec_id(const struct device *dev,
-								 uint8_t *id)
+static int spi_psram_read_jedec_id(const struct device *dev, uint8_t *id)
 {
 	if (id == NULL) {
 		return -EINVAL;
 	}
 	acquire_device(dev);
 
-	int ret = spi_psram_cmd_read(dev, SPI_PSRAM_CMD_RDID, id, SPI_PSRAM_MAX_READ_ID_LEN);
+	int ret = spi_psram_cmd_read(dev, SPI_PSRAM_CMD_RDID, id,
+				     SPI_PSRAM_MAX_READ_ID_LEN);
 
 	release_device(dev);
 
-	return  ret;
+	return ret;
 }
 #endif /*CONFIG_FLASH_JESD216_API*/
 
@@ -369,8 +362,8 @@ static int spi_psram_configure(const struct device *dev)
 	}
 
 	if (mf_id != cfg->mf_id[0]) {
-		LOG_ERR("Device id %02x does not match config %02x ",
-				mf_id, cfg->mf_id[0]);
+		LOG_ERR("Device id %02x does not match config %02x ", mf_id,
+			cfg->mf_id[0]);
 		return -EINVAL;
 	}
 
@@ -397,8 +390,8 @@ static int spi_psram_init(const struct device *dev)
 #ifdef CONFIG_FLASH_PAGE_LAYOUT
 
 static void spi_psram_pages_layout(const struct device *dev,
-								   const struct flash_pages_layout **layout,
-								   size_t *layout_size)
+				   const struct flash_pages_layout **layout,
+				   size_t *layout_size)
 {
 	const struct spi_psram_config *cfg = dev->config;
 
@@ -418,17 +411,17 @@ spi_psram_get_parameters(const struct device *dev)
 }
 
 static const struct flash_driver_api spi_psram_api = {
-		.read = spi_psram_read,
-		.write = spi_psram_write,
-		.erase = spi_psram_erase,
-		.get_parameters = spi_psram_get_parameters,
-		.write_protection = spi_psram_write_protection_set,
+	.read = spi_psram_read,
+	.write = spi_psram_write,
+	.erase = spi_psram_erase,
+	.get_parameters = spi_psram_get_parameters,
+	.write_protection = spi_psram_write_protection_set,
 #ifdef CONFIG_FLASH_PAGE_LAYOUT
-		.page_layout = spi_psram_pages_layout,
+	.page_layout = spi_psram_pages_layout,
 #endif
 #ifdef CONFIG_FLASH_JESD216_API
-		.sfdp_read = NULL,
-		.read_jedec_id = spi_psram_read_jedec_id,
+	.sfdp_read = NULL,
+	.read_jedec_id = spi_psram_read_jedec_id,
 #endif
 };
 
@@ -438,21 +431,20 @@ static const struct flash_driver_api spi_psram_api = {
  * the device.  We can't extract it from the raw BFP data, so require
  * it to be present in devicetree.
  */
-BUILD_ASSERT(DT_INST_NODE_HAS_PROP(0, size),
-			 "pseudo,sram size required");
+BUILD_ASSERT(DT_INST_NODE_HAS_PROP(0, size), "pseudo,sram size required");
 
 /* instance 0 size in bytes */
 #define INST_0_BYTES (DT_INST_PROP(0, size) / 8)
 
 BUILD_ASSERT(SPI_PSRAM_IS_SECTOR_ALIGNED(CONFIG_SPI_PSRAM_LAYOUT_PAGE_SIZE),
-			 "SPI_PSRAM_LAYOUT_PAGE_SIZE must be multiple of 4096");
+	     "SPI_PSRAM_LAYOUT_PAGE_SIZE must be multiple of 4096");
 
 /* instance 0 page count */
 #define LAYOUT_PAGES_COUNT (INST_0_BYTES / CONFIG_SPI_PSRAM_LAYOUT_PAGE_SIZE)
 
-BUILD_ASSERT((CONFIG_SPI_PSRAM_LAYOUT_PAGE_SIZE * LAYOUT_PAGES_COUNT)
-			 == INST_0_BYTES,
-			 "SPI_PSRAM_LAYOUT_PAGE_SIZE incompatible with flash size");
+BUILD_ASSERT((CONFIG_SPI_PSRAM_LAYOUT_PAGE_SIZE * LAYOUT_PAGES_COUNT) ==
+		     INST_0_BYTES,
+	     "SPI_PSRAM_LAYOUT_PAGE_SIZE incompatible with flash size");
 
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 
@@ -473,6 +465,5 @@ static const struct spi_psram_config spi_psram_config_0 = {
 static struct spi_psram_data spi_psram_data_0;
 
 DEVICE_DT_INST_DEFINE(0, &spi_psram_init, device_pm_control_nop,
-					  &spi_psram_data_0, &spi_psram_config_0,
-					  POST_KERNEL, CONFIG_SPI_PSRAM_INIT_PRIORITY,
-					  &spi_psram_api);
+		      &spi_psram_data_0, &spi_psram_config_0, POST_KERNEL,
+		      CONFIG_SPI_PSRAM_INIT_PRIORITY, &spi_psram_api);
