@@ -19,7 +19,6 @@ zephyr_sources(
   sem.c
   thread_entry.c
   timeutil.c
-  work_q.c
   heap.c
   heap-validate.c
   )
@@ -33,7 +32,7 @@ zephyr_sources_ifdef(CONFIG_RING_BUFFER ring_buffer.c)
 
 zephyr_sources_ifdef(CONFIG_ASSERT assert.c)
 
-zephyr_sources_ifdef(CONFIG_USERSPACE mutex.c)
+zephyr_sources_ifdef(CONFIG_USERSPACE mutex.c user_work.c)
 
 zephyr_sources_ifdef(CONFIG_SCHED_DEADLINE p4wq.c)
 

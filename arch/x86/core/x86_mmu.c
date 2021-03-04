@@ -208,27 +208,61 @@ static const struct paging_level paging_levels[] = {
 #define VM_ADDR		CONFIG_KERNEL_VM_BASE
 #define VM_SIZE		CONFIG_KERNEL_VM_SIZE
 
-/* Define a range [PT_START, PT_END) which is the memory range
- * covered by all the page tables needed for the address space
+/* Define a range [PT_VIRT_START, PT_VIRT_END) which is the memory range
+ * covered by all the page tables needed for the virtual address space
  */
-#define PT_START	((uintptr_t)ROUND_DOWN(VM_ADDR, PT_AREA))
-#define PT_END		((uintptr_t)ROUND_UP(VM_ADDR + VM_SIZE, PT_AREA))
+#define PT_VIRT_START	((uintptr_t)ROUND_DOWN(VM_ADDR, PT_AREA))
+#define PT_VIRT_END	((uintptr_t)ROUND_UP(VM_ADDR + VM_SIZE, PT_AREA))
 
 /* Number of page tables needed to cover address space. Depends on the specific
  * bounds, but roughly 1 page table per 2MB of RAM
  */
-#define NUM_PT	((PT_END - PT_START) / PT_AREA)
+#define NUM_PT_VIRT	((PT_VIRT_END - PT_VIRT_START) / PT_AREA)
+
+#ifdef CONFIG_KERNEL_LINK_IN_VIRT
+/* When linking in virtual address space, the physical address space
+ * also needs to be mapped as platform is booted via physical address
+ * and various structures needed by boot (e.g. GDT, IDT) must be
+ * available via physical addresses. So the reserved space for
+ * page tables needs to be enlarged to accommodate this.
+ *
+ * Note that this assumes the physical and virtual address spaces
+ * do not overlap, hence the simply addition of space.
+ */
+#define SRAM_ADDR	CONFIG_SRAM_BASE_ADDRESS
+#define SRAM_SIZE	KB(CONFIG_SRAM_SIZE)
+
+#define PT_PHYS_START	((uintptr_t)ROUND_DOWN(SRAM_ADDR, PT_AREA))
+#define PT_PHYS_END	((uintptr_t)ROUND_UP(SRAM_ADDR + SRAM_SIZE, PT_AREA))
+
+#define NUM_PT_PHYS	((PT_PHYS_END - PT_PHYS_START) / PT_AREA)
+#else
+#define NUM_PT_PHYS	0
+#endif /* CONFIG_KERNEL_LINK_IN_VIRT */
+
+#define NUM_PT		(NUM_PT_VIRT + NUM_PT_PHYS)
 
 #if defined(CONFIG_X86_64) || defined(CONFIG_X86_PAE)
 /* Same semantics as above, but for the page directories needed to cover
  * system RAM.
  */
-#define PD_START	((uintptr_t)ROUND_DOWN(VM_ADDR, PD_AREA))
-#define PD_END		((uintptr_t)ROUND_UP(VM_ADDR + VM_SIZE, PD_AREA))
+#define PD_VIRT_START	((uintptr_t)ROUND_DOWN(VM_ADDR, PD_AREA))
+#define PD_VIRT_END	((uintptr_t)ROUND_UP(VM_ADDR + VM_SIZE, PD_AREA))
 /* Number of page directories needed to cover the address space. Depends on the
  * specific bounds, but roughly 1 page directory per 1GB of RAM
  */
-#define NUM_PD	((PD_END - PD_START) / PD_AREA)
+#define NUM_PD_VIRT	((PD_VIRT_END - PD_VIRT_START) / PD_AREA)
+
+#ifdef CONFIG_KERNEL_LINK_IN_VIRT
+#define PD_PHYS_START	((uintptr_t)ROUND_DOWN(SRAM_ADDR, PD_AREA))
+#define PD_PHYS_END	((uintptr_t)ROUND_UP(SRAM_ADDR + SRAM_SIZE, PD_AREA))
+
+#define NUM_PD_PHYS	((PD_PHYS_END - PD_PHYS_START) / PD_AREA)
+#else
+#define NUM_PD_PHYS	0
+#endif /* CONFIG_KERNEL_LINK_IN_VIRT */
+
+#define NUM_PD		(NUM_PD_VIRT + NUM_PD_PHYS)
 #else
 /* 32-bit page tables just have one toplevel page directory */
 #define NUM_PD	1
@@ -736,7 +770,7 @@ static inline pentry_t pte_finalize_value(pentry_t val, bool user_table)
 {
 #ifdef CONFIG_X86_KPTI
 	static const uintptr_t shared_phys_addr =
-		(uintptr_t)Z_X86_PHYS_ADDR(&z_shared_kernel_page_start);
+		Z_X86_PHYS_ADDR(POINTER_TO_UINT(&z_shared_kernel_page_start));
 
 	if (user_table && (val & MMU_US) == 0 && (val & MMU_P) != 0 &&
 	    get_entry_phys(val, PTE_LEVEL) != shared_phys_addr) {
@@ -1627,9 +1661,12 @@ void arch_mem_domain_thread_add(struct k_thread *thread)
 	/* New memory domain we are being added to */
 	struct k_mem_domain *domain = thread->mem_domain_info.mem_domain;
 	/* This is only set for threads that were migrating from some other
-	 * memory domain; new threads this is NULL
+	 * memory domain; new threads this is NULL.
+	 *
+	 * Note that NULL check on old_ptables must be done before any
+	 * address translation or else (NULL + offset) != NULL.
 	 */
-	pentry_t *old_ptables = z_x86_virt_addr(thread->arch.ptables);
+	pentry_t *old_ptables = UINT_TO_POINTER(thread->arch.ptables);
 	bool is_user = (thread->base.user_options & K_USER) != 0;
 	bool is_migration = (old_ptables != NULL) && is_user;
 
@@ -1638,6 +1675,7 @@ void arch_mem_domain_thread_add(struct k_thread *thread)
 	 * z_x86_current_stack_perms()
 	 */
 	if (is_migration) {
+		old_ptables = z_x86_virt_addr(thread->arch.ptables);
 		set_stack_perms(thread, domain->arch.ptables);
 	}
 

@@ -1942,10 +1942,30 @@ int net_tcp_queue_data(struct net_context *context, struct net_pkt *pkt)
 
 	if (tcp_window_full(conn)) {
 		/* Trigger resend if the timer is not active */
-		if (!k_delayed_work_remaining_get(&conn->send_data_timer)) {
-			NET_DBG("Window full, trigger resend");
-			tcp_resend_data(&conn->send_data_timer.work);
-		}
+		/* TODO: use k_work_delayable for send_data_timer so we don't
+		 * have to directly access the internals of the legacy object.
+		 *
+		 * NOTE: It is not permitted to access any fields of k_work or
+		 * k_work_delayable directly.  This replacement does so, but
+		 * only as a temporary workaround until the legacy
+		 * k_delayed_work structure is replaced with k_work_delayable;
+		 * at that point k_work_schedule() can be invoked to cause the
+		 * work to be scheduled if it is not already scheduled.
+		 *
+		 * This solution diverges from the original, which would
+		 * invoke the retransmit function directly here.  Because that
+		 * function is given a k_work pointer, again this cannot be
+		 * done without accessing the internal data of the
+		 * k_work_delayable structure.
+		 *
+		 * The original inline retransmission could be supported by
+		 * refactoring the work_handler to delegate to a function that
+		 * takes conn directly, rather than the work item in which
+		 * conn is embedded, and calling that function directly here
+		 * and in the work handler.
+		 */
+		(void)k_work_schedule_for_queue(&tcp_work_q,
+						&conn->send_data_timer.work, K_NO_WAIT);
 
 		ret = -EAGAIN;
 		goto out;
