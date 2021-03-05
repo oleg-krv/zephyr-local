@@ -244,7 +244,7 @@
 /drivers/peci/                            @albertofloyd @franciscomunoz @scottwcpg
 /drivers/pinmux/*hsdk*                    @iriszzw
 /drivers/pinmux/*it8xxx2*                 @ite
-/drivers/psci/                            @carlocaione
+/drivers/pm_cpu_ops/                      @carlocaione
 /drivers/ps2/                             @albertofloyd @franciscomunoz @scottwcpg
 /drivers/pwm/*rv32m1*                     @henrikbrixandersen
 /drivers/pwm/*sam0*                       @nzmichaelh
@@ -365,7 +365,7 @@
 /dts/bindings/*/sifive*                   @mateusz-holenko @kgugala @pgielda
 /dts/bindings/*/litex*                    @mateusz-holenko @kgugala @pgielda
 /dts/bindings/*/vexriscv*                 @mateusz-holenko @kgugala @pgielda
-/dts/bindings/psci/*                      @carlocaione
+/dts/bindings/pm_cpu_ops/*                @carlocaione
 /dts/posix/                               @aescolar @vanwinkeljan @daor-oti
 /dts/bindings/sensor/*bme680*             @BoschSensortec
 /dts/bindings/sensor/st*                  @avisconti
@@ -392,7 +392,8 @@
 /include/drivers/spi.h                    @tbursztyka
 /include/drivers/lora.h                   @Mani-Sadhasivam
 /include/drivers/peci.h                   @albertofloyd @franciscomunoz @scottwcpg
-/include/drivers/psci.h                   @carlocaione
+/include/drivers/pm_cpu_ops.h             @carlocaione
+/include/drivers/pm_cpu_ops/              @carlocaione
 /include/app_memory/                      @dcpleung
 /include/arch/arc/                        @abrodkin @ruuddw
 /include/arch/arc/arch.h                  @abrodkin @ruuddw
@@ -412,6 +413,7 @@
 /include/arch/sparc/                      @martin-aberg
 /include/sys/atomic.h                     @andyross
 /include/bluetooth/                       @joerchan @jhedberg @Vudentz
+/include/bluetooth/audio/                 @joerchan @jhedberg @Vudentz @Thalley @asbjornsabo
 /include/cache.h                          @carlocaione @andyross
 /include/canbus/                          @alexanderwachter
 /include/tracing/                         @nashif
@@ -462,6 +464,7 @@
 /lib/gui/                                 @vanwinkeljan
 /lib/open-amp/                            @arnopo
 /lib/os/                                  @dcpleung @nashif @andyross
+/lib/os/cbprintf_packaged.c               @npitre
 /lib/posix/                               @pfalcon
 /lib/cmsis_rtos_v2/                       @nashif
 /lib/cmsis_rtos_v1/                       @nashif
@@ -538,6 +541,7 @@
 /share/zephyr-package/                    @tejlmand
 /share/zephyrunittest-package/            @tejlmand
 /subsys/bluetooth/                        @joerchan @jhedberg @Vudentz
+/subsys/bluetooth/audio/                  @joerchan @jhedberg @Vudentz @Thalley @asbjornsabo
 /subsys/bluetooth/controller/             @carlescufi @cvinayak @thoh-ot @kruithofa
 /subsys/bluetooth/mesh/                   @jhedberg @trond-snekvik @joerchan @Vudentz
 /subsys/canbus/                           @alexanderwachter
