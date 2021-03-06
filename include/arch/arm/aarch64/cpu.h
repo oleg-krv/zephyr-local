@@ -77,6 +77,7 @@
 
 #define GET_MPIDR()		read_sysreg(mpidr_el1)
 #define MPIDR_TO_CORE(mpidr)	MPIDR_AFFLVL(mpidr, 0)
+#define IS_PRIMARY_CORE()	(!MPIDR_TO_CORE(GET_MPIDR()))
 
 #define MODE_EL_SHIFT		(0x2)
 #define MODE_EL_MASK		(0x3)
@@ -200,5 +201,9 @@
 #define CORTEX_A72_L2ACTLR_DISABLE_ACE_SH_OR_CHI_BIT	BIT(6)
 
 #endif /* CONFIG_CPU_CORTEX_A72 */
+
+#define L1_CACHE_SHIFT		(6)
+#define L1_CACHE_BYTES		BIT(L1_CACHE_SHIFT)
+#define ARM64_CPU_INIT_SIZE	L1_CACHE_BYTES
 
 #endif /* ZEPHYR_INCLUDE_ARCH_ARM_AARCH64_CPU_H_ */

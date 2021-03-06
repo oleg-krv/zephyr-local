@@ -32,7 +32,7 @@ extern const struct log_backend *log_backend_net_get(void);
 extern int net_init_clock_via_sntp(void);
 
 static K_SEM_DEFINE(waiter, 0, 1);
-static struct k_sem counter;
+static K_SEM_DEFINE(counter, 0, UINT_MAX);
 static atomic_t services_flags;
 
 #if defined(CONFIG_NET_NATIVE)
@@ -361,7 +361,7 @@ int net_config_init_by_iface(struct net_if *iface, const char *app_info,
 
 	/* First make sure that network interface is up */
 	if (check_interface(iface) == false) {
-		k_sem_init(&counter, 1, UINT_MAX);
+		k_sem_init(&counter, 1, K_SEM_MAX_LIMIT);
 
 		while (count-- > 0) {
 			if (!k_sem_count_get(&counter)) {
