@@ -94,8 +94,6 @@ static int cbprintf_via_va_list(cbprintf_cb out, void *ctx,
 	return cbvprintf(out, ctx, fmt, u.ap);
 }
 
-#define VA_STACK_MIN_ALIGN	8
-
 #elif defined(__x86_64__)
 /*
  * Reference:
@@ -130,8 +128,6 @@ static int cbprintf_via_va_list(cbprintf_cb out, void *ctx,
 
 	return cbvprintf(out, ctx, fmt, u.ap);
 }
-
-#define VA_STACK_MIN_ALIGN	8
 
 #elif defined(__xtensa__)
 /*
@@ -193,38 +189,10 @@ static int cbprintf_via_va_list(cbprintf_cb out, void *ctx,
 
 #endif
 
-/*
- * Special alignment cases
- */
-
-#if defined(__i386__)
-/* there are no gaps on the stack */
-#define VA_STACK_ALIGN(type)	1
-#endif
-
-#if defined(__riscv)
-#define VA_STACK_MIN_ALIGN	(__riscv_xlen / 8)
-#endif
-
 #if defined(__sparc__)
-/* no gaps on the stack even though the CPU can't do unaligned accesses */
-#define VA_STACK_ALIGN(type)	1
+/* CPU can't do unaligned accesses even though no gaps on the stack.*/
 #define VA_STACK_LL_DBL_MEMCPY	true
-#endif
-
-/*
- * Default alignment values if not specified by architecture config
- */
-
-#ifndef VA_STACK_MIN_ALIGN
-#define VA_STACK_MIN_ALIGN	1
-#endif
-
-#ifndef VA_STACK_ALIGN
-#define VA_STACK_ALIGN(type)	MAX(VA_STACK_MIN_ALIGN, __alignof__(type))
-#endif
-
-#ifndef VA_STACK_LL_DBL_MEMCPY
+#else
 #define VA_STACK_LL_DBL_MEMCPY	false
 #endif
 
@@ -405,6 +373,11 @@ int cbvprintf_package(void *packaged, size_t len,
 
 		/* align destination buffer location */
 		buf = (void *) ROUND_UP(buf, align);
+
+		/* Check if buffer is properly aligned. */
+		if ((uintptr_t)buf0 & (align - 1)) {
+			return -EFAULT;
+		}
 
 		/* make sure the data fits */
 		if (buf0 && buf - buf0 + size > len) {
