@@ -365,8 +365,8 @@ uint8_t ll_adv_params_set(uint16_t interval, uint8_t adv_type,
 	adv->own_addr_type = own_addr_type;
 	if (adv->own_addr_type == BT_ADDR_LE_PUBLIC_ID ||
 	    adv->own_addr_type == BT_ADDR_LE_RANDOM_ID) {
-		adv->id_addr_type = direct_addr_type;
-		memcpy(&adv->id_addr, direct_addr, BDADDR_SIZE);
+		adv->peer_addr_type = direct_addr_type;
+		memcpy(&adv->peer_addr, direct_addr, BDADDR_SIZE);
 	}
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
@@ -718,8 +718,8 @@ uint8_t ll_adv_enable(uint8_t enable)
 	if (adv->own_addr_type == BT_ADDR_LE_PUBLIC_ID ||
 	    adv->own_addr_type == BT_ADDR_LE_RANDOM_ID) {
 		/* Look up the resolving list */
-		lll->rl_idx = ull_filter_rl_find(adv->id_addr_type,
-						 adv->id_addr, NULL);
+		lll->rl_idx = ull_filter_rl_find(adv->peer_addr_type,
+						 adv->peer_addr, NULL);
 
 		if (lll->rl_idx != FILTER_IDX_NONE) {
 			/* Generate RPAs if required */
@@ -892,6 +892,13 @@ uint8_t ll_adv_enable(uint8_t enable)
 		conn->connect_expire = 6;
 		conn->supervision_expire = 0;
 		conn->procedure_expire = 0;
+
+#if defined(CONFIG_BT_CTLR_CHECK_SAME_PEER_CONN)
+		conn->own_addr_type = BT_ADDR_LE_NONE->type;
+		memcpy(conn->own_addr, BT_ADDR_LE_NONE->a.val, sizeof(conn->own_addr));
+		conn->peer_addr_type = BT_ADDR_LE_NONE->type;
+		memcpy(conn->peer_addr, BT_ADDR_LE_NONE->a.val, sizeof(conn->peer_addr));
+#endif /* CONFIG_BT_CTLR_CHECK_SAME_PEER_CONN */
 
 		conn->common.fex_valid = 0;
 		conn->slave.latency_cancel = 0;
@@ -1986,22 +1993,6 @@ static inline uint8_t disable(uint8_t handle)
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
 
-#if defined(CONFIG_BT_CTLR_ADV_EXT) && (CONFIG_BT_CTLR_ADV_AUX_SET > 0)
-	struct lll_adv_aux *lll_aux = adv->lll.aux;
-
-	if (lll_aux) {
-		struct ll_adv_aux_set *aux;
-		uint8_t err;
-
-		aux = (void *)HDR_LLL2EVT(lll_aux);
-
-		err = ull_adv_aux_stop(aux);
-		if (err) {
-			return err;
-		}
-	}
-#endif /* CONFIG_BT_CTLR_ADV_EXT && (CONFIG_BT_CTLR_ADV_AUX_SET > 0) */
-
 	mark = ull_disable_mark(adv);
 	LL_ASSERT(mark == adv);
 
@@ -2038,6 +2029,22 @@ static inline uint8_t disable(uint8_t handle)
 
 	mark = ull_disable_unmark(adv);
 	LL_ASSERT(mark == adv);
+
+#if defined(CONFIG_BT_CTLR_ADV_EXT) && (CONFIG_BT_CTLR_ADV_AUX_SET > 0)
+	struct lll_adv_aux *lll_aux = adv->lll.aux;
+
+	if (lll_aux) {
+		struct ll_adv_aux_set *aux;
+		uint8_t err;
+
+		aux = (void *)HDR_LLL2EVT(lll_aux);
+
+		err = ull_adv_aux_stop(aux);
+		if (err) {
+			return err;
+		}
+	}
+#endif /* CONFIG_BT_CTLR_ADV_EXT && (CONFIG_BT_CTLR_ADV_AUX_SET > 0) */
 
 #if defined(CONFIG_BT_PERIPHERAL)
 	if (adv->lll.conn) {
@@ -2089,20 +2096,34 @@ static inline uint8_t *adv_pdu_adva_get(struct pdu_adv *pdu)
 static const uint8_t *adva_update(struct ll_adv_set *adv, struct pdu_adv *pdu)
 {
 #if defined(CONFIG_BT_CTLR_PRIVACY)
-	const uint8_t *tx_addr = ull_filter_adva_get(adv);
+	const uint8_t *rpa = ull_filter_adva_get(adv);
 #else
-	const uint8_t *tx_addr = NULL;
+	const uint8_t *rpa = NULL;
 #endif
+	const uint8_t *own_addr;
+	const uint8_t *tx_addr;
 	uint8_t *adv_addr;
 
-	if (tx_addr) {
-		pdu->tx_addr = 1;
+	if (!rpa || IS_ENABLED(CONFIG_BT_CTLR_CHECK_SAME_PEER_CONN)) {
+		if (0) {
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
-	} else if (ll_adv_cmds_is_ext() && pdu->tx_addr) {
-		tx_addr = ll_adv_aux_random_addr_get(adv, NULL);
+		} else if (ll_adv_cmds_is_ext() && pdu->tx_addr) {
+			own_addr = ll_adv_aux_random_addr_get(adv, NULL);
 #endif
+		} else {
+			own_addr = ll_addr_get(pdu->tx_addr, NULL);
+		}
+	}
+
+#if defined(CONFIG_BT_CTLR_CHECK_SAME_PEER_CONN)
+	memcpy(adv->own_addr, own_addr, BDADDR_SIZE);
+#endif /* CONFIG_BT_CTLR_CHECK_SAME_PEER_CONN */
+
+	if (rpa) {
+		pdu->tx_addr = 1;
+		tx_addr = rpa;
 	} else {
-		tx_addr = ll_addr_get(pdu->tx_addr, NULL);
+		tx_addr = own_addr;
 	}
 
 	adv_addr = adv_pdu_adva_get(pdu);

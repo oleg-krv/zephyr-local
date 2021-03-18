@@ -40,6 +40,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include "lwm2m_object.h"
 #include "lwm2m_engine.h"
+#include "lwm2m_rw_link_format.h"
 #include "lwm2m_rw_plain_text.h"
 #include "lwm2m_rw_oma_tlv.h"
 #ifdef CONFIG_LWM2M_RW_JSON_SUPPORT
@@ -58,28 +59,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #define ENGINE_UPDATE_INTERVAL_MS 500
 #define OBSERVE_COUNTER_START 0U
-
-#define WELL_KNOWN_CORE_PATH	"</.well-known/core>"
-
-/*
- * TODO: to implement a way for clients to specify alternate path
- * via Kconfig (LwM2M specification 8.2.2 Alternate Path)
- *
- * For now, in order to inform server we support JSON format, we have to
- * report 'ct=11543' to the server. '</>' is required in order to append
- * content attribute. And resource type attribute is appended because of
- * Eclipse wakaama will reject the registration when 'rt="oma.lwm2m"' is
- * missing.
- */
-
-#define RESOURCE_TYPE		";rt=\"oma.lwm2m\""
-
-#if defined(CONFIG_LWM2M_RW_JSON_SUPPORT)
-#define REG_PREFACE		"</>" RESOURCE_TYPE \
-				";ct=" STRINGIFY(LWM2M_FORMAT_OMA_JSON)
-#else
-#define REG_PREFACE		""
-#endif
 
 #if defined(CONFIG_COAP_EXTENDED_OPTIONS_LEN)
 #define	COAP_OPTION_BUF_LEN	(CONFIG_COAP_EXTENDED_OPTIONS_LEN_VALUE + 1)
@@ -1101,17 +1080,13 @@ void lwm2m_acknowledge(struct lwm2m_ctx *client_ctx)
 	request->acknowledged = true;
 }
 
-uint16_t lwm2m_get_rd_data(uint8_t *client_data, uint16_t size)
+int lwm2m_register_payload_handler(struct lwm2m_message *msg)
 {
 	struct lwm2m_engine_obj *obj;
 	struct lwm2m_engine_obj_inst *obj_inst;
-	uint8_t temp[32];
-	uint16_t pos = 0U;
-	int len;
+	int ret;
 
-	/* Add resource-type/content-type to the registration message */
-	memcpy(client_data, REG_PREFACE, sizeof(REG_PREFACE) - 1);
-	pos += sizeof(REG_PREFACE) - 1;
+	engine_put_begin(&msg->out, NULL);
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&engine_obj_list, obj, node) {
 		/* Security obj MUST NOT be part of registration message */
@@ -1121,43 +1096,37 @@ uint16_t lwm2m_get_rd_data(uint8_t *client_data, uint16_t size)
 
 		/* Only report <OBJ_ID> when no instance available */
 		if (obj->instance_count == 0U) {
-			len = snprintk(temp, sizeof(temp), "%s</%u>",
-				       (pos > 0) ? "," : "", obj->obj_id);
-			if (pos + len >= size) {
-				/* full buffer -- exit loop */
-				break;
+			struct lwm2m_obj_path path = {
+				.obj_id = obj->obj_id,
+				.level = LWM2M_PATH_LEVEL_OBJECT,
+			};
+
+			ret = engine_put_corelink(&msg->out, &path);
+			if (ret < 0) {
+				return ret;
 			}
 
-			memcpy(&client_data[pos], temp, len);
-			pos += len;
 			continue;
 		}
 
 		SYS_SLIST_FOR_EACH_CONTAINER(&engine_obj_inst_list,
 					     obj_inst, node) {
 			if (obj_inst->obj->obj_id == obj->obj_id) {
-				len = snprintk(temp, sizeof(temp),
-					       "%s</%u/%u>",
-					       (pos > 0) ? "," : "",
-					       obj_inst->obj->obj_id,
-					       obj_inst->obj_inst_id);
-				/*
-				 * TODO: iterate through resources once block
-				 * transfer is handled correctly
-				 */
-				if (pos + len >= size) {
-					/* full buffer -- exit loop */
-					break;
-				}
+				struct lwm2m_obj_path path = {
+					.obj_id = obj_inst->obj->obj_id,
+					.obj_inst_id = obj_inst->obj_inst_id,
+					.level = LWM2M_PATH_LEVEL_OBJECT_INST,
+				};
 
-				memcpy(&client_data[pos], temp, len);
-				pos += len;
+				ret = engine_put_corelink(&msg->out, &path);
+				if (ret < 0) {
+					return ret;
+				}
 			}
 		}
 	}
 
-	client_data[pos] = '\0';
-	return pos;
+	return 0;
 }
 
 /* input / output selection */
@@ -1167,7 +1136,7 @@ static int select_writer(struct lwm2m_output_context *out, uint16_t accept)
 	switch (accept) {
 
 	case LWM2M_FORMAT_APP_LINK_FORMAT:
-		/* TODO: rewrite do_discover as content formatter */
+		out->writer = &link_format_writer;
 		break;
 
 	case LWM2M_FORMAT_PLAIN_TEXT:
@@ -1365,6 +1334,37 @@ static int path_to_objs(const struct lwm2m_obj_path *path,
 	}
 
 	return 0;
+}
+
+struct lwm2m_attr *lwm2m_engine_get_next_attr(const void *ref,
+					      struct lwm2m_attr *prev)
+{
+	struct lwm2m_attr *iter = (prev == NULL) ? write_attr_pool : prev + 1;
+	struct lwm2m_attr *result = NULL;
+
+	if (!PART_OF_ARRAY(write_attr_pool, iter)) {
+		return NULL;
+	}
+
+	while (iter < &write_attr_pool[ARRAY_SIZE(write_attr_pool)]) {
+		if (ref == iter->ref) {
+			result = iter;
+			break;
+		}
+
+		++iter;
+	}
+
+	return result;
+}
+
+const char *lwm2m_engine_get_attr_name(const struct lwm2m_attr *attr)
+{
+	if (attr->type >= NR_LWM2M_ATTR) {
+		return NULL;
+	}
+
+	return LWM2M_ATTR_STR[attr->type];
 }
 
 int lwm2m_engine_create_obj_inst(char *pathstr)
@@ -3217,88 +3217,22 @@ move_forward:
 	return ret;
 }
 
-static int print_attr(struct lwm2m_output_context *out,
-		      uint8_t *buf, uint16_t buflen, void *ref)
+int lwm2m_discover_handler(struct lwm2m_message *msg, bool is_bootstrap)
 {
-	struct lwm2m_attr *attr;
-	int i, used, base, ret;
-	uint8_t digit;
-	int32_t fraction;
-
-	for (i = 0; i < CONFIG_LWM2M_NUM_ATTR; i++) {
-		if (ref != write_attr_pool[i].ref) {
-			continue;
-		}
-
-		attr = write_attr_pool + i;
-
-		/* assuming integer will have float_val.val2 set as 0 */
-
-		used = snprintk(buf, buflen, ";%s=%s%d%s",
-				LWM2M_ATTR_STR[attr->type],
-				attr->float_val.val1 == 0 &&
-				attr->float_val.val2 < 0 ? "-" : "",
-				attr->float_val.val1,
-				attr->float_val.val2 != 0 ? "." : "");
-
-		base = 100000;
-		fraction = attr->float_val.val2 < 0 ?
-			   -attr->float_val.val2 : attr->float_val.val2;
-		while (fraction && used < buflen && base > 0) {
-			digit = fraction / base;
-			buf[used++] = '0' + digit;
-			fraction -= digit * base;
-			base /= 10;
-		}
-
-		ret = buf_append(CPKT_BUF_WRITE(out->out_cpkt), buf, used);
-		if (ret < 0) {
-			return ret;
-		}
-	}
-
-	return 0;
-}
-
-static int print_resource_dimension(struct lwm2m_output_context *out,
-				    uint8_t *buf, uint16_t buflen,
-				    struct lwm2m_engine_res *res)
-{
-	int ret, i, inst_count = 0;
-
-	if (res->multi_res_inst) {
-		for (i = 0; i < res->res_inst_count; i++) {
-			if (res->res_instances[i].res_inst_id !=
-			    RES_INSTANCE_NOT_CREATED) {
-				inst_count++;
-			}
-		}
-
-		snprintk(buf, buflen, ";dim=%d", inst_count);
-		ret = buf_append(CPKT_BUF_WRITE(out->out_cpkt), buf,
-				 strlen(buf));
-		if (ret < 0) {
-			return ret;
-		}
-	}
-
-	return 0;
-}
-
-static int do_discover_op(struct lwm2m_message *msg, bool well_known)
-{
-	static char disc_buf[24];
 	struct lwm2m_engine_obj *obj;
 	struct lwm2m_engine_obj_inst *obj_inst;
 	int ret;
 	bool reported = false;
 
-	/* object ID is required unless it's a ".well-known/core" discovery
-	 * ref: lwm2m spec 20170208-A table 11
-	 */
-	if (!well_known &&
-	    (msg->path.level == 0U ||
+	/* Object ID is required in Device Management Discovery (5.4.2). */
+	if (!is_bootstrap &&
+	    (msg->path.level == LWM2M_PATH_LEVEL_NONE ||
 	     msg->path.obj_id == LWM2M_OBJECT_SECURITY_ID)) {
+		return -EPERM;
+	}
+
+	/* Bootstrap discovery allows to specify at most Object ID. */
+	if (is_bootstrap && msg->path.level > LWM2M_PATH_LEVEL_OBJECT) {
 		return -EPERM;
 	}
 
@@ -3316,139 +3250,115 @@ static int do_discover_op(struct lwm2m_message *msg, bool well_known)
 		return ret;
 	}
 
-	/* Handle CoAP .well-known/core discover */
-	if (well_known) {
-		/* </.well-known/core> */
-		ret = buf_append(CPKT_BUF_WRITE(msg->out.out_cpkt),
-				 WELL_KNOWN_CORE_PATH,
-				 strlen(WELL_KNOWN_CORE_PATH));
-		if (ret < 0) {
-			return ret;
-		}
-
-		SYS_SLIST_FOR_EACH_CONTAINER(&engine_obj_list, obj, node) {
-			snprintk(disc_buf, sizeof(disc_buf), ",</%u>",
-				 obj->obj_id);
-
-			ret = buf_append(CPKT_BUF_WRITE(msg->out.out_cpkt),
-					 disc_buf, strlen(disc_buf));
-			if (ret < 0) {
-				return ret;
-			}
-		}
-
-		return 0;
-	}
-
-	/* Report object attributes only when Object ID (alone) was
-	 * provided (and do it only once in case of multiple instances).
+	/*
+	 * Add required prefix for bootstrap discovery (5.2.7.3).
+	 * For device management discovery, `engine_put_begin()` adds nothing.
 	 */
-	if (msg->path.level == 1) {
-		SYS_SLIST_FOR_EACH_CONTAINER(&engine_obj_list, obj, node) {
-			if (obj->obj_id != msg->path.obj_id) {
-				continue;
-			}
+	engine_put_begin(&msg->out, &msg->path);
 
-			snprintk(disc_buf, sizeof(disc_buf), "%s</%u>",
-				 reported ? "," : "", obj->obj_id);
+	SYS_SLIST_FOR_EACH_CONTAINER(&engine_obj_list, obj, node) {
+		/* Skip unrelated objects */
+		if (msg->path.level > 0 && msg->path.obj_id != obj->obj_id) {
+			continue;
+		}
 
-			ret = buf_append(CPKT_BUF_WRITE(msg->out.out_cpkt),
-					 disc_buf, strlen(disc_buf));
-			if (ret < 0) {
-				return ret;
-			}
+		/* For bootstrap discover, only report object ID when no
+		 * instance is available.
+		 * For device management discovery, only report object ID with
+		 * attributes if object ID (alone) was provided.
+		 */
+		if ((is_bootstrap && obj->instance_count == 0U) ||
+		    (!is_bootstrap && msg->path.level == LWM2M_PATH_LEVEL_OBJECT)) {
+			struct lwm2m_obj_path path = {
+				.obj_id = obj->obj_id,
+				.level = LWM2M_PATH_LEVEL_OBJECT,
+			};
 
-			/* report object attrs (5.4.2) */
-			ret = print_attr(&msg->out, disc_buf, sizeof(disc_buf),
-					 obj);
+			ret = engine_put_corelink(&msg->out, &path);
 			if (ret < 0) {
 				return ret;
 			}
 
 			reported = true;
-			break;
-		}
-	}
 
-	SYS_SLIST_FOR_EACH_CONTAINER(&engine_obj_inst_list, obj_inst, node) {
-		if (obj_inst->obj->obj_id != msg->path.obj_id) {
-			continue;
+			if (is_bootstrap) {
+				continue;
+			}
 		}
 
-		/* skip unrelated object instance */
-		if (msg->path.level > 1 &&
-		    msg->path.obj_inst_id != obj_inst->obj_inst_id) {
-			continue;
-		}
-
-		/* Report object instances only if Resource ID is missing. */
-		if (msg->path.level <= 2U) {
-			snprintk(disc_buf, sizeof(disc_buf), "%s</%u/%u>",
-				 reported ? "," : "",
-				 obj_inst->obj->obj_id, obj_inst->obj_inst_id);
-
-			ret = buf_append(CPKT_BUF_WRITE(msg->out.out_cpkt),
-					 disc_buf, strlen(disc_buf));
-			if (ret < 0) {
-				return ret;
+		SYS_SLIST_FOR_EACH_CONTAINER(&engine_obj_inst_list,
+					     obj_inst, node) {
+			if (obj_inst->obj->obj_id != obj->obj_id) {
+				continue;
 			}
 
-			/* Report object instance attributes only when Instance
-			 * ID was specified (5.4.2).
+			/* Skip unrelated object instance. */
+			if (msg->path.level > LWM2M_PATH_LEVEL_OBJECT &&
+			    msg->path.obj_inst_id != obj_inst->obj_inst_id) {
+				continue;
+			}
+
+			/* Report object instances only if no Resource ID is
+			 * provided.
 			 */
-			if (msg->path.level == 2U) {
-				ret = print_attr(&msg->out, disc_buf,
-						 sizeof(disc_buf), obj_inst);
+			if (msg->path.level <= LWM2M_PATH_LEVEL_OBJECT_INST) {
+				struct lwm2m_obj_path path = {
+					.obj_id = obj_inst->obj->obj_id,
+					.obj_inst_id = obj_inst->obj_inst_id,
+					.level = LWM2M_PATH_LEVEL_OBJECT_INST,
+				};
+
+				ret = engine_put_corelink(&msg->out, &path);
 				if (ret < 0) {
 					return ret;
 				}
+
+				reported = true;
 			}
 
-			reported = true;
-		}
-
-		for (int i = 0; i < obj_inst->resource_count; i++) {
-			/* skip unrelated resources */
-			if (msg->path.level == 3U &&
-			    msg->path.res_id != obj_inst->resources[i].res_id) {
+			/* Do not report resources in bootstrap discovery. */
+			if (is_bootstrap) {
 				continue;
 			}
 
-			snprintk(disc_buf, sizeof(disc_buf),
-				 "%s</%u/%u/%u>",
-				 reported ? "," : "",
-				 obj_inst->obj->obj_id,
-				 obj_inst->obj_inst_id,
-				 obj_inst->resources[i].res_id);
+			for (int i = 0; i < obj_inst->resource_count; i++) {
+				/* Skip unrelated resources. */
+				if (msg->path.level == LWM2M_PATH_LEVEL_RESOURCE &&
+				    msg->path.res_id != obj_inst->resources[i].res_id) {
+					continue;
+				}
 
-			ret = buf_append(CPKT_BUF_WRITE(msg->out.out_cpkt),
-					 disc_buf, strlen(disc_buf));
-			if (ret < 0) {
-				return ret;
-			}
+				struct lwm2m_obj_path path = {
+					.obj_id = obj_inst->obj->obj_id,
+					.obj_inst_id = obj_inst->obj_inst_id,
+					.res_id = obj_inst->resources[i].res_id,
+					.level = LWM2M_PATH_LEVEL_RESOURCE,
+				};
 
-			/* report resource attrs when path > 1 (5.4.2) */
-			if (msg->path.level > 1) {
-				ret = print_resource_dimension(
-					&msg->out, disc_buf, sizeof(disc_buf),
-					&obj_inst->resources[i]);
+				ret = engine_put_corelink(&msg->out, &path);
 				if (ret < 0) {
 					return ret;
 				}
 
-				ret = print_attr(&msg->out,
-						 disc_buf, sizeof(disc_buf),
-						 &obj_inst->resources[i]);
-				if (ret < 0) {
-					return ret;
-				}
+				reported = true;
 			}
-
-			reported = true;
 		}
 	}
 
 	return reported ? 0 : -ENOENT;
+}
+
+static int do_discover_op(struct lwm2m_message *msg, uint16_t content_format)
+{
+	switch (content_format) {
+	case LWM2M_FORMAT_APP_LINK_FORMAT:
+		return do_discover_op_link_format(
+				msg, msg->ctx->bootstrap_mode);
+
+	default:
+		LOG_ERR("Unsupported format: %u", content_format);
+		return -ENOMSG;
+	}
 }
 
 int lwm2m_get_or_create_engine_obj(struct lwm2m_message *msg,
@@ -3484,6 +3394,44 @@ int lwm2m_get_or_create_engine_obj(struct lwm2m_message *msg,
 	}
 
 	return ret;
+}
+
+struct lwm2m_engine_obj *lwm2m_engine_get_obj(
+					const struct lwm2m_obj_path *path)
+{
+	if (path->level < LWM2M_PATH_LEVEL_OBJECT) {
+		return NULL;
+	}
+
+	return get_engine_obj(path->obj_id);
+}
+
+struct lwm2m_engine_obj_inst *lwm2m_engine_get_obj_inst(
+					const struct lwm2m_obj_path *path)
+{
+	if (path->level < LWM2M_PATH_LEVEL_OBJECT_INST) {
+		return NULL;
+	}
+
+	return get_engine_obj_inst(path->obj_id, path->obj_inst_id);
+}
+
+struct lwm2m_engine_res *lwm2m_engine_get_res(
+					const struct lwm2m_obj_path *path)
+{
+	struct lwm2m_engine_res *res = NULL;
+	int ret;
+
+	if (path->level < LWM2M_PATH_LEVEL_RESOURCE) {
+		return NULL;
+	}
+
+	ret = path_to_objs(path, NULL, NULL, &res, NULL);
+	if (ret < 0) {
+		return NULL;
+	}
+
+	return res;
 }
 
 static int do_write_op(struct lwm2m_message *msg,
@@ -3587,149 +3535,6 @@ static int bootstrap_delete(struct lwm2m_message *msg)
 
 	return ret;
 }
-
-static inline int bs_discover_fill_enabler(struct lwm2m_message *msg)
-{
-	char buf[sizeof("lwm2m='" LWM2M_PROTOCOL_VERSION "'")];
-
-	snprintk(buf, sizeof(buf), "lwm2m=\"%s\"", LWM2M_PROTOCOL_VERSION);
-	return buf_append(CPKT_BUF_WRITE(msg->out.out_cpkt), buf, strlen(buf));
-}
-
-static inline int bs_discover_fill_object(struct lwm2m_engine_obj *obj,
-					  struct lwm2m_message *msg)
-{
-	char buf[sizeof(",</xxxxx>")];
-
-	snprintk(buf, sizeof(buf), ",</%u>", obj->obj_id);
-	return buf_append(CPKT_BUF_WRITE(msg->out.out_cpkt), buf, strlen(buf));
-}
-
-static int bs_discover_fill_instance(struct lwm2m_engine_obj_inst *obj_inst,
-				     struct lwm2m_message *msg)
-{
-	char buf[sizeof(",</xxxxx/xxxxx>")];
-	bool bootstrap_inst;
-	uint16_t server_id;
-	int ret;
-
-	snprintk(buf, sizeof(buf), ",</%u/%u>", obj_inst->obj->obj_id,
-		 obj_inst->obj_inst_id);
-
-	ret = buf_append(CPKT_BUF_WRITE(msg->out.out_cpkt), buf, strlen(buf));
-	if (ret < 0) {
-		return ret;
-	}
-
-	/* Security and Server instnaces shall report Short Server ID associated
-	 * with them (but only if not bootstrap instance).
-	 */
-	if (obj_inst->obj->obj_id == LWM2M_OBJECT_SECURITY_ID) {
-		snprintk(buf, sizeof(buf), "0/%d/1", obj_inst->obj_inst_id);
-		ret = lwm2m_engine_get_bool(buf, &bootstrap_inst);
-		if (ret < 0) {
-			return ret;
-		}
-
-		if (!bootstrap_inst) {
-			snprintk(buf, sizeof(buf), "0/%d/10",
-				 obj_inst->obj_inst_id);
-			ret = lwm2m_engine_get_u16(buf, &server_id);
-			if (ret < 0) {
-				return ret;
-			}
-
-			snprintk(buf, sizeof(buf), ";ssid=%d", server_id);
-			ret = buf_append(CPKT_BUF_WRITE(msg->out.out_cpkt),
-					buf, strlen(buf));
-			if (ret < 0) {
-				return ret;
-			}
-		}
-	}
-
-	if (obj_inst->obj->obj_id == LWM2M_OBJECT_SERVER_ID) {
-		snprintk(buf, sizeof(buf), "1/%d/0", obj_inst->obj_inst_id);
-		ret = lwm2m_engine_get_u16(buf, &server_id);
-		if (ret < 0) {
-			return ret;
-		}
-
-		snprintk(buf, sizeof(buf), ";ssid=%d", server_id);
-		ret = buf_append(CPKT_BUF_WRITE(msg->out.out_cpkt),
-				 buf, strlen(buf));
-		if (ret < 0) {
-			return ret;
-		}
-	}
-
-	return 0;
-}
-
-static int bootstrap_discover(struct lwm2m_message *msg)
-{
-	struct lwm2m_engine_obj *obj;
-	struct lwm2m_engine_obj_inst *obj_inst;
-	int ret;
-	bool reported = false;
-
-	/* set output content-format */
-	ret = coap_append_option_int(msg->out.out_cpkt,
-				     COAP_OPTION_CONTENT_FORMAT,
-				     LWM2M_FORMAT_APP_LINK_FORMAT);
-	if (ret < 0) {
-		LOG_ERR("Error setting response content-format: %d", ret);
-		return ret;
-	}
-
-	ret = coap_packet_append_payload_marker(msg->out.out_cpkt);
-	if (ret < 0) {
-		return ret;
-	}
-
-	/*
-	 * lwm2m spec 20170208-A sec 5.2.7.3 bootstrap discover on "/"
-	 * - prefixed w/ lwm2m enabler version. e.g. lwm2m="1.0"
-	 * - returns object and object instances only
-	 */
-	ret = bs_discover_fill_enabler(msg);
-	if (ret < 0) {
-		return ret;
-	}
-
-	SYS_SLIST_FOR_EACH_CONTAINER(&engine_obj_list, obj, node) {
-		if (msg->path.level > 0 && msg->path.obj_id != obj->obj_id) {
-			continue;
-		}
-
-		/* Only report </OBJ_ID> when no instance available */
-		if (obj->instance_count == 0U) {
-			ret = bs_discover_fill_object(obj, msg);
-			if (ret < 0) {
-				return ret;
-			}
-
-			reported = true;
-			continue;
-		}
-
-		SYS_SLIST_FOR_EACH_CONTAINER(&engine_obj_inst_list,
-					     obj_inst, node) {
-			if (obj_inst->obj->obj_id != obj->obj_id) {
-				continue;
-			}
-
-			ret = bs_discover_fill_instance(obj_inst, msg);
-			if (ret < 0) {
-				return ret;
-			}
-
-			reported = true;
-		}
-	}
-
-	return reported ? 0 : -ENOENT;
-}
 #endif
 
 static int handle_request(struct coap_packet *request,
@@ -3743,7 +3548,6 @@ static int handle_request(struct coap_packet *request,
 	uint8_t tkl = 0U;
 	uint16_t format = LWM2M_FORMAT_NONE, accept;
 	int observe = -1; /* default to -1, 0 = ENABLE, 1 = DISABLE */
-	bool well_known = false;
 	int block_opt, block_num;
 	struct lwm2m_block_context *block_ctx = NULL;
 	enum coap_block_size block_size;
@@ -3803,22 +3607,10 @@ static int handle_request(struct coap_packet *request,
 		}
 	}
 
-	/* check for .well-known/core URI query (DISCOVER) */
-	if (r == 2 &&
-	    (options[0].len == 11U &&
-	     strncmp(options[0].value, ".well-known", 11) == 0) &&
-	    (options[1].len == 4U &&
-	     strncmp(options[1].value, "core", 4) == 0)) {
-		if ((code & COAP_REQUEST_MASK) != COAP_METHOD_GET) {
-			r = -EPERM;
-			goto error;
-		}
-
-		well_known = true;
 #if defined(CONFIG_LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP)
 	/* check for bootstrap-finish */
-	} else if ((code & COAP_REQUEST_MASK) == COAP_METHOD_POST && r == 1 && \
-		   strncmp(options[0].value, "bs", options[0].len) == 0) {
+	if ((code & COAP_REQUEST_MASK) == COAP_METHOD_POST && r == 1 &&
+	    strncmp(options[0].value, "bs", options[0].len) == 0) {
 		engine_bootstrap_finish();
 
 		msg->code = COAP_RESPONSE_CODE_CHANGED;
@@ -3829,8 +3621,9 @@ static int handle_request(struct coap_packet *request,
 		}
 
 		return 0;
+	} else
 #endif
-	} else {
+	{
 		r = coap_options_to_path(options, r, &msg->path);
 		if (r < 0) {
 			r = -ENOENT;
@@ -3863,8 +3656,7 @@ static int handle_request(struct coap_packet *request,
 		goto error;
 	}
 
-	if (!well_known && !(msg->ctx->bootstrap_mode &&
-			     msg->path.level == 0)) {
+	if (!(msg->ctx->bootstrap_mode && msg->path.level == 0)) {
 		/* find registered obj */
 		obj = get_engine_obj(msg->path.obj_id);
 		if (!obj) {
@@ -3882,7 +3674,7 @@ static int handle_request(struct coap_packet *request,
 		 * LwM2M V1_0_1-20170704-A, table 25,
 		 * Discover: CoAP GET + accept=LWM2M_FORMAT_APP_LINK_FORMAT
 		 */
-		if (well_known || accept == LWM2M_FORMAT_APP_LINK_FORMAT) {
+		if (accept == LWM2M_FORMAT_APP_LINK_FORMAT) {
 			msg->operation = LWM2M_OP_DISCOVER;
 			accept = LWM2M_FORMAT_APP_LINK_FORMAT;
 		} else {
@@ -4046,13 +3838,7 @@ static int handle_request(struct coap_packet *request,
 			break;
 
 		case LWM2M_OP_DISCOVER:
-#if defined(CONFIG_LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP)
-			if (msg->ctx->bootstrap_mode) {
-				r = bootstrap_discover(msg);
-				break;
-			}
-#endif
-			r = do_discover_op(msg, well_known);
+			r = do_discover_op(msg, accept);
 			break;
 
 		case LWM2M_OP_WRITE:

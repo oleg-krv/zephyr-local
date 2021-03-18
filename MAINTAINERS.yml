@@ -136,8 +136,11 @@ ARM arch:
         - MaureenHelm
         - stephanosio
     files:
-        - arch/arm/
-        - include/arch/arm/
+        - arch/arm/aarch32/
+        - arch/arm/common/
+        - arch/arm/offsets/
+        - include/arch/arm/aarch32
+        - include/arch/arm/*
         - tests/arch/arm/
     labels:
         - "area: ARM"
@@ -227,6 +230,8 @@ C library:
     status: orphaned
     collaborators:
          - nashif
+         - enjiamai
+         - KangJianX
     files:
          - lib/libc/
          - tests/lib/c_lib/
@@ -269,6 +274,7 @@ Debug:
         - nashif
     collaborators:
         - dcpleung
+        - chen-png
     files:
         - include/debug/
         - subsys/debug/
@@ -353,6 +359,7 @@ Documentation:
     collaborators:
         - nashif
         - utzig
+        - jocelyn-li
     files:
         - doc/*
         - doc/static/
@@ -384,6 +391,7 @@ Documentation:
         - nashif
         - lyakh
         - lgirdwood
+        - mengxianglinx
     files:
         - drivers/audio/
         - include/audio/
@@ -570,9 +578,7 @@ Documentation:
         - "area: HWINFO"
 
 "Drivers: I2C":
-    status: maintained
-    maintainers:
-        - pabigot
+    status: orphaned
     files:
         - drivers/i2c/
         - dts/bindings/i2c/
@@ -801,6 +807,8 @@ Documentation:
     status: maintained
     maintainers:
         - andyross
+    collaborators:
+        - KangJianX
     files:
         - drivers/timer/
         - include/drivers/timer/
@@ -864,7 +872,6 @@ Filesystems:
         - de-nordic
         - Laczen
         - nashif
-        - pabigot
         - vanwinkeljan
     files:
         - include/fs/
@@ -903,7 +910,6 @@ Kernel:
         - nashif
         - ceolin
         - dcpleung
-        - pabigot
     files:
         - doc/reference/kernel/
         - include/kernel*.h
@@ -927,9 +933,7 @@ Base OS:
         - "area: Base OS"
 
 Little FS:
-    status: maintained
-    maintainers:
-        - pabigot
+    status: orphaned
     files:
         - subsys/fs/Kconfig.littlefs
         - subsys/fs/littlefs_fs.c
@@ -944,6 +948,8 @@ Logging:
     status: maintained
     maintainers:
         - nordic-krch
+    collaborators:
+        - chen-png
     files:
         - include/logging/
         - samples/subsys/logging/
@@ -1013,6 +1019,7 @@ Networking:
     collaborators:
         - tbursztyka
         - pfalcon
+        - mengxianglinx
     files:
         - drivers/net/
         - include/net/
@@ -1116,6 +1123,8 @@ POSIX API layer:
     status: orphaned
     collaborators:
         - pfalcon
+        - enjiamai
+        - KangJianX
     files:
         - include/posix/
         - lib/posix/
@@ -1129,7 +1138,7 @@ Power management:
         - ceolin
     collaborators:
         - nashif
-        - pabigot
+        - mengxianglinx
     files:
         - include/power/power.h
         - samples/subsys/power/
@@ -1156,6 +1165,13 @@ Twister:
     status: maintained
     maintainers:
         - nashif
+    collaborators:
+        - chen-png
+        - jocelyn-li
+        - galak
+        - PerMac
+        - enjiamai
+        - hakehuang
     files:
         - scripts/twister
         - scripts/pylib/twister/
@@ -1348,6 +1364,19 @@ STM32 Platforms:
         STM32 SOCs, dts files and related drivers. ST nucleo, disco and eval
         boards.
 
+Espressif Platforms:
+    status: maintained
+    maintainers:
+        - sylvioalves
+    files:
+        - drivers/*/*esp32*
+        - boards/xtensa/esp32/
+        - soc/xtensa/esp32/
+        - dts/xtensa/espressif/
+        - dts/bindings/*/*esp32*
+    labels:
+        - "platform: ESP32"
+
 Storage:
     status: maintained
     maintainers:
@@ -1388,6 +1417,8 @@ USB:
     status: maintained
     maintainers:
         - jfischer-no
+    collaborators:
+        - mengxianglinx
     files:
         - drivers/usb/
         - dts/bindings/usb/
@@ -1404,6 +1435,7 @@ Userspace:
     collaborators:
         - dcpleung
         - ioannisg
+        - enjiamai
     files:
         - doc/reference/usermode/kernelobjects.rst
         - include/app_memory/
@@ -1444,6 +1476,7 @@ West:
     files:
         - scripts/west-commands.yml
         - scripts/west_commands/
+        - doc/guides/west/
     labels:
         - "area: West"
 
@@ -1477,6 +1510,9 @@ x86 arch:
         - arch/x86/
         - include/arch/x86/
         - tests/arch/x86/
+        - drivers/interrupt_controller/*intel*
+        - drivers/interrupt_controller/*ioapic*
+        - drivers/interrupt_controller/*loapic*
     labels:
         - "area: X86"
 

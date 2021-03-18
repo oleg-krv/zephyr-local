@@ -80,6 +80,8 @@ source "drivers/sensor/dps310/Kconfig"
 
 source "drivers/sensor/ens210/Kconfig"
 
+source "drivers/sensor/fdc2x1x/Kconfig"
+
 source "drivers/sensor/fxas21002/Kconfig"
 
 source "drivers/sensor/fxos8700/Kconfig"
@@ -167,6 +169,8 @@ source "drivers/sensor/opt3001/Kconfig"
 source "drivers/sensor/pms7003/Kconfig"
 
 source "drivers/sensor/qdec_nrfx/Kconfig"
+
+source "drivers/sensor/qdec_sam/Kconfig"
 
 source "drivers/sensor/sht3xd/Kconfig"
 
