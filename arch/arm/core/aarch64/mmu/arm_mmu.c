@@ -10,6 +10,7 @@
 #include <device.h>
 #include <init.h>
 #include <kernel.h>
+#include <kernel_arch_func.h>
 #include <kernel_arch_interface.h>
 #include <kernel_internal.h>
 #include <logging/log.h>
@@ -631,13 +632,13 @@ static const struct arm_mmu_flat_range mmu_zephyr_ranges[] = {
 	{ .name  = "zephyr_code",
 	  .start = _image_text_start,
 	  .end   = _image_text_end,
-	  .attrs = MT_NORMAL | MT_P_RX_U_NA | MT_DEFAULT_SECURE_STATE },
+	  .attrs = MT_NORMAL | MT_P_RX_U_RX | MT_DEFAULT_SECURE_STATE },
 
 	/* Mark rodata segment cacheable, read only and execute-never */
 	{ .name  = "zephyr_rodata",
 	  .start = _image_rodata_start,
 	  .end   = _image_rodata_end,
-	  .attrs = MT_NORMAL | MT_P_RO_U_NA | MT_DEFAULT_SECURE_STATE },
+	  .attrs = MT_NORMAL | MT_P_RO_U_RO | MT_DEFAULT_SECURE_STATE },
 };
 
 static inline void add_arm_mmu_flat_range(struct arm_mmu_ptables *ptables,
@@ -917,20 +918,6 @@ int arch_mem_domain_init(struct k_mem_domain *domain)
 	return 0;
 }
 
-void arch_mem_domain_destroy(struct k_mem_domain *domain)
-{
-	struct arm_mmu_ptables *domain_ptables = &domain->arch.ptables;
-	k_spinlock_key_t key;
-
-	MMU_DEBUG("%s\n", __func__);
-
-	sys_slist_remove(&domain_list, NULL, &domain->arch.node);
-	key = k_spin_lock(&xlat_lock);
-	discard_table(domain_ptables->base_xlat_table, BASE_XLAT_LEVEL);
-	domain_ptables->base_xlat_table = NULL;
-	k_spin_unlock(&xlat_lock, key);
-}
-
 static void private_map(struct arm_mmu_ptables *ptables, const char *name,
 			uintptr_t phys, uintptr_t virt, size_t size, uint32_t attrs)
 {
@@ -1002,6 +989,16 @@ void arch_mem_domain_thread_add(struct k_thread *thread)
 	}
 
 	thread->arch.ptables = domain_ptables;
+	if (thread == _current) {
+		if (!is_ptable_active(domain_ptables)) {
+			z_arm64_swap_ptables(thread);
+		}
+	} else {
+#ifdef CONFIG_SMP
+		/* the thread could be running on another CPU right now */
+		arch_sched_ipi();
+#endif
+	}
 
 	if (is_migration) {
 		reset_map(old_ptables, __func__, thread->stack_info.start,
@@ -1027,6 +1024,30 @@ void arch_mem_domain_thread_remove(struct k_thread *thread)
 
 	reset_map(domain_ptables, __func__, thread->stack_info.start,
 		  thread->stack_info.size);
+}
+
+void z_arm64_swap_ptables(struct k_thread *incoming)
+{
+	struct arm_mmu_ptables *ptables = incoming->arch.ptables;
+
+	if (!is_ptable_active(ptables)) {
+		z_arm64_set_ttbr0((uintptr_t)ptables->base_xlat_table);
+	}
+}
+
+void z_arm64_thread_pt_init(struct k_thread *incoming)
+{
+	struct arm_mmu_ptables *ptables;
+
+	if ((incoming->base.user_options & K_USER) == 0)
+		return;
+
+	ptables = incoming->arch.ptables;
+
+	/* Map the thread stack */
+	map_thread_stack(incoming, ptables);
+
+	z_arm64_swap_ptables(incoming);
 }
 
 #endif /* CONFIG_USERSPACE */
