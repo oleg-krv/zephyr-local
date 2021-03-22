@@ -235,6 +235,8 @@
 /drivers/led_strip/                       @mbolivar-nordic
 /drivers/lora/                            @Mani-Sadhasivam
 /drivers/memc/                            @gmarull
+/drivers/misc/                            @tejlmand
+/drivers/misc/ft8xx/                      @hubertmis
 /drivers/modem/*gsm*                      @jukkar
 /drivers/modem/hl7800.c                   @rerickson1
 /drivers/modem/Kconfig.hl7800             @rerickson1
@@ -574,6 +576,7 @@
 /subsys/mgmt/mcumgr/smp_udp.c             @aunsbjerg
 /subsys/mgmt/updatehub/                   @nandojve @otavio
 /subsys/mgmt/osdp/                        @cbsiddharth
+/subsys/modbus/                           @jfischer-no
 /subsys/net/buf.c                         @jukkar @jhedberg @tbursztyka @pfalcon
 /subsys/net/ip/                           @jukkar @tbursztyka @pfalcon
 /subsys/net/lib/                          @jukkar @tbursztyka @pfalcon
