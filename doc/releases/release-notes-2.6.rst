@@ -29,6 +29,9 @@ interface and listing all issues with the `bug label
 API Changes
 ***********
 
+* The :c:func:`wait_for_usb_dfu` function now accepts a ``k_timeout_t`` argument instead of
+  using the ``CONFIG_USB_DFU_WAIT_DELAY_MS`` macro.
+
 Deprecated in this release
 
 * :c:macro:`DT_CLOCKS_LABEL_BY_IDX`, :c:macro:`DT_CLOCKS_LABEL_BY_NAME`,
@@ -67,6 +70,16 @@ Deprecated in this release
 * The ``CONFIG_OPENOCD_SUPPORT`` Kconfig option has been deprecated in favor
   of ``CONFIG_DEBUG_THREAD_INFO``.
 
+* Disk drivers (``disk_access_*.c``) are moved to ``drivers/disk`` and renamed
+  according to their function. Driver's Kconfig options are revised and renamed.
+  SDMMC host controller drivers are selected when the corresponding node
+  in devicetree is enabled. Following application relevant Kconfig options
+  are renamed: ``CONFIG_DISK_ACCESS_RAM`` -> `CONFIG_DISK_DRIVER_RAM`,
+  ``CONFIG_DISK_ACCESS_FLASH`` -> `CONFIG_DISK_DRIVER_FLASH`,
+  ``CONFIG_DISK_ACCESS_SDHC`` -> `CONFIG_DISK_DRIVER_SDMMC`.
+  Disk API header ``<include/disk/disk_access.h>`` is deprecated in favor of
+  ``<include/storage/disk_access.h>``.
+
 ==========================
 
 Removed APIs in this release
@@ -76,6 +89,8 @@ Removed APIs in this release
 * Removed support for k_mem_domain_destroy and k_mem_domain_remove_thread
 
 * Removed support for counter_read and counter_get_max_relative_alarm
+
+* Removed support for device_list_get
 
 ============================
 
