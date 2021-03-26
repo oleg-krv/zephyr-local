@@ -880,7 +880,16 @@ int z_impl_k_float_disable(struct k_thread *thread)
 #if defined(CONFIG_FPU) && defined(CONFIG_FPU_SHARING)
 	return arch_float_disable(thread);
 #else
-	return -ENOSYS;
+	return -ENOTSUP;
+#endif /* CONFIG_FPU && CONFIG_FPU_SHARING */
+}
+
+int z_impl_k_float_enable(struct k_thread *thread, unsigned int options)
+{
+#if defined(CONFIG_FPU) && defined(CONFIG_FPU_SHARING)
+	return arch_float_enable(thread, options);
+#else
+	return -ENOTSUP;
 #endif /* CONFIG_FPU && CONFIG_FPU_SHARING */
 }
 
