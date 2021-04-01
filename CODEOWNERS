@@ -21,10 +21,9 @@
 /arch/arc/                                @abrodkin @ruuddw @evgeniy-paltsev
 /arch/arm/                                @MaureenHelm @galak @ioannisg
 /arch/arm/core/aarch32/cortex_m/cmse/     @ioannisg
-/arch/arm/core/aarch64/                   @carlocaione
 /arch/arm/include/aarch32/cortex_m/cmse.h @ioannisg
-/arch/arm/include/aarch64/                @carlocaione
 /arch/arm/core/aarch32/cortex_a_r/        @MaureenHelm @galak @ioannisg @bbolen @stephanosio
+/arch/arm64/                              @carlocaione
 /arch/common/                             @ioannisg @andyross
 /soc/arc/snps_*/                          @abrodkin @ruuddw @evgeniy-paltsev
 /soc/nios2/                               @nashif
@@ -40,11 +39,10 @@
 /soc/arm/cypress/                         @nandojve
 /soc/arm/bcm*/                            @sbranden
 /soc/arm/infineon_xmc/                    @parthitce
-/soc/arm/nxp*/                            @MaureenHelm
+/soc/arm/nxp*/                            @MaureenHelm @mmahadevan108 @dleach02
 /soc/arm/nordic_nrf/                      @ioannisg
 /soc/arm/nuvoton/                         @ssekar15
 /soc/arm/nuvoton_npcx/                    @MulinChao @WealianLiao @ChiHuaL
-/soc/arm/qemu_cortex_a53/                 @carlocaione
 /soc/arm/quicklogic_eos_s3/               @kowalewskijan @kgugala
 /soc/arm/silabs_exx32/efm32pg1b/          @rdmeneze
 /soc/arm/silabs_exx32/efr32mg21/          @l-alfred
@@ -56,6 +54,10 @@
 /soc/arm/ti_simplelink/msp432p4xx/        @Mani-Sadhasivam
 /soc/arm/xilinx_zynqmp/                   @stephanosio
 /soc/xtensa/intel_s1000/                  @sathishkuttan @dcpleung
+/soc/arm64/                               @carlocaione
+/soc/arm64/qemu_cortex_a53/               @carlocaione
+/soc/arm64/bcm_vk/                        @abhishek-brcm
+/soc/arm64/xenvm/                         @lorc
 /arch/x86/                                @jhedberg @nashif @jenmwms @aasthagr
 /arch/nios2/                              @nashif
 /arch/posix/                              @aescolar @daor-oti
@@ -87,16 +89,16 @@
 /boards/arm/disco_l475_iot1/              @erwango
 /boards/arm/efm32pg_stk3401a/             @rdmeneze
 /boards/arm/faze/                         @mbittan @simonguinot
-/boards/arm/frdm*/                        @MaureenHelm
+/boards/arm/frdm*/                        @MaureenHelm @mmahadevan108 @dleach02
 /boards/arm/frdm*/doc/                    @MaureenHelm @MeganHansen
 /boards/arm/google_*/                     @jackrosenthal
-/boards/arm/hexiwear*/                    @MaureenHelm
+/boards/arm/hexiwear*/                    @MaureenHelm @mmahadevan108 @dleach02
 /boards/arm/hexiwear*/doc/                @MaureenHelm @MeganHansen
-/boards/arm/ip_k66f/                      @parthitce
-/boards/arm/lpcxpresso*/                  @MaureenHelm
+/boards/arm/ip_k66f/                      @parthitce @lmajewski
+/boards/arm/lpcxpresso*/                  @MaureenHelm @mmahadevan108 @dleach02
 /boards/arm/lpcxpresso*/doc/              @MaureenHelm @MeganHansen
 /boards/arm/mimx8mm_evk/                  @Mani-Sadhasivam
-/boards/arm/mimxrt*/                      @MaureenHelm
+/boards/arm/mimxrt*/                      @MaureenHelm @mmahadevan108 @dleach02
 /boards/arm/mimxrt*/doc/                  @MaureenHelm @MeganHansen
 /boards/arm/mps2_an385/                   @fvincenzo
 /boards/arm/msp_exp432p401r_launchxl/     @Mani-Sadhasivam
@@ -105,7 +107,6 @@
 /boards/arm/nucleo*/                      @erwango @ABOSTM @FRASTM
 /boards/arm/nucleo_f401re/                @idlethread
 /boards/arm/nuvoton_pfm_m487/             @ssekar15
-/boards/arm/qemu_cortex_a53/              @carlocaione
 /boards/arm/qemu_cortex_r*/               @stephanosio
 /boards/arm/qemu_cortex_m*/               @ioannisg
 /boards/arm/quick_feather/                @kowalewskijan @kgugala
@@ -143,6 +144,9 @@
 /boards/xtensa/intel_s1000_crb/           @sathishkuttan @dcpleung
 /boards/xtensa/odroid_go/                 @ydamigos
 /boards/sparc/                            @martin-aberg
+/boards/arm64/qemu_cortex_a53/            @carlocaione
+/boards/arm64/bcm958402m2_a72/            @abhishek-brcm
+/boards/arm64/xenvm/                      @lorc
 # All cmake related files
 /cmake/                                   @tejlmand @nashif
 /cmake/*/arcmwdt/                         @abrodkin @evgeniy-paltsev @tejlmand
@@ -150,7 +154,7 @@
 /doc/                                     @dbkinder
 /doc/guides/coccinelle.rst                @himanshujha199640 @JuliaLawall
 /doc/CMakeLists.txt                       @carlescufi
-/doc/scripts/                             @carlescufi
+/doc/_scripts/                            @carlescufi
 /doc/guides/bluetooth/                    @joerchan @jhedberg @Vudentz
 /doc/guides/dts/                          @galak @mbolivar-nordic
 /doc/reference/bluetooth/                 @joerchan @jhedberg @Vudentz
@@ -161,7 +165,7 @@
 /drivers/*/*sam4l*                        @nandojve
 /drivers/*/*cc13xx_cc26xx*                @bwitherspoon
 /drivers/*/*litex*                        @mateusz-holenko @kgugala @pgielda
-/drivers/*/*mcux*                         @MaureenHelm
+/drivers/*/*mcux*                         @MaureenHelm @mmahadevan108 @dleach02
 /drivers/*/*stm32*                        @erwango @ABOSTM @FRASTM
 /drivers/*/*native_posix*                 @aescolar @daor-oti
 /drivers/*/*lpc11u6x*                     @mbittan @simonguinot
@@ -324,7 +328,7 @@
 /dts/arm/broadcom/                        @sbranden
 /dts/arm/cypress/                         @nandojve
 /dts/arm/infineon/                        @parthitce
-/dts/arm/qemu-virt/                       @carlocaione
+/dts/arm64/                               @carlocaione
 /dts/arm/quicklogic/                      @wtatarski @kowalewskijan @kgugala
 /dts/arm/st/                              @erwango
 /dts/arm/ti/cc13?2*                       @bwitherspoon
@@ -333,7 +337,7 @@
 /dts/arm/nordic/                          @ioannisg @carlescufi
 /dts/arm/nuvoton/                         @ssekar15
 /dts/arm/nuvoton/npcx/                    @MulinChao @WealianLiao @ChiHuaL
-/dts/arm/nxp/                             @MaureenHelm
+/dts/arm/nxp/                             @MaureenHelm @mmahadevan108 @dleach02
 /dts/arm/microchip/                       @franciscomunoz @albertofloyd @scottwcpg
 /dts/arm/silabs/efm32_pg_1b.dtsi          @rdmeneze
 /dts/arm/silabs/efm32gg11b*               @oanerer
@@ -352,7 +356,6 @@
 /dts/riscv/riscv32-litex-vexriscv.dtsi    @mateusz-holenko @kgugala @pgielda
 /dts/arm/armv*m.dtsi                      @galak @ioannisg
 /dts/arm/armv7-r.dtsi                     @bbolen @stephanosio
-/dts/arm/armv8-a.dtsi                     @carlocaione
 /dts/arm/xilinx/                          @bbolen @stephanosio
 /dts/x86/                                 @jhedberg
 /dts/xtensa/xtensa.dtsi                   @ydamigos
@@ -368,7 +371,7 @@
 /dts/bindings/*/*npcx*                    @MulinChao @WealianLiao @ChiHuaL
 /dts/bindings/*/*psoc6*                   @nandojve
 /dts/bindings/*/nordic*                   @anangl
-/dts/bindings/*/nxp*                      @MaureenHelm
+/dts/bindings/*/nxp*                      @MaureenHelm @mmahadevan108 @dleach02
 /dts/bindings/*/openisa*                  @MaureenHelm
 /dts/bindings/*/st*                       @erwango
 /dts/bindings/sensor/ams*                 @alexanderwachter
@@ -410,8 +413,7 @@
 /include/arch/arc/v2/irq.h                @abrodkin @ruuddw @evgeniy-paltsev
 /include/arch/arm/aarch32/                @MaureenHelm @galak @ioannisg
 /include/arch/arm/aarch32/cortex_a_r/     @stephanosio
-/include/arch/arm/aarch64/                @carlocaione
-/include/arch/arm/arm-smccc.h             @carlocaione
+/include/arch/arm64/                      @carlocaione
 /include/arch/arm/aarch32/irq.h           @carlocaione
 /include/arch/nios2/                      @nashif
 /include/arch/nios2/arch.h                @nashif

@@ -316,7 +316,7 @@ static inline int z_vrfy_k_poll(struct k_poll_event *events,
 	/* Validate the events buffer and make a copy of it in an
 	 * allocated kernel-side buffer.
 	 */
-	if (Z_SYSCALL_VERIFY(num_events >= 0)) {
+	if (Z_SYSCALL_VERIFY(num_events >= 0U)) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -387,7 +387,7 @@ static int signal_poll_event(struct k_poll_event *event, uint32_t state)
 	struct z_poller *poller = event->poller;
 	int retcode = 0;
 
-	if (poller) {
+	if (poller != NULL) {
 		if (poller->mode == MODE_POLL) {
 			retcode = signal_poller(event, state);
 		} else if (poller->mode == MODE_TRIGGERED) {

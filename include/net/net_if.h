@@ -187,6 +187,12 @@ enum net_if_flag {
 	 */
 	NET_IF_FORWARD_MULTICASTS,
 
+	/** Interface supports IPv4 */
+	NET_IF_IPV4,
+
+	/** Interface supports IPv6 */
+	NET_IF_IPV6,
+
 /** @cond INTERNAL_HIDDEN */
 	/* Total number of flags - must be at the end of the enum */
 	NET_IF_NUM_FLAGS
@@ -375,6 +381,14 @@ struct net_if_config {
 #if defined(CONFIG_NET_IPV4_AUTO) && defined(CONFIG_NET_NATIVE_IPV4)
 	struct net_if_ipv4_autoconf ipv4auto;
 #endif /* CONFIG_NET_IPV4_AUTO */
+
+#if defined(CONFIG_NET_L2_VIRTUAL)
+	/**
+	 * This list keeps track of the virtual network interfaces
+	 * that are attached to this network interface.
+	 */
+	sys_slist_t virtual_interfaces;
+#endif /* CONFIG_NET_L2_VIRTUAL */
 };
 
 /**
@@ -1275,18 +1289,7 @@ bool net_if_ipv6_router_rm(struct net_if_router *router);
  *
  * @return Hop limit
  */
-static inline uint8_t net_if_ipv6_get_hop_limit(struct net_if *iface)
-{
-#if defined(CONFIG_NET_NATIVE_IPV6)
-	if (!iface->config.ip.ipv6) {
-		return 0;
-	}
-
-	return iface->config.ip.ipv6->hop_limit;
-#else
-	return 0;
-#endif
-}
+uint8_t net_if_ipv6_get_hop_limit(struct net_if *iface);
 
 /**
  * @brief Set the default IPv6 hop limit of a given interface.
@@ -1294,17 +1297,7 @@ static inline uint8_t net_if_ipv6_get_hop_limit(struct net_if *iface)
  * @param iface Network interface
  * @param hop_limit New hop limit
  */
-static inline void net_ipv6_set_hop_limit(struct net_if *iface,
-					  uint8_t hop_limit)
-{
-#if defined(CONFIG_NET_NATIVE_IPV6)
-	if (!iface->config.ip.ipv6) {
-		return;
-	}
-
-	iface->config.ip.ipv6->hop_limit = hop_limit;
-#endif
-}
+void net_ipv6_set_hop_limit(struct net_if *iface, uint8_t hop_limit);
 
 /**
  * @brief Set IPv6 reachable time for a given interface
@@ -1526,18 +1519,15 @@ int net_if_config_ipv4_put(struct net_if *iface);
  *
  * @return Time-to-live
  */
-static inline uint8_t net_if_ipv4_get_ttl(struct net_if *iface)
-{
-#if defined(CONFIG_NET_NATIVE_IPV4)
-	if (!iface->config.ip.ipv4) {
-		return 0;
-	}
+uint8_t net_if_ipv4_get_ttl(struct net_if *iface);
 
-	return iface->config.ip.ipv4->ttl;
-#else
-	return 0;
-#endif
-}
+/**
+ * @brief Set IPv4 time-to-live value specified to a given interface
+ *
+ * @param iface Network interface
+ * @param ttl Time-to-live value
+ */
+void net_if_ipv4_set_ttl(struct net_if *iface, uint8_t ttl);
 
 /**
  * @brief Check if this IPv4 address belongs to one of the interfaces.

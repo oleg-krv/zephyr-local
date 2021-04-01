@@ -274,7 +274,7 @@ static void oob_data_request(struct bt_conn *conn,
 
 		return;
 	}
-#endif /* !defined(CONFIG_BT_SMP_OOB_LEGACY_PAIR_ONLY) */
+#else /* !defined(CONFIG_BT_SMP_OOB_LEGACY_PAIR_ONLY) */
 
 	LOG_DBG("Legacy OOB TK requested from remote %s", log_strdup(addr));
 
@@ -282,6 +282,7 @@ static void oob_data_request(struct bt_conn *conn,
 	if (err < 0) {
 		LOG_ERR("Failed to set OOB Temp Key: %d", err);
 	}
+#endif
 }
 
 #if !defined(CONFIG_BT_SMP_OOB_LEGACY_PAIR_ONLY)
@@ -860,7 +861,7 @@ static void passkey_entry(const uint8_t *data, uint16_t len)
 	status = err < 0 ? BTP_STATUS_FAILED : BTP_STATUS_SUCCESS;
 
 rsp:
-	tester_rsp(BTP_SERVICE_ID_GAP, GAP_PASSKEY_ENTRY, CONTROLLER_INDEX,
+	tester_rsp(BTP_SERVICE_ID_GAP, GAP_CONN_PARAM_UPDATE, CONTROLLER_INDEX,
 		   status);
 }
 

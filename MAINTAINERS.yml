@@ -153,9 +153,12 @@ ARM64 arch:
         - npitre
         - ioannisg
     files:
-        - arch/arm/core/aarch64/
-        - include/arch/arm/aarch64/
+        - arch/arm64/
+        - include/arch/arm64/
         - tests/arch/arm64/
+        - soc/arm64/qemu_cortex_a53/
+        - boards/arm64/qemu_cortex_a53/
+        - dts/arm64/
     labels:
         - "area: ARM64"
 
@@ -244,6 +247,9 @@ CMSIS API layer:
          - nashif
     files:
          - lib/cmsis_rtos_v*/
+         - include/cmsis_rtos_v*/
+         - samples/portability/cmsis_rtos_v*/
+         - tests/portability/cmsis_rtos_v*/
     labels:
         - "area: Portability"
 
@@ -636,7 +642,11 @@ Documentation:
         - "area: IPM"
 
 "Drivers: kscan":
-    status: orphaned
+    status: maintained
+    maintainers:
+      - albertofloyd
+    collaborators:
+      - VenkatKotakonda
     files:
         - drivers/kscan/
         - include/drivers/kscan.h
@@ -693,6 +703,8 @@ Documentation:
 
 "Drivers: Neural Networks":
     status: orphaned
+    collaborators:
+        - nashif
     files:
         - drivers/neural_net/
     labels:
@@ -713,7 +725,11 @@ Documentation:
         - "area: PCI"
 
 "Drivers: PECI":
-    status: orphaned
+    status: maintained
+    maintainers:
+      - albertofloyd
+    collaborators:
+      - VenkatKotakonda
     files:
         - drivers/peci/
         - include/drivers/peci.h
@@ -897,6 +913,9 @@ JSON Web Token:
 
 Kconfig:
     status: orphaned
+    collaborators:
+        - tejlmand
+        - nashif
     files:
         - scripts/kconfig/
         - doc/guides/kconfig/
@@ -968,6 +987,7 @@ MAINTAINERS file:
         - MaureenHelm
     collaborators:
         - ioannisg
+        - nashif
     files:
         - MAINTAINERS.yml
     labels:
@@ -1306,6 +1326,9 @@ NXP Platforms:
   status: maintained
   maintainers:
     - MaureenHelm
+  collaborators:
+    - mmahadevan108
+    - dleach02
   files:
     - boards/arm/mimx*/
     - boards/arm/frdm_k*/
@@ -1436,8 +1459,9 @@ USB:
 
 Userspace:
     status: maintained
-    collaborators:
+    maintainers:
         - dcpleung
+    collaborators:
         - ioannisg
         - enjiamai
     files:

@@ -51,6 +51,14 @@ LOG_MODULE_REGISTER(net_shell, LOG_LEVEL_DBG);
 #include <net/ethernet_mgmt.h>
 #endif
 
+#if defined(CONFIG_NET_L2_VIRTUAL)
+#include <net/virtual.h>
+#endif
+
+#if defined(CONFIG_NET_L2_VIRTUAL_MGMT)
+#include <net/virtual_mgmt.h>
+#endif
+
 #if defined(CONFIG_NET_GPTP)
 #include <net/gptp.h>
 #include "ethernet/gptp/gptp_messages.h"
@@ -146,6 +154,16 @@ static const char *iface2str(struct net_if *iface, const char **extra)
 		}
 
 		return "Ethernet";
+	}
+#endif
+
+#ifdef CONFIG_NET_L2_VIRTUAL
+	if (net_if_l2(iface) == &NET_L2_GET_NAME(VIRTUAL)) {
+		if (extra) {
+			*extra = "=======";
+		}
+
+		return "Virtual";
 	}
 #endif
 
@@ -267,6 +285,53 @@ static void print_supported_ethernet_capabilities(
 }
 #endif /* CONFIG_NET_L2_ETHERNET */
 
+static const char *iface_flags2str(struct net_if *iface)
+{
+	static char str[sizeof("POINTOPOINT") + sizeof("PROMISC") +
+			sizeof("NO_AUTO_START") + sizeof("SUSPENDED") +
+			sizeof("MCAST_FORWARD") + sizeof("IPv4") +
+			sizeof("IPv6")];
+	int pos = 0;
+
+	if (net_if_flag_is_set(iface, NET_IF_POINTOPOINT)) {
+		pos += snprintk(str + pos, sizeof(str) - pos,
+				"POINTOPOINT,");
+	}
+
+	if (net_if_flag_is_set(iface, NET_IF_PROMISC)) {
+		pos += snprintk(str + pos, sizeof(str) - pos,
+				"PROMISC,");
+	}
+
+	if (net_if_flag_is_set(iface, NET_IF_NO_AUTO_START)) {
+		pos += snprintk(str + pos, sizeof(str) - pos,
+				"NO_AUTO_START,");
+	} else {
+		pos += snprintk(str + pos, sizeof(str) - pos,
+				"AUTO_START,");
+	}
+
+	if (net_if_flag_is_set(iface, NET_IF_FORWARD_MULTICASTS)) {
+		pos += snprintk(str + pos, sizeof(str) - pos,
+				"MCAST_FORWARD,");
+	}
+
+	if (net_if_flag_is_set(iface, NET_IF_IPV4)) {
+		pos += snprintk(str + pos, sizeof(str) - pos,
+				"IPv4,");
+	}
+
+	if (net_if_flag_is_set(iface, NET_IF_IPV6)) {
+		pos += snprintk(str + pos, sizeof(str) - pos,
+				"IPv6,");
+	}
+
+	/* get rid of last ',' character */
+	str[pos - 1] = '\0';
+
+	return str;
+}
+
 static void iface_cb(struct net_if *iface, void *user_data)
 {
 #if defined(CONFIG_NET_NATIVE)
@@ -316,6 +381,47 @@ static void iface_cb(struct net_if *iface, void *user_data)
 	}
 #endif
 
+#if defined(CONFIG_NET_L2_VIRTUAL)
+	if (!sys_slist_is_empty(&iface->config.virtual_interfaces)) {
+		struct virtual_interface_context *ctx, *tmp;
+
+		PR("Virtual interfaces attached to this : ");
+		SYS_SLIST_FOR_EACH_CONTAINER_SAFE(
+					&iface->config.virtual_interfaces,
+					ctx, tmp, node) {
+			if (ctx->virtual_iface == iface) {
+				continue;
+			}
+
+			PR("%d ", net_if_get_by_iface(ctx->virtual_iface));
+		}
+
+		PR("\n");
+	}
+
+	if (net_if_l2(iface) == &NET_L2_GET_NAME(VIRTUAL)) {
+		struct net_if *orig_iface;
+		char *name, buf[CONFIG_NET_L2_VIRTUAL_MAX_NAME_LEN];
+
+		name = net_virtual_get_name(iface, buf, sizeof(buf));
+		if (!(name && name[0])) {
+			name = "<unknown>";
+		}
+
+		PR("Name      : %s\n", name);
+
+		orig_iface = net_virtual_get_iface(iface);
+		if (orig_iface == NULL) {
+			PR("No attached network interface.\n");
+		} else {
+			PR("Attached  : %d (%s / %p)\n",
+			   net_if_get_by_iface(orig_iface),
+			   iface2str(orig_iface, NULL),
+			   orig_iface);
+		}
+	}
+#endif /* CONFIG_NET_L2_VIRTUAL */
+
 	if (net_if_get_link_addr(iface) &&
 	    net_if_get_link_addr(iface)->addr) {
 		PR("Link addr : %s\n",
@@ -324,6 +430,7 @@ static void iface_cb(struct net_if *iface, void *user_data)
 	}
 
 	PR("MTU       : %d\n", net_if_get_mtu(iface));
+	PR("Flags     : %s\n", iface_flags2str(iface));
 
 #if defined(CONFIG_NET_L2_ETHERNET_MGMT)
 	if (net_if_l2(iface) == &NET_L2_GET_NAME(ETHERNET)) {
@@ -394,6 +501,12 @@ static void iface_cb(struct net_if *iface, void *user_data)
 
 #if defined(CONFIG_NET_IPV6)
 	count = 0;
+
+	if (!net_if_flag_is_set(iface, NET_IF_IPV6)) {
+		PR("%s not %s for this interface.\n", "IPv6", "enabled");
+		ipv6 = NULL;
+		goto skip_ipv6;
+	}
 
 	ipv6 = iface->config.ip.ipv6;
 
@@ -466,6 +579,8 @@ static void iface_cb(struct net_if *iface, void *user_data)
 		   router->is_infinite ? " infinite" : "");
 	}
 
+skip_ipv6:
+
 	if (ipv6) {
 		PR("IPv6 hop limit           : %d\n",
 		   ipv6->hop_limit);
@@ -476,7 +591,6 @@ static void iface_cb(struct net_if *iface, void *user_data)
 		PR("IPv6 retransmit timer    : %d\n",
 		   ipv6->retrans_timer);
 	}
-
 #endif /* CONFIG_NET_IPV6 */
 
 #if defined(CONFIG_NET_IPV4)
@@ -491,11 +605,18 @@ static void iface_cb(struct net_if *iface, void *user_data)
 		 (net_if_l2(iface) == &NET_L2_GET_NAME(BLUETOOTH)) ||
 #endif
 		 0) {
-		PR_WARNING("IPv4 not supported for this interface.\n");
+		PR_WARNING("%s not %s for this interface.\n", "IPv4",
+			   "supported");
 		return;
 	}
 
 	count = 0;
+
+	if (!net_if_flag_is_set(iface, NET_IF_IPV4)) {
+		PR("%s not %s for this interface.\n", "IPv4", "enabled");
+		ipv4 = NULL;
+		goto skip_ipv4;
+	}
 
 	ipv4 = iface->config.ip.ipv4;
 
@@ -538,6 +659,8 @@ static void iface_cb(struct net_if *iface, void *user_data)
 	if (count == 0) {
 		PR("\t<none>\n");
 	}
+
+skip_ipv4:
 
 	if (ipv4) {
 		PR("IPv4 gateway : %s\n",
@@ -619,9 +742,10 @@ static void iface_per_route_cb(struct net_if *iface, void *user_data)
 	const struct shell *shell = data->shell;
 	const char *extra;
 
-	PR("\nIPv6 routes for interface %p (%s)\n", iface,
+	PR("\nIPv6 routes for interface %d (%p) (%s)\n",
+	   net_if_get_by_iface(iface), iface,
 	   iface2str(iface, &extra));
-	PR("=======================================%s\n", extra);
+	PR("=========================================%s\n", extra);
 
 	data->user_data = iface;
 
@@ -642,8 +766,8 @@ static void route_mcast_cb(struct net_route_entry_mcast *entry,
 		return;
 	}
 
-	PR("IPv6 multicast route %p for interface %p (%s)\n", entry,
-	   iface, iface2str(iface, &extra));
+	PR("IPv6 multicast route %p for interface %d (%p) (%s)\n", entry,
+	   net_if_get_by_iface(iface), iface, iface2str(iface, &extra));
 	PR("==========================================================="
 	   "%s\n", extra);
 
@@ -1244,9 +1368,9 @@ static void context_cb(struct net_context *context, void *user_data)
 	get_addresses(context, addr_local, sizeof(addr_local),
 		      addr_remote, sizeof(addr_remote));
 
-	PR("[%2d] %p\t%p    %c%c%c   %16s\t%16s\n",
+	PR("[%2d] %p\t%d      %c%c%c   %16s\t%16s\n",
 	   (*count) + 1, context,
-	   net_context_get_iface(context),
+	   net_if_get_by_iface(net_context_get_iface(context)),
 	   net_context_get_family(context) == AF_INET6 ? '6' :
 	   (net_context_get_family(context) == AF_INET ? '4' : ' '),
 	   net_context_get_type(context) == SOCK_DGRAM ? 'D' :
@@ -1568,7 +1692,8 @@ static void arp_cb(struct arp_entry *entry, void *user_data)
 		PR("     Interface  Link              Address\n");
 	}
 
-	PR("[%2d] %p %s %s\n", *count, entry->iface,
+	PR("[%2d] %d          %s %s\n", *count,
+	   net_if_get_by_iface(entry->iface),
 	   net_sprint_ll_addr(entry->eth.addr, sizeof(struct net_eth_addr)),
 	   net_sprint_ipv4_addr(&entry->ip));
 
@@ -1638,7 +1763,7 @@ static int cmd_net_conn(const struct shell *shell, size_t argc, char *argv[])
 	struct net_shell_user_data user_data;
 	int count = 0;
 
-	PR("     Context   \tIface         Flags Local           \tRemote\n");
+	PR("     Context   \tIface  Flags            Local             Remote\n");
 
 	user_data.shell = shell;
 	user_data.user_data = &count;
@@ -3048,9 +3173,9 @@ static void address_lifetime_cb(struct net_if *iface, void *user_data)
 
 	ARG_UNUSED(user_data);
 
-	PR("\nIPv6 addresses for interface %p (%s)\n", iface,
-	       iface2str(iface, &extra));
-	PR("==========================================%s\n", extra);
+	PR("\nIPv6 addresses for interface %d (%p) (%s)\n",
+	   net_if_get_by_iface(iface), iface, iface2str(iface, &extra));
+	PR("============================================%s\n", extra);
 
 	if (!ipv6) {
 		PR("No IPv6 config found for this interface.\n");
@@ -3401,7 +3526,7 @@ static void nbr_cb(struct net_nbr *nbr, void *user_data)
 #endif
 
 	if (*count == 0) {
-		PR("     Neighbor   Interface        Flags State     "
+		PR("     Neighbor  Interface  Flags    State     "
 		   "Remain  Link              %sAddress\n", padding);
 	}
 
@@ -3423,8 +3548,8 @@ static void nbr_cb(struct net_nbr *nbr, void *user_data)
 		    k_uptime_get();
 #endif
 
-	PR("[%2d] %p %p %5d/%d/%d/%d %s%s %6d  %17s%s %s\n",
-	   *count, nbr, nbr->iface,
+	PR("[%2d] %p  %d      %5d/%d/%d/%d  %s%s %6d  %17s%s %s\n",
+	   *count, nbr, net_if_get_by_iface(nbr->iface),
 	   net_ipv6_nbr_data(nbr)->link_metric,
 	   nbr->ref,
 	   net_ipv6_nbr_data(nbr)->ns_count,
@@ -4846,6 +4971,102 @@ static int cmd_net_udp(const struct shell *shell, size_t argc, char *argv[])
 	return 0;
 }
 
+#if defined(CONFIG_NET_L2_VIRTUAL)
+static void virtual_iface_cb(struct net_if *iface, void *user_data)
+{
+	struct net_shell_user_data *data = user_data;
+	const struct shell *shell = data->shell;
+	int *count = data->user_data;
+	char *name, buf[CONFIG_NET_L2_VIRTUAL_MAX_NAME_LEN];
+	struct net_if *orig_iface;
+
+	if (net_if_l2(iface) != &NET_L2_GET_NAME(VIRTUAL)) {
+		return;
+	}
+
+	if (*count == 0) {
+		PR("Interface  Attached-To  Description\n");
+		(*count)++;
+	}
+
+	orig_iface = net_virtual_get_iface(iface);
+
+	name = net_virtual_get_name(iface, buf, sizeof(buf));
+
+	PR("%d          %c            %s\n",
+	   net_if_get_by_iface(iface),
+	   orig_iface ? net_if_get_by_iface(orig_iface) + '0' : '-',
+	   name);
+
+	(*count)++;
+}
+
+static void attached_iface_cb(struct net_if *iface, void *user_data)
+{
+	struct net_shell_user_data *data = user_data;
+	const struct shell *shell = data->shell;
+	int *count = data->user_data;
+	char buf[CONFIG_NET_L2_VIRTUAL_MAX_NAME_LEN];
+	const char *name;
+	struct virtual_interface_context *ctx, *tmp;
+
+	if (sys_slist_is_empty(&iface->config.virtual_interfaces)) {
+		return;
+	}
+
+	if (*count == 0) {
+		PR("Interface  Below-of  Description\n");
+		(*count)++;
+	}
+
+	PR("%d          ", net_if_get_by_iface(iface));
+
+	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&iface->config.virtual_interfaces,
+					  ctx, tmp, node) {
+		if (ctx->virtual_iface == iface) {
+			continue;
+		}
+
+		PR("%d ", net_if_get_by_iface(ctx->virtual_iface));
+	}
+
+	name = net_virtual_get_name(iface, buf, sizeof(buf));
+	if (name == NULL) {
+		name = iface2str(iface, NULL);
+	}
+
+	PR("        %s\n", name);
+
+	(*count)++;
+}
+#endif /* CONFIG_NET_L2_VIRTUAL */
+
+static int cmd_net_virtual(const struct shell *shell, size_t argc,
+			   char *argv[])
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+#if defined(CONFIG_NET_L2_VIRTUAL)
+	struct net_shell_user_data user_data;
+	int count = 0;
+
+	user_data.shell = shell;
+	user_data.user_data = &count;
+
+	net_if_foreach(virtual_iface_cb, &user_data);
+
+	count = 0;
+	PR("\n");
+
+	net_if_foreach(attached_iface_cb, &user_data);
+#else
+	PR_INFO("Set %s to enable %s support.\n", "CONFIG_NET_L2_VIRTUAL",
+		"virtual network interface");
+#endif
+	return 0;
+}
+
 #if defined(CONFIG_NET_VLAN)
 static void iface_vlan_del_cb(struct net_if *iface, void *user_data)
 {
@@ -4858,14 +5079,17 @@ static void iface_vlan_del_cb(struct net_if *iface, void *user_data)
 	if (ret < 0) {
 		if (ret != -ESRCH) {
 			PR_WARNING("Cannot delete VLAN tag %d from "
-				   "interface %p\n",
-				   vlan_tag, iface);
+				   "interface %d (%p)\n",
+				   vlan_tag,
+				   net_if_get_by_iface(iface),
+				   iface);
 		}
 
 		return;
 	}
 
-	PR("VLAN tag %d removed from interface %p\n", vlan_tag, iface);
+	PR("VLAN tag %d removed from interface %d (%p)\n", vlan_tag,
+	   net_if_get_by_iface(iface), iface);
 }
 
 static void iface_vlan_cb(struct net_if *iface, void *user_data)
@@ -4973,8 +5197,8 @@ static int cmd_net_vlan_add(const struct shell *shell, size_t argc,
 	}
 
 	if (net_if_l2(iface) != &NET_L2_GET_NAME(ETHERNET)) {
-		PR_WARNING("Network interface %p is not ethernet interface\n",
-			   iface);
+		PR_WARNING("Network interface %d (%p) is not ethernet interface\n",
+			   net_if_get_by_iface(iface), iface);
 		return -ENOEXEC;
 	}
 
@@ -4989,7 +5213,8 @@ static int cmd_net_vlan_add(const struct shell *shell, size_t argc,
 		return -ENOEXEC;
 	}
 
-	PR("VLAN tag %d set to interface %p\n", tag, iface);
+	PR("VLAN tag %d set to interface %d (%p)\n", tag,
+	   net_if_get_by_iface(iface), iface);
 
 	return 0;
 
@@ -5548,6 +5773,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(net_commands,
 	SHELL_CMD(tcp, &net_cmd_tcp, "Connect/send/close TCP connection.",
 		  cmd_net_tcp),
 	SHELL_CMD(udp, &net_cmd_udp, "Send/recv UDP packet", cmd_net_udp),
+	SHELL_CMD(virtual, NULL, "Show virtual network interfaces.",
+		  cmd_net_virtual),
 	SHELL_CMD(vlan, &net_cmd_vlan, "Show VLAN information.", cmd_net_vlan),
 	SHELL_CMD(websocket, NULL, "Print information about WebSocket "
 								"connections.",

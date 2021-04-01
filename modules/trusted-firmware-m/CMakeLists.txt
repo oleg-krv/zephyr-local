@@ -181,7 +181,7 @@ function(trusted_firmware_build)
     )
 
   add_library(tfm_api
-    ${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/tf-m-tests/app/os_wrapper_cmsis_rtos_v2.c
+    ${ZEPHYR_BASE}/modules/trusted-firmware-m/src/zephyr_tfm_log.c
   )
 
   target_include_directories(tfm_api
@@ -204,6 +204,10 @@ function(trusted_firmware_build)
 
   add_dependencies(tfm_api tfm)
 endfunction()
+
+zephyr_library_sources_ifdef(CONFIG_BUILD_WITH_TFM  interface/interface.c)
+# Non-Secure interface to request system reboot
+zephyr_library_sources_ifdef(CONFIG_TFM_PARTITION_PLATFORM  src/reboot.c)
 
 if (CONFIG_BUILD_WITH_TFM)
   if (CONFIG_TFM_IPC)

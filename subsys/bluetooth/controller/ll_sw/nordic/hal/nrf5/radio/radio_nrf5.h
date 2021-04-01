@@ -48,5 +48,13 @@
 #define HAL_RADIO_PDU_LEN_MAX (BIT(8) - 1)
 #endif
 
+#include <nrf_peripherals.h>
+
+#if defined(PPI_PRESENT)
 #include "radio_nrf5_ppi.h"
+#elif defined(DPPI_PRESENT)
+#include "radio_nrf5_dppi.h"
+#else
+#error "PPI or DPPI abstractions missing."
+#endif
 #include "radio_nrf5_txp.h"

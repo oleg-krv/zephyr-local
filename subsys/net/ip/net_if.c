@@ -19,6 +19,7 @@ LOG_MODULE_REGISTER(net_if, CONFIG_NET_IF_LOG_LEVEL);
 #include <net/net_if.h>
 #include <net/net_mgmt.h>
 #include <net/ethernet.h>
+#include <net/virtual.h>
 
 #include "net_private.h"
 #include "ipv6.h"
@@ -426,6 +427,17 @@ static inline void init_iface(struct net_if *iface)
 		NET_ERR("Iface %p driver API init NULL", iface);
 		return;
 	}
+
+	/* By default IPv4 and IPv6 are enabled for a given network interface.
+	 * These can be turned off later if needed.
+	 */
+#if defined(CONFIG_NET_NATIVE_IPV4)
+	net_if_flag_set(iface, NET_IF_IPV4);
+#endif
+#if defined(CONFIG_NET_NATIVE_IPV6)
+	net_if_flag_set(iface, NET_IF_IPV6);
+#endif
+	net_virtual_init(iface);
 
 	NET_DBG("On iface %p", iface);
 
@@ -940,6 +952,11 @@ int net_if_config_ipv6_get(struct net_if *iface, struct net_if_ipv6 **ipv6)
 
 	k_mutex_lock(&lock, K_FOREVER);
 
+	if (!net_if_flag_is_set(iface, NET_IF_IPV6)) {
+		ret = -ENOTSUP;
+		goto out;
+	}
+
 	if (iface->config.ip.ipv6) {
 		if (ipv6) {
 			*ipv6 = iface->config.ip.ipv6;
@@ -976,6 +993,11 @@ int net_if_config_ipv6_put(struct net_if *iface)
 	int i;
 
 	k_mutex_lock(&lock, K_FOREVER);
+
+	if (!net_if_flag_is_set(iface, NET_IF_IPV6)) {
+		ret = -ENOTSUP;
+		goto out;
+	}
 
 	if (!iface->config.ip.ipv6) {
 		ret = -EALREADY;
@@ -1173,14 +1195,18 @@ void net_if_start_dad(struct net_if *iface)
 	struct net_if_addr *ifaddr;
 	struct net_if_ipv6 *ipv6;
 	struct in6_addr addr = { };
-	int i;
+	int ret, i;
 
 	k_mutex_lock(&lock, K_FOREVER);
 
 	NET_DBG("Starting DAD for iface %p", iface);
 
-	if (net_if_config_ipv6_get(iface, &ipv6) < 0) {
-		NET_WARN("Cannot do DAD IPv6 config is not valid.");
+	ret = net_if_config_ipv6_get(iface, &ipv6);
+	if (ret < 0) {
+		if (ret != -ENOTSUP) {
+			NET_WARN("Cannot do DAD IPv6 config is not valid.");
+		}
+
 		goto out;
 	}
 
@@ -1654,6 +1680,11 @@ struct net_if_addr *net_if_ipv6_addr_add(struct net_if *iface,
 					 &ipv6->unicast[i].address.in6_addr);
 
 			net_if_ipv6_start_dad(iface, &ipv6->unicast[i]);
+		} else {
+			/* If DAD is not done for point-to-point links, then
+			 * the address is usable immediately.
+			 */
+			ipv6->unicast[i].addr_state = NET_ADDR_PREFERRED;
 		}
 
 		net_mgmt_event_notify_with_info(
@@ -2442,6 +2473,47 @@ bool net_if_ipv6_router_rm(struct net_if_router *router)
 	return iface_router_rm(router);
 }
 
+uint8_t net_if_ipv6_get_hop_limit(struct net_if *iface)
+{
+#if defined(CONFIG_NET_NATIVE_IPV6)
+	int ret = 0;
+
+	k_mutex_lock(&lock, K_FOREVER);
+
+	if (!iface->config.ip.ipv6) {
+		goto out;
+	}
+
+	ret = iface->config.ip.ipv6->hop_limit;
+out:
+	k_mutex_unlock(&lock);
+
+	return ret;
+#else
+	ARG_UNUSED(iface);
+
+	return 0;
+#endif
+}
+
+void net_ipv6_set_hop_limit(struct net_if *iface, uint8_t hop_limit)
+{
+#if defined(CONFIG_NET_NATIVE_IPV6)
+	k_mutex_lock(&lock, K_FOREVER);
+
+	if (!iface->config.ip.ipv6) {
+		goto out;
+	}
+
+	iface->config.ip.ipv6->hop_limit = hop_limit;
+out:
+	k_mutex_unlock(&lock);
+#else
+	ARG_UNUSED(iface);
+	ARG_UNUSED(hop_limit);
+#endif
+}
+
 struct in6_addr *net_if_ipv6_get_ll(struct net_if *iface,
 				    enum net_addr_state addr_state)
 {
@@ -2614,9 +2686,7 @@ const struct in6_addr *net_if_ipv6_select_src_addr(struct net_if *dst_iface,
 
 	k_mutex_lock(&lock, K_FOREVER);
 
-	if (!net_ipv6_is_ll_addr(dst) && (!net_ipv6_is_addr_mcast(dst) ||
-	    net_ipv6_is_addr_mcast_mesh(dst))) {
-
+	if (!net_ipv6_is_ll_addr(dst) && !net_ipv6_is_addr_mcast_link(dst)) {
 		/* If caller has supplied interface, then use that */
 		if (dst_iface) {
 			src = net_if_ipv6_get_best_match(dst_iface, dst,
@@ -2786,6 +2856,11 @@ int net_if_config_ipv4_get(struct net_if *iface, struct net_if_ipv4 **ipv4)
 
 	k_mutex_lock(&lock, K_FOREVER);
 
+	if (!net_if_flag_is_set(iface, NET_IF_IPV4)) {
+		ret = -ENOTSUP;
+		goto out;
+	}
+
 	if (iface->config.ip.ipv4) {
 		if (ipv4) {
 			*ipv4 = iface->config.ip.ipv4;
@@ -2823,6 +2898,11 @@ int net_if_config_ipv4_put(struct net_if *iface)
 
 	k_mutex_lock(&lock, K_FOREVER);
 
+	if (!net_if_flag_is_set(iface, NET_IF_IPV4)) {
+		ret = -ENOTSUP;
+		goto out;
+	}
+
 	if (!iface->config.ip.ipv4) {
 		ret = -EALREADY;
 		goto out;
@@ -2844,6 +2924,47 @@ out:
 	k_mutex_unlock(&lock);
 
 	return ret;
+}
+
+uint8_t net_if_ipv4_get_ttl(struct net_if *iface)
+{
+#if defined(CONFIG_NET_NATIVE_IPV4)
+	int ret = 0;
+
+	k_mutex_lock(&lock, K_FOREVER);
+
+	if (!iface->config.ip.ipv4) {
+		goto out;
+	}
+
+	ret = iface->config.ip.ipv4->ttl;
+out:
+	k_mutex_unlock(&lock);
+
+	return ret;
+#else
+	ARG_UNUSED(iface);
+
+	return 0;
+#endif
+}
+
+void net_if_ipv4_set_ttl(struct net_if *iface, uint8_t ttl)
+{
+#if defined(CONFIG_NET_NATIVE_IPV4)
+	k_mutex_lock(&lock, K_FOREVER);
+
+	if (!iface->config.ip.ipv4) {
+		goto out;
+	}
+
+	iface->config.ip.ipv4->ttl = ttl;
+out:
+	k_mutex_unlock(&lock);
+#else
+	ARG_UNUSED(iface);
+	ARG_UNUSED(ttl);
+#endif
 }
 
 struct net_if_router *net_if_ipv4_router_lookup(struct net_if *iface,
@@ -3933,6 +4054,8 @@ int net_if_down(struct net_if *iface)
 	if (status < 0) {
 		goto out;
 	}
+
+	net_virtual_disable(iface);
 
 done:
 	net_if_flag_clear(iface, NET_IF_UP);

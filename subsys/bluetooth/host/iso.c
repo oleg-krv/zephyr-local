@@ -234,7 +234,13 @@ void hci_le_cis_req(struct net_buf *buf)
 	iso->role = BT_HCI_ROLE_SLAVE;
 	bt_conn_set_state(iso, BT_CONN_CONNECT);
 
-	hci_le_accept_cis(cis_handle);
+	err = hci_le_accept_cis(cis_handle);
+	if (err) {
+		bt_iso_cleanup(iso);
+		hci_le_reject_cis(cis_handle,
+				  BT_HCI_ERR_INSUFFICIENT_RESOURCES);
+		return;
+	}
 }
 
 int hci_le_remove_cig(uint8_t cig_id)
@@ -1198,13 +1204,26 @@ static struct bt_iso_big *get_free_big(void)
 	 */
 
 	for (int i = 0; i < ARRAY_SIZE(bigs); i++) {
-		if (atomic_get(&bigs[i].initialized) == false) {
+		if (!atomic_test_and_set_bit(bigs[i].flags, BT_BIG_INITIALIZED)) {
 			bigs[i].handle = i;
 			return &bigs[i];
 		}
 	}
 
 	BT_DBG("Could not allocate any more BIGs");
+
+	return NULL;
+}
+
+static struct bt_iso_big *big_lookup_flag(int bit)
+{
+	for (int i = 0; i < ARRAY_SIZE(bigs); i++) {
+		if (atomic_test_bit(bigs[i].flags, bit)) {
+			return &bigs[i];
+		}
+	}
+
+	BT_DBG("No BIG with flag bit %d set", bit);
 
 	return NULL;
 }
@@ -1220,9 +1239,7 @@ static void cleanup_big(struct bt_iso_big *big)
 		}
 	}
 
-	big->bis = NULL;
-	big->num_bis = 0;
-	atomic_clear(&big->initialized);
+	memset(big, 0, sizeof(*big));
 }
 
 static void big_disconnect(struct bt_iso_big *big)
@@ -1273,6 +1290,7 @@ static int hci_le_create_big(struct bt_le_ext_adv *padv, struct bt_iso_big *big,
 			     struct bt_iso_big_create_param *param)
 {
 	struct bt_hci_cp_le_create_big *req;
+	struct bt_hci_cmd_state_set state;
 	struct net_buf *buf;
 	int err;
 	static struct bt_iso_chan_qos *qos;
@@ -1304,6 +1322,7 @@ static int hci_le_create_big(struct bt_le_ext_adv *padv, struct bt_iso_big *big,
 		memset(req->bcode, 0, sizeof(req->bcode));
 	}
 
+	bt_hci_cmd_state_set_init(buf, &state, big->flags, BT_BIG_PENDING, true);
 	err = bt_hci_cmd_send_sync(BT_HCI_OP_LE_CREATE_BIG, buf, NULL);
 
 	if (err) {
@@ -1359,8 +1378,6 @@ int bt_iso_big_create(struct bt_le_ext_adv *padv, struct bt_iso_big_create_param
 		cleanup_big(big);
 		return err;
 	}
-
-	atomic_set(&big->initialized, true);
 
 	*out_big = big;
 
@@ -1419,7 +1436,7 @@ int bt_iso_big_terminate(struct bt_iso_big *big)
 	int err;
 	bool broadcaster;
 
-	if (atomic_get(&big->initialized) == false || !big->num_bis || !big->bis) {
+	if (!atomic_test_bit(big->flags, BT_BIG_INITIALIZED) || !big->num_bis || !big->bis) {
 		BT_DBG("BIG not initialized");
 		return -EINVAL;
 	}
@@ -1464,12 +1481,28 @@ int bt_iso_big_terminate(struct bt_iso_big *big)
 void hci_le_big_complete(struct net_buf *buf)
 {
 	struct bt_hci_evt_le_big_complete *evt = (void *)buf->data;
-	struct bt_iso_big *big = &bigs[evt->big_handle];
+	struct bt_iso_big *big;
+
+	if (evt->big_handle >= ARRAY_SIZE(bigs)) {
+		BT_WARN("Invalid BIG handle");
+
+		big = big_lookup_flag(BT_BIG_PENDING);
+		if (big) {
+			big_disconnect(big);
+			cleanup_big(big);
+		}
+
+		return;
+	}
+
+	big = &bigs[evt->big_handle];
+	atomic_clear_bit(big->flags, BT_BIG_PENDING);
 
 	BT_DBG("BIG[%u] %p completed, status %u", big->handle, big, evt->status);
 
 	if (evt->num_bis != big->num_bis) {
 		BT_ERR("Invalid number of BIS, was %u expected %u", evt->num_bis, big->num_bis);
+		big_disconnect(big);
 		cleanup_big(big);
 		return;
 	}
@@ -1486,8 +1519,14 @@ void hci_le_big_complete(struct net_buf *buf)
 void hci_le_big_terminate(struct net_buf *buf)
 {
 	struct bt_hci_evt_le_big_terminate *evt = (void *)buf->data;
-	uint16_t handle = sys_le16_to_cpu(evt->big_handle);
-	struct bt_iso_big *big = &bigs[handle];
+	struct bt_iso_big *big;
+
+	if (evt->big_handle >= ARRAY_SIZE(bigs)) {
+		BT_WARN("Invalid BIG handle");
+		return;
+	}
+
+	big = &bigs[evt->big_handle];
 
 	BT_DBG("BIG[%u] %p terminated", big->handle, big);
 
@@ -1498,8 +1537,21 @@ void hci_le_big_terminate(struct net_buf *buf)
 void hci_le_big_sync_established(struct net_buf *buf)
 {
 	struct bt_hci_evt_le_big_sync_established *evt = (void *)buf->data;
-	uint16_t big_handle = sys_le16_to_cpu(evt->big_handle);
-	struct bt_iso_big *big = &bigs[big_handle];
+	struct bt_iso_big *big;
+
+	if (evt->big_handle >= ARRAY_SIZE(bigs)) {
+		BT_WARN("Invalid BIG handle");
+		big = big_lookup_flag(BT_BIG_SYNCING);
+		if (big) {
+			big_disconnect(big);
+			cleanup_big(big);
+		}
+
+		return;
+	}
+
+	big = &bigs[evt->big_handle];
+	atomic_clear_bit(big->flags, BT_BIG_SYNCING);
 
 	BT_DBG("BIG[%u] %p sync established", big->handle, big);
 
@@ -1527,8 +1579,14 @@ void hci_le_big_sync_established(struct net_buf *buf)
 void hci_le_big_sync_lost(struct net_buf *buf)
 {
 	struct bt_hci_evt_le_big_sync_lost *evt = (void *)buf->data;
-	uint16_t handle = sys_le16_to_cpu(evt->big_handle);
-	struct bt_iso_big *big = &bigs[handle];
+	struct bt_iso_big *big;
+
+	if (evt->big_handle >= ARRAY_SIZE(bigs)) {
+		BT_WARN("Invalid BIG handle");
+		return;
+	}
+
+	big = &bigs[evt->big_handle];
 
 	BT_DBG("BIG[%u] %p sync lost", big->handle, big);
 
@@ -1540,6 +1598,7 @@ static int hci_le_big_create_sync(const struct bt_le_per_adv_sync *sync, struct 
 				  const struct bt_iso_big_sync_param *param)
 {
 	struct bt_hci_cp_le_big_create_sync *req;
+	struct bt_hci_cmd_state_set state;
 	struct net_buf *buf;
 	int err;
 	uint8_t bit_idx = 0;
@@ -1578,6 +1637,7 @@ static int hci_le_big_create_sync(const struct bt_le_per_adv_sync *sync, struct 
 		return -EINVAL;
 	}
 
+	bt_hci_cmd_state_set_init(buf, &state, big->flags, BT_BIG_SYNCING, true);
 	err = bt_hci_cmd_send_sync(BT_HCI_OP_LE_BIG_CREATE_SYNC, buf, NULL);
 
 	return err;
@@ -1645,8 +1705,6 @@ int bt_iso_big_sync(struct bt_le_per_adv_sync *sync, struct bt_iso_big_sync_para
 	for (int i = 0; i < big->num_bis; i++) {
 		bt_iso_chan_set_state(big->bis[i], BT_ISO_CONNECT);
 	}
-
-	atomic_set(&big->initialized, true);
 
 	*out_big = big;
 

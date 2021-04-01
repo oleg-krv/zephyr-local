@@ -49,6 +49,22 @@ extern "C" {
 #define VA_STACK_ALIGN(type)	MAX(VA_STACK_MIN_ALIGN, __alignof__(type))
 #endif
 
+#if defined(__sparc__)
+/* The SPARC V8 ABI guarantees that the arguments of a variable argument
+ * list function are stored on the stack at addresses which are 32-bit
+ * aligned. It means that variables of type unit64_t and double may not
+ * be properly aligned on the stack.
+ *
+ * The compiler is aware of the ABI and takes care of this. However,
+ * as we are directly accessing the variable argument list here, we need
+ * to take the alignment into consideration and copy 64-bit arguments
+ * as 32-bit words.
+ */
+#define Z_CBPRINTF_VA_STACK_LL_DBL_MEMCPY	1
+#else
+#define Z_CBPRINTF_VA_STACK_LL_DBL_MEMCPY	0
+#endif
+
 /** @brief Return 1 if argument is a pointer to char or wchar_t
  *
  * @param x argument.
@@ -114,50 +130,51 @@ extern "C" {
 			sizeof((v)+0) \
 		)
 
+static inline void cbprintf_wcpy(int *dst, int *src, size_t len)
+{
+	for (int i = 0; i < len; i++) {
+		dst[i] = src[i];
+	}
+}
+
 /** @brief Promote and store argument in the buffer.
  *
  * @param buf Buffer.
  *
  * @param arg Argument.
  */
-#ifdef __sparc__
-static inline void cbprintf_wcpy(int *dst, int *src, uint32_t len)
-{
-	for (int i = 0; i < len; i++) {
-		dst[i] = src[i];
-	}
-}
-/* Sparc is expecting va_list to be packed but don't support unaligned access.*/
-#define Z_CBPRINTF_STORE_ARG(buf, arg) do {\
-	__auto_type _v = (arg) + 0; \
-	double _d = _Generic((arg) + 0, \
-			float : (arg) + 0, \
+#define Z_CBPRINTF_STORE_ARG(buf, arg) do { \
+	if (Z_CBPRINTF_VA_STACK_LL_DBL_MEMCPY) { \
+		/* If required, copy arguments by word to avoid unaligned access.*/ \
+		__auto_type _v = (arg) + 0; \
+		double _d = _Generic((arg) + 0, \
+				float : (arg) + 0, \
+				default : \
+					0.0); \
+		size_t arg_size = Z_CBPRINTF_ARG_SIZE(arg); \
+		size_t _wsize = arg_size / sizeof(int); \
+		cbprintf_wcpy((int *)buf, \
+			      (int *) _Generic((arg) + 0, float : &_d, default : &_v), \
+			      _wsize); \
+	} else { \
+		*_Generic((arg) + 0, \
+			char : (int *)buf, \
+			unsigned char: (int *)buf, \
+			short : (int *)buf, \
+			unsigned short : (int *)buf, \
+			int : (int *)buf, \
+			unsigned int : (unsigned int *)buf, \
+			long : (long *)buf, \
+			unsigned long : (unsigned long *)buf, \
+			long long : (long long *)buf, \
+			unsigned long long : (unsigned long long *)buf, \
+			float : (double *)buf, \
+			double : (double *)buf, \
+			long double : (long double *)buf, \
 			default : \
-				0.0); \
-	uint32_t _wsize = Z_CBPRINTF_ARG_SIZE(arg) / sizeof(int); \
-	cbprintf_wcpy((int *)buf, \
-		      (int *) _Generic((arg) + 0, float : &_d, default : &_v), \
-		      _wsize); \
+				(const void **)buf) = arg; \
+	} \
 } while (0)
-#else /* __sparc__ */
-#define Z_CBPRINTF_STORE_ARG(buf, arg) \
-	*_Generic((arg) + 0, \
-		char : (int *)buf, \
-		unsigned char: (int *)buf, \
-		short : (int *)buf, \
-		unsigned short : (int *)buf, \
-		int : (int *)buf, \
-		unsigned int : (unsigned int *)buf, \
-		long : (long *)buf, \
-		unsigned long : (unsigned long *)buf, \
-		long long : (long long *)buf, \
-		unsigned long long : (unsigned long long *)buf, \
-		float : (double *)buf, \
-		double : (double *)buf, \
-		long double : (long double *)buf, \
-		default : \
-			(const void **)buf) = arg
-#endif
 
 /** @brief Return alignment needed for given argument.
  *
@@ -193,23 +210,27 @@ static inline void cbprintf_wcpy(int *dst, int *src, uint32_t len)
  *
  * @param _idx index. Index is postincremented.
  *
+ * @param _align_offset Current index with alignment offset.
+ *
  * @param _max maximum index (buffer capacity).
  *
  * @param _arg argument.
  */
-#define Z_CBPRINTF_PACK_ARG2(_buf, _idx, _max, _arg) do { \
+#define Z_CBPRINTF_PACK_ARG2(_buf, _idx, _align_offset, _max, _arg) do { \
 	BUILD_ASSERT(!((sizeof(double) < VA_STACK_ALIGN(long double)) && \
 			Z_CBPRINTF_IS_LONGDOUBLE(_arg) && \
 			!IS_ENABLED(CONFIG_CBPRINTF_PACKAGE_LONGDOUBLE)),\
 			"Packaging of long double not enabled in Kconfig."); \
-	while (_idx % Z_CBPRINTF_ALIGNMENT(_arg)) { \
+	while (_align_offset % Z_CBPRINTF_ALIGNMENT(_arg)) { \
 		_idx += sizeof(int); \
+		_align_offset += sizeof(int); \
 	} \
 	uint32_t _arg_size = Z_CBPRINTF_ARG_SIZE(_arg); \
 	if (_buf && _idx < _max) { \
 		Z_CBPRINTF_STORE_ARG(&_buf[_idx], _arg); \
 	} \
 	_idx += _arg_size; \
+	_align_offset += _arg_size; \
 } while (0)
 
 /** @brief Package single argument.
@@ -219,7 +240,7 @@ static inline void cbprintf_wcpy(int *dst, int *src, uint32_t len)
  * @param arg argument.
  */
 #define Z_CBPRINTF_PACK_ARG(arg) \
-	Z_CBPRINTF_PACK_ARG2(_pbuf, _pkg_len, _pmax, arg)
+	Z_CBPRINTF_PACK_ARG2(_pbuf, _pkg_len, _pkg_offset, _pmax, arg)
 
 /** @brief Package descriptor.
  *
@@ -246,56 +267,67 @@ union z_cbprintf_hdr {
  *
  * @param _outlen number of bytes required to store the package.
  *
+ * @param _align_offset Input buffer alignment offset in words. Where offset 0
+ * means that buffer is aligned to CBPRINTF_PACKAGE_ALIGNMENT.
+ *
  * @param ... String with variable list of arguments.
  */
-#define Z_CBPRINTF_STATIC_PACKAGE_GENERIC(buf, _inlen, _outlen, \
+#define Z_CBPRINTF_STATIC_PACKAGE_GENERIC(buf, _inlen, _outlen, _align_offset, \
 					  ... /* fmt, ... */) \
 do { \
 	_Pragma("GCC diagnostic push") \
 	_Pragma("GCC diagnostic ignored \"-Wpointer-arith\"") \
+	BUILD_ASSERT(!IS_ENABLED(CONFIG_XTENSA) || \
+		     (IS_ENABLED(CONFIG_XTENSA) && \
+		      !(_align_offset % CBPRINTF_PACKAGE_ALIGNMENT)), \
+			"Xtensa requires aligned package."); \
+	BUILD_ASSERT((_align_offset % sizeof(int)) == 0, \
+			"Alignment offset must be multiply of a word."); \
 	if (IS_ENABLED(CONFIG_CBPRINTF_STATIC_PACKAGE_CHECK_ALIGNMENT)) { \
 		__ASSERT(!((uintptr_t)buf & (CBPRINTF_PACKAGE_ALIGNMENT - 1)), \
 			"Buffer must be aligned."); \
 	} \
 	uint8_t *_pbuf = buf; \
-	size_t _pmax = (buf != NULL) ? _inlen : SIZE_MAX; \
-	size_t _pkg_len = 0; \
+	int _pmax = (buf != NULL) ? _inlen : INT32_MAX; \
+	int _pkg_len = 0; \
+	int _pkg_offset = _align_offset; \
 	union z_cbprintf_hdr *_len_loc; \
 	/* package starts with string address and field with length */ \
-	if (_pmax < sizeof(char *) + 2 * sizeof(uint16_t)) { \
+	if (_pmax < sizeof(union z_cbprintf_hdr)) { \
+		_outlen = -ENOSPC; \
 		break; \
 	} \
 	_len_loc = (union z_cbprintf_hdr *)_pbuf; \
 	_pkg_len += sizeof(union z_cbprintf_hdr); \
-	if (_pbuf) { \
-		*(char **)&_pbuf[_pkg_len] = GET_ARG_N(1, __VA_ARGS__); \
-	} \
-	_pkg_len += sizeof(char *); \
+	_pkg_offset += sizeof(union z_cbprintf_hdr); \
 	/* Pack remaining arguments */\
-	COND_CODE_0(NUM_VA_ARGS_LESS_1(__VA_ARGS__), (), ( \
-	    FOR_EACH(Z_CBPRINTF_PACK_ARG, (;), GET_ARGS_LESS_N(1, __VA_ARGS__));\
-	)) \
+	FOR_EACH(Z_CBPRINTF_PACK_ARG, (;), __VA_ARGS__);\
 	/* Store length */ \
 	_outlen = (_pkg_len > _pmax) ? -ENOSPC : _pkg_len; \
 	/* Store length in the header, set number of dumped strings to 0 */ \
 	if (_pbuf) { \
-		union z_cbprintf_hdr hdr = { .desc = {.len = _pkg_len }}; \
+		union z_cbprintf_hdr hdr = { \
+			.desc = {.len = _pkg_len / sizeof(int) } \
+		}; \
 		*_len_loc = hdr; \
 	} \
 	_Pragma("GCC diagnostic pop") \
 } while (0)
 
 #if Z_C_GENERIC
-#define Z_CBPRINTF_STATIC_PACKAGE(packaged, inlen, outlen, ... /* fmt, ... */) \
-	Z_CBPRINTF_STATIC_PACKAGE_GENERIC(packaged, inlen, outlen, __VA_ARGS__)
+#define Z_CBPRINTF_STATIC_PACKAGE(packaged, inlen, outlen, align_offset, \
+				  ... /* fmt, ... */) \
+	Z_CBPRINTF_STATIC_PACKAGE_GENERIC(packaged, inlen, outlen, \
+					  align_offset, __VA_ARGS__)
 #else
-#define Z_CBPRINTF_STATIC_PACKAGE(packaged, inlen, outlen, ... /* fmt, ... */) \
+#define Z_CBPRINTF_STATIC_PACKAGE(packaged, inlen, outlen, align_offset, \
+				  ... /* fmt, ... */) \
 do { \
 	/* Small trick needed to avoid warning on always true */ \
 	if (((uintptr_t)packaged + 1) != 1) { \
 		outlen = cbprintf_package(packaged, inlen, __VA_ARGS__); \
 	} else { \
-		outlen = cbprintf_package(NULL, 0, __VA_ARGS__); \
+		outlen = cbprintf_package(NULL, align_offset, __VA_ARGS__); \
 	} \
 } while (0)
 #endif /* Z_C_GENERIC */
