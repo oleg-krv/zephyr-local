@@ -70,7 +70,7 @@ static inline int iis2iclx_reboot(const struct device *dev)
 {
 	struct iis2iclx_data *data = dev->data;
 
-	if (iis2iclx_boot_set(data->ctx, 1) < 0) {
+	if (iis2iclx_boot_set(&data->ctx, 1) < 0) {
 		return -EIO;
 	}
 
@@ -84,7 +84,7 @@ static int iis2iclx_accel_set_fs_raw(const struct device *dev, uint8_t fs)
 {
 	struct iis2iclx_data *data = dev->data;
 
-	if (iis2iclx_xl_full_scale_set(data->ctx, fs) < 0) {
+	if (iis2iclx_xl_full_scale_set(&data->ctx, fs) < 0) {
 		return -EIO;
 	}
 
@@ -97,7 +97,7 @@ static int iis2iclx_accel_set_odr_raw(const struct device *dev, uint8_t odr)
 {
 	struct iis2iclx_data *data = dev->data;
 
-	if (iis2iclx_xl_data_rate_set(data->ctx, odr) < 0) {
+	if (iis2iclx_xl_data_rate_set(&data->ctx, odr) < 0) {
 		return -EIO;
 	}
 
@@ -196,7 +196,7 @@ static int iis2iclx_sample_fetch_accel(const struct device *dev)
 	struct iis2iclx_data *data = dev->data;
 	int16_t buf[2];
 
-	if (iis2iclx_acceleration_raw_get(data->ctx, buf) < 0) {
+	if (iis2iclx_acceleration_raw_get(&data->ctx, buf) < 0) {
 		LOG_ERR("Failed to read sample");
 		return -EIO;
 	}
@@ -213,7 +213,7 @@ static int iis2iclx_sample_fetch_temp(const struct device *dev)
 	struct iis2iclx_data *data = dev->data;
 	int16_t buf;
 
-	if (iis2iclx_temperature_raw_get(data->ctx, &buf) < 0) {
+	if (iis2iclx_temperature_raw_get(&data->ctx, &buf) < 0) {
 		LOG_ERR("Failed to read sample");
 		return -EIO;
 	}
@@ -540,7 +540,7 @@ static int iis2iclx_init_chip(const struct device *dev)
 
 	iis2iclx->dev = dev;
 
-	if (iis2iclx_device_id_get(iis2iclx->ctx, &chip_id) < 0) {
+	if (iis2iclx_device_id_get(&iis2iclx->ctx, &chip_id) < 0) {
 		LOG_ERR("Failed reading chip id");
 		return -EIO;
 	}
@@ -553,7 +553,7 @@ static int iis2iclx_init_chip(const struct device *dev)
 	}
 
 	/* reset device */
-	if (iis2iclx_reset_set(iis2iclx->ctx, 1) < 0) {
+	if (iis2iclx_reset_set(&iis2iclx->ctx, 1) < 0) {
 		return -EIO;
 	}
 
@@ -573,12 +573,12 @@ static int iis2iclx_init_chip(const struct device *dev)
 	}
 
 	/* Set FIFO bypass mode */
-	if (iis2iclx_fifo_mode_set(iis2iclx->ctx, IIS2ICLX_BYPASS_MODE) < 0) {
+	if (iis2iclx_fifo_mode_set(&iis2iclx->ctx, IIS2ICLX_BYPASS_MODE) < 0) {
 		LOG_ERR("failed to set FIFO mode");
 		return -EIO;
 	}
 
-	if (iis2iclx_block_data_update_set(iis2iclx->ctx, 1) < 0) {
+	if (iis2iclx_block_data_update_set(&iis2iclx->ctx, 1) < 0) {
 		LOG_ERR("failed to set BDU mode");
 		return -EIO;
 	}
@@ -589,6 +589,9 @@ static int iis2iclx_init_chip(const struct device *dev)
 static int iis2iclx_init(const struct device *dev)
 {
 	const struct iis2iclx_config * const config = dev->config;
+#if defined(CONFIG_IIS2ICLX_SENSORHUB)
+	struct iis2iclx_data *data = dev->data;
+#endif /* CONFIG_IIS2ICLX_SENSORHUB */
 
 	if (config->bus_init(dev) < 0) {
 		LOG_ERR("failed to initialize bus");
@@ -658,12 +661,12 @@ static int iis2iclx_init(const struct device *dev)
 
 #define IIS2ICLX_CONFIG_SPI(inst)					\
 	{								\
-		.bus = DEVICE_DT_GET(DT_INST_BUS(inst)),		\
-		.bus_init = iis2iclx_spi_init,				\
-		.bus_cfg.spi_cfg =					\
+		.stmemsc_cfg.spi.bus = DEVICE_DT_GET(DT_INST_BUS(inst)),\
+		.stmemsc_cfg.spi.spi_cfg =				\
 			SPI_CONFIG_DT_INST(inst,			\
 					   IIS2ICLX_SPI_OPERATION,	\
 					   0),				\
+		.bus_init = iis2iclx_spi_init,				\
 		.odr = DT_INST_PROP(inst, odr),				\
 		.range = DT_INST_PROP(inst, range),			\
 		COND_CODE_1(DT_INST_NODE_HAS_PROP(inst, drdy_gpios),	\
@@ -676,9 +679,9 @@ static int iis2iclx_init(const struct device *dev)
 
 #define IIS2ICLX_CONFIG_I2C(inst)					\
 	{								\
-		.bus = DEVICE_DT_GET(DT_INST_BUS(inst)),		\
+		.stmemsc_cfg.i2c.bus = DEVICE_DT_GET(DT_INST_BUS(inst)),\
+		.stmemsc_cfg.i2c.i2c_slv_addr = DT_INST_REG_ADDR(inst),	\
 		.bus_init = iis2iclx_i2c_init,				\
-		.bus_cfg.i2c_slv_addr = DT_INST_REG_ADDR(inst),		\
 		.odr = DT_INST_PROP(inst, odr),				\
 		.range = DT_INST_PROP(inst, range),			\
 		COND_CODE_1(DT_INST_NODE_HAS_PROP(inst, drdy_gpios),	\
