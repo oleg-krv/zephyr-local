@@ -3,6 +3,9 @@
 
 if SHIELD_ADAFRUIT_2_8_TFT_TOUCH_V2
 
+config GPIO
+	default y
+
 if DISPLAY
 
 config SPI
@@ -70,5 +73,12 @@ config LVGL_POINTER_KSCAN_INVERT_Y
 endif # LVGL
 
 endif # DISPLAY
+
+if DISK_DRIVERS
+
+config DISK_DRIVER_SDMMC
+	default y
+
+endif # DISK_DRIVERS
 
 endif # SHIELD_ADAFRUIT_2_8_TFT_TOUCH_V2
