@@ -13,6 +13,7 @@
 #include <zephyr/types.h>
 #include <sys/util.h>
 #include <sys/byteorder.h>
+#include <sys/check.h>
 
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/conn.h>
@@ -31,7 +32,7 @@
 #define DUMMY_2_BYTE_OP	BT_MESH_MODEL_OP_2(0xff, 0xff)
 
 struct comp_data {
-	uint8_t *status;
+	uint8_t *page;
 	struct net_buf_simple *comp;
 };
 
@@ -62,7 +63,10 @@ static void comp_data_status(struct bt_mesh_model *model,
 
 	param = cli->op_param;
 
-	*(param->status) = net_buf_simple_pull_u8(buf);
+	if (param->page) {
+		*(param->page) = net_buf_simple_pull_u8(buf);
+	}
+
 	to_copy  = MIN(net_buf_simple_tailroom(param->comp), buf->len);
 	net_buf_simple_add_mem(param->comp, buf->data, to_copy);
 
@@ -812,7 +816,7 @@ static int cli_wait(void)
 }
 
 int bt_mesh_cfg_comp_data_get(uint16_t net_idx, uint16_t addr, uint8_t page,
-			      uint8_t *status, struct net_buf_simple *comp)
+			      uint8_t *rsp, struct net_buf_simple *comp)
 {
 	BT_MESH_MODEL_BUF_DEFINE(msg, OP_DEV_COMP_DATA_GET, 1);
 	struct bt_mesh_msg_ctx ctx = {
@@ -822,7 +826,7 @@ int bt_mesh_cfg_comp_data_get(uint16_t net_idx, uint16_t addr, uint8_t page,
 		.send_ttl = BT_MESH_TTL_DEFAULT,
 	};
 	struct comp_data param = {
-		.status = status,
+		.page = rsp,
 		.comp = comp,
 	};
 	int err;
@@ -2070,4 +2074,69 @@ int32_t bt_mesh_cfg_cli_timeout_get(void)
 void bt_mesh_cfg_cli_timeout_set(int32_t timeout)
 {
 	msg_timeout = timeout;
+}
+
+int bt_mesh_comp_p0_get(struct bt_mesh_comp_p0 *page,
+			struct net_buf_simple *buf)
+{
+	if (buf->len < 10) {
+		return -EINVAL;
+	}
+
+	page->cid = net_buf_simple_pull_le16(buf);
+	page->pid = net_buf_simple_pull_le16(buf);
+	page->vid = net_buf_simple_pull_le16(buf);
+	page->crpl = net_buf_simple_pull_le16(buf);
+	page->feat = net_buf_simple_pull_le16(buf);
+	page->_buf = buf;
+
+	return 0;
+}
+
+struct bt_mesh_comp_p0_elem *bt_mesh_comp_p0_elem_pull(const struct bt_mesh_comp_p0 *page,
+						       struct bt_mesh_comp_p0_elem *elem)
+{
+	size_t modlist_size;
+
+	if (page->_buf->len < 4) {
+		return NULL;
+	}
+
+	elem->loc = net_buf_simple_pull_le16(page->_buf);
+	elem->nsig = net_buf_simple_pull_u8(page->_buf);
+	elem->nvnd = net_buf_simple_pull_u8(page->_buf);
+
+	modlist_size = elem->nsig * 2 + elem->nvnd * 4;
+
+	if (page->_buf->len < modlist_size) {
+		return NULL;
+	}
+
+	elem->_buf = net_buf_simple_pull_mem(page->_buf, modlist_size);
+
+	return elem;
+}
+
+uint16_t bt_mesh_comp_p0_elem_mod(struct bt_mesh_comp_p0_elem *elem, int idx)
+{
+	CHECKIF(idx >= elem->nsig) {
+		return 0xffff;
+	}
+
+	return sys_get_le16(&elem->_buf[idx * 2]);
+}
+
+struct bt_mesh_mod_id_vnd bt_mesh_comp_p0_elem_mod_vnd(struct bt_mesh_comp_p0_elem *elem, int idx)
+{
+	CHECKIF(idx >= elem->nvnd) {
+		return (struct bt_mesh_mod_id_vnd){ 0xffff, 0xffff };
+	}
+
+	size_t offset = elem->nsig * 2 + idx * 4;
+	struct bt_mesh_mod_id_vnd mod = {
+		.company = sys_get_le16(&elem->_buf[offset]),
+		.id = sys_get_le16(&elem->_buf[offset + 2]),
+	};
+
+	return mod;
 }

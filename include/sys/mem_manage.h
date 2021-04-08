@@ -79,6 +79,46 @@
 #include <inttypes.h>
 #include <sys/__assert.h>
 
+struct k_mem_paging_stats_t {
+#ifdef CONFIG_DEMAND_PAGING_STATS
+	struct {
+		/** Number of page faults */
+		unsigned long			cnt;
+
+		/** Number of page faults with IRQ locked */
+		unsigned long			irq_locked;
+
+		/** Number of page faults with IRQ unlocked */
+		unsigned long			irq_unlocked;
+
+#ifndef CONFIG_DEMAND_PAGING_ALLOW_IRQ
+		/** Number of page faults while in ISR */
+		unsigned long			in_isr;
+#endif
+	} pagefaults;
+
+	struct {
+		/** Number of clean pages selected for eviction */
+		unsigned long			clean;
+
+		/** Number of dirty pages selected for eviction */
+		unsigned long			dirty;
+	} eviction;
+#endif /* CONFIG_DEMAND_PAGING_STATS */
+};
+
+struct k_mem_paging_histogram_t {
+#ifdef CONFIG_DEMAND_PAGING_TIMING_HISTOGRAM
+	/* Counts for each bin in timing histogram */
+	unsigned long	counts[CONFIG_DEMAND_PAGING_TIMING_HISTOGRAM_NUM_BINS];
+
+	/* Bounds for the bins in timing histogram,
+	 * excluding the first and last (hence, NUM_SLOTS - 1).
+	 */
+	unsigned long	bounds[CONFIG_DEMAND_PAGING_TIMING_HISTOGRAM_NUM_BINS];
+#endif /* CONFIG_DEMAND_PAGING_TIMING_HISTOGRAM */
+};
+
 /* Just like Z_MEM_PHYS_ADDR() but with type safety and assertions */
 static inline uintptr_t z_mem_phys_addr(void *virt)
 {
@@ -348,6 +388,72 @@ void k_mem_pin(void *addr, size_t size);
  */
 void k_mem_unpin(void *addr, size_t size);
 #endif /* CONFIG_DEMAND_PAGING */
+
+#ifdef CONFIG_DEMAND_PAGING_STATS
+/**
+ * Get the paging statistics since system startup
+ *
+ * This populates the paging statistics struct being passed in
+ * as argument.
+ *
+ * @param[in,out] stats Paging statistics struct to be filled.
+ */
+__syscall void k_mem_paging_stats_get(struct k_mem_paging_stats_t *stats);
+
+#ifdef CONFIG_DEMAND_PAGING_THREAD_STATS
+struct k_thread;
+/**
+ * Get the paging statistics since system startup for a thread
+ *
+ * This populates the paging statistics struct being passed in
+ * as argument for a particular thread.
+ *
+ * @param[in] thread Thread
+ * @param[in,out] stats Paging statistics struct to be filled.
+ */
+__syscall
+void k_mem_paging_thread_stats_get(struct k_thread *thread,
+				   struct k_mem_paging_stats_t *stats);
+#endif /* CONFIG_DEMAND_PAGING_THREAD_STATS */
+
+#ifdef CONFIG_DEMAND_PAGING_TIMING_HISTOGRAM
+/**
+ * Get the eviction timing histogram
+ *
+ * This populates the timing histogram struct being passed in
+ * as argument.
+ *
+ * @param[in,out] stats Timing histogram struct to be filled.
+ */
+__syscall void k_mem_paging_histogram_eviction_get(
+	struct k_mem_paging_histogram_t *hist);
+
+/**
+ * Get the backing store page-in timing histogram
+ *
+ * This populates the timing histogram struct being passed in
+ * as argument.
+ *
+ * @param[in,out] stats Timing histogram struct to be filled.
+ */
+__syscall void k_mem_paging_histogram_backing_store_page_in_get(
+	struct k_mem_paging_histogram_t *hist);
+
+/**
+ * Get the backing store page-out timing histogram
+ *
+ * This populates the timing histogram struct being passed in
+ * as argument.
+ *
+ * @param[in,out] stats Timing histogram struct to be filled.
+ */
+__syscall void k_mem_paging_histogram_backing_store_page_out_get(
+	struct k_mem_paging_histogram_t *hist);
+#endif /* CONFIG_DEMAND_PAGING_TIMING_HISTOGRAM */
+
+#include <syscalls/mem_manage.h>
+
+#endif /* CONFIG_DEMAND_PAGING_STATS */
 
 #ifdef __cplusplus
 }

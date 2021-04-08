@@ -29,8 +29,15 @@ interface and listing all issues with the `bug label
 API Changes
 ***********
 
+* Driver APIs now return ``-ENOSYS`` if optional functions are not implemented.
+  If the feature is not supported by the hardware ``-ENOTSUP`` will be returned.
+  Formerly ``-ENOTSUP`` was returned for both failure modes, meaning this change
+  may require existing code that tests only for that value to be changed.
+
 * The :c:func:`wait_for_usb_dfu` function now accepts a ``k_timeout_t`` argument instead of
   using the ``CONFIG_USB_DFU_WAIT_DELAY_MS`` macro.
+
+* Added disconnect reason to the :c:func:`disconnected` callback of :c:struct:`bt_iso_chan_ops`.
 
 Deprecated in this release
 
@@ -309,6 +316,14 @@ HALs
 
 * HALs are now moved out of the main tree as external modules and reside in
   their own standalone repositories.
+
+
+Trusted Firmware-m
+******************
+
+* Configured QEMU to run Zephyr samples and tests in CI on mps2_an521_nonsecure
+  (Cortex-M33 Non-Secure) with TF-M as the secure firmware component.
+
 
 Documentation
 *************
