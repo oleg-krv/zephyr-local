@@ -16,10 +16,10 @@
  * failure detection. Please refer the block diagram for more detail.
  *
  *            +---------------------+    +-----------------+
- *  LFCLK --->| T0 Prescale Counter |--->| 16-Bit T0 Timer |---+----> T0 Timer
- * (32kHz)    |     (TWCP 1:32)     |    |     (TWDT0)     |   |       Event
- *            +---------------------+    +-----------------+   |
- *  +----------------------------------------------------------+
+ *  LFCLK --->| T0 Prescale Counter |-+->| 16-Bit T0 Timer |--------> T0 Timer
+ * (32kHz)    |     (TWCP 1:32)     | |  |     (TWDT0)     |           Event
+ *            +---------------------+ |  +-----------------+
+ *  +---------------------------------+
  *  |
  *  |    +-------------------+    +-----------------+
  *  +--->| Watchdog Prescale |--->| 8-Bit Watchdog  |-----> Watchdog Event/Reset
@@ -114,16 +114,13 @@ static void wdt_t0out_isr(const struct device *dev, struct npcx_wui *wui)
 	struct wdt_npcx_data *const data = DRV_DATA(dev);
 	ARG_UNUSED(wui);
 
+	LOG_DBG("WDT reset will issue after %d delay cycle! WUI(%d %d %d)",
+		CONFIG_WDT_NPCX_DELAY_CYCLES, wui->table, wui->group, wui->bit);
+
 	/* Handle watchdog event here. */
 	if (data->cb) {
 		data->cb(dev, 0);
 	}
-
-	LOG_DBG("WDT issued! WUI(%d %d %d)", wui->table, wui->group, wui->bit);
-
-	/* Wait for watchdog event and reset occurred! */
-	while (1)
-		;
 }
 
 static void wdt_config_t0out_interrupt(const struct device *dev)
