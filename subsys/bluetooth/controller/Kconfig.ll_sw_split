@@ -536,8 +536,8 @@ config BT_MAYFLY_YIELD_AFTER_CALL
 	  If set to 'n', all pending mayflies for callee are executed before
 	  yielding
 
-config BT_TICKER_COMPATIBILITY_MODE
-	bool "Ticker compatibility mode"
+config BT_TICKER_LOW_LAT
+	bool "Ticker low latency mode"
 	default y if SOC_SERIES_NRF51X
 	help
 	  This option enables legacy ticker scheduling which defers overlapping
@@ -555,13 +555,29 @@ config BT_TICKER_LAZY_GET
 
 config BT_TICKER_EXT
 	bool "Ticker extensions"
-	depends on !BT_TICKER_COMPATIBILITY_MODE
+	depends on !BT_TICKER_LOW_LAT && !BT_TICKER_SLOT_AGNOSTIC
 	default y
 	help
 	  This option enables ticker extensions such as re-scheduling of
 	  ticker nodes with slot_window set to non-zero. Ticker extensions
 	  are invoked by using available '_ext' versions of ticker interface
 	  functions.
+
+config BT_TICKER_SLOT_AGNOSTIC
+	bool "Slot agnostic ticker mode"
+	help
+	  This option enables slot agnostic ticker mode, which ignores slot
+	  reservations and collision handling, and operates as a simple
+	  multi-instance programmable timer.
+
+config BT_CTLR_JIT_SCHEDULING
+	bool "Just-in-Time Scheduling"
+	select BT_TICKER_SLOT_AGNOSTIC
+	help
+	  This option enables the experimental 'Next Generation' scheduling
+	  feature, which eliminates priorities and collision resolving in the
+	  ticker, and instead relies on just-in-time ("lazy") resolution in
+	  the link layer.
 
 config BT_CTLR_USER_EXT
 	prompt "Enable proprietary extensions in Controller"

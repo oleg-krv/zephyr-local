@@ -130,6 +130,13 @@ void att_sent(struct bt_conn *conn, void *user_data)
 	}
 }
 
+/* In case of success the ownership of the buffer is transferred to the stack
+ * which takes care of releasing it when it completes transmitting to the
+ * controller.
+ *
+ * In case bt_l2cap_send_cb fails the buffer state and ownership are retained
+ * so the buffer can be safely pushed back to the queue to be processed later.
+ */
 static int chan_send(struct bt_att_chan *chan, struct net_buf *buf,
 		     bt_att_chan_sent_t cb)
 {
@@ -189,11 +196,23 @@ static int chan_send(struct bt_att_chan *chan, struct net_buf *buf,
 
 	chan->sent = cb ? cb : chan_cb(buf);
 
+	/* bt_l2cap_send_cb takes onwership of the buffer so take another
+	 * reference to restore the state in case an error is returned.
+	 */
+	net_buf_ref(buf);
+
 	err = bt_l2cap_send_cb(chan->att->conn, BT_L2CAP_CID_ATT,
 			       buf, att_cb(chan->sent),
 			       &chan->chan.chan);
 	if (err) {
+		/* In case of an error has occurred restore the buffer state as
+		 * the extra reference shall have prevented the buffer to be
+		 * freed.
+		 */
 		net_buf_simple_restore(&buf->b, &state);
+	} else {
+		/* In case of success unref the extra reference taken */
+		net_buf_unref(buf);
 	}
 
 	return err;

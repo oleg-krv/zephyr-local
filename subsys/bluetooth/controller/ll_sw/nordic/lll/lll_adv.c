@@ -59,8 +59,8 @@ static int adv_extra_data_free(struct lll_adv_pdu *pdu, uint8_t last);
 #endif /* CONFIG_BT_CTLR_ADV_EXT_PDU_EXTRA_DATA_MEMORY */
 
 static int prepare_cb(struct lll_prepare_param *p);
-static int is_abort_cb(void *next, int prio, void *curr,
-		       lll_prepare_cb_t *resume_cb, int *resume_prio);
+static int is_abort_cb(void *next, void *curr,
+		       lll_prepare_cb_t *resume_cb);
 static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
 static void isr_tx(void *param);
 static void isr_rx(void *param);
@@ -741,10 +741,14 @@ static int prepare_cb(struct lll_prepare_param *p)
 	lll = p->param;
 
 #if defined(CONFIG_BT_PERIPHERAL)
-	/* Check if stopped (on connection establishment race between LLL and
-	 * ULL.
+	/* Check if stopped (on connection establishment- or disabled race
+	 * between LLL and ULL.
+	 * When connectable advertising is disabled in thread context, cancelled
+	 * flag is set, and initiated flag is checked. Here, we avoid
+	 * transmitting connectable advertising event if cancelled flag is set.
 	 */
-	if (unlikely(lll->conn && lll->conn->slave.initiated)) {
+	if (unlikely(lll->conn &&
+		(lll->conn->slave.initiated || lll->conn->slave.cancelled))) {
 		radio_isr_set(lll_isr_early_abort, lll);
 		radio_disable();
 
@@ -861,8 +865,7 @@ static int resume_prepare_cb(struct lll_prepare_param *p)
 }
 #endif /* CONFIG_BT_PERIPHERAL */
 
-static int is_abort_cb(void *next, int prio, void *curr,
-		       lll_prepare_cb_t *resume_cb, int *resume_prio)
+static int is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb)
 {
 #if defined(CONFIG_BT_PERIPHERAL)
 	struct lll_adv *lll = curr;
@@ -878,7 +881,6 @@ static int is_abort_cb(void *next, int prio, void *curr,
 
 			/* wrap back after the pre-empter */
 			*resume_cb = resume_prepare_cb;
-			*resume_prio = 0; /* TODO: */
 
 			/* Retain HF clk */
 			err = lll_hfclock_on();
@@ -1081,7 +1083,14 @@ static void isr_done(void *param)
 	}
 #endif /* CONFIG_BT_PERIPHERAL */
 
-	if (lll->chan_map_curr) {
+	/* NOTE: Do not continue to connectable advertise if advertising is
+	 *       being disabled, by checking the cancelled flag.
+	 */
+	if (lll->chan_map_curr &&
+#if defined(CONFIG_BT_PERIPHERAL)
+	    (!lll->conn || !lll->conn->slave.cancelled) &&
+#endif /* CONFIG_BT_PERIPHERAL */
+	    1) {
 		struct pdu_adv *pdu;
 		uint32_t start_us;
 
@@ -1115,25 +1124,6 @@ static void isr_done(void *param)
 		radio_tmr_end_capture();
 
 		return;
-
-#if defined(CONFIG_BT_CTLR_ADV_EXT) && defined(BT_CTLR_ADV_EXT_PBACK)
-	} else {
-		struct pdu_adv_com_ext_adv *p;
-		struct pdu_adv_ext_hdr *h;
-		struct pdu_adv *pdu;
-
-		pdu = lll_adv_data_curr_get(lll);
-		p = (void *)&pdu->adv_ext_ind;
-		h = (void *)p->ext_hdr_adv_data;
-
-		if ((pdu->type == PDU_ADV_TYPE_EXT_IND) && h->aux_ptr) {
-			radio_filter_disable();
-
-			lll_adv_aux_pback_prepare(lll);
-
-			return;
-		}
-#endif /* CONFIG_BT_CTLR_ADV_EXT */
 	}
 
 	radio_filter_disable();
@@ -1323,12 +1313,22 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 		return 0;
 
 #if defined(CONFIG_BT_PERIPHERAL)
+	/* NOTE: Do not accept CONNECT_IND if cancelled flag is set in thread
+	 *       context when disabling connectable advertising. This is to
+	 *       avoid any race in checking the initiated flags in thread mode
+	 *       which is set here if accepting a connection establishment.
+	 *
+	 *       Under this race, peer central would get failed to establish
+	 *       connection as the disconnect reason. This is an acceptable
+	 *       outcome to keep the thread mode implementation simple when
+	 *       disabling connectable advertising.
+	 */
 	} else if ((pdu_rx->type == PDU_ADV_TYPE_CONNECT_IND) &&
 		   (pdu_rx->len == sizeof(struct pdu_adv_connect_ind)) &&
+		   lll->conn && !lll->conn->slave.cancelled &&
 		   lll_adv_connect_ind_check(lll, pdu_rx, tx_addr, addr,
 					     rx_addr, tgt_addr,
-					     devmatch_ok, &rl_idx) &&
-		   lll->conn) {
+					     devmatch_ok, &rl_idx)) {
 		struct node_rx_ftr *ftr;
 		struct node_rx_pdu *rx;
 

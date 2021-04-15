@@ -160,18 +160,26 @@ struct ull_hdr {
 
 struct lll_hdr {
 	void *parent;
+#if defined(CONFIG_BT_CTLR_JIT_SCHEDULING)
+	uint8_t score;
+	uint8_t latency;
+#endif /* CONFIG_BT_CTLR_JIT_SCHEDULING */
 };
 
 struct lll_prepare_param {
 	uint32_t ticks_at_expire;
 	uint32_t remainder;
 	uint16_t lazy;
-	void  *param;
+#if defined(CONFIG_BT_CTLR_JIT_SCHEDULING)
+	int8_t  prio;
+#endif /* CONFIG_BT_CTLR_JIT_SCHEDULING */
+	uint8_t force;
+	void *param;
 };
 
 typedef int (*lll_prepare_cb_t)(struct lll_prepare_param *prepare_param);
-typedef int (*lll_is_abort_cb_t)(void *next, int prio, void *curr,
-				 lll_prepare_cb_t *resume_cb, int *resume_prio);
+typedef int (*lll_is_abort_cb_t)(void *next, void *curr,
+				 lll_prepare_cb_t *resume_cb);
 typedef void (*lll_abort_cb_t)(struct lll_prepare_param *prepare_param,
 			       void *param);
 
@@ -180,9 +188,8 @@ struct lll_event {
 	lll_prepare_cb_t         prepare_cb;
 	lll_is_abort_cb_t        is_abort_cb;
 	lll_abort_cb_t           abort_cb;
-	int                      prio;
-	uint8_t                     is_resume:1;
-	uint8_t                     is_aborted:1;
+	uint8_t                  is_resume:1;
+	uint8_t                  is_aborted:1;
 };
 
 #define DEFINE_NODE_RX_USER_TYPE(i, _) NODE_RX_TYPE_##i,
@@ -379,7 +386,14 @@ static inline void lll_hdr_init(void *lll, void *parent)
 	struct lll_hdr *hdr = lll;
 
 	hdr->parent = parent;
+
+#if defined(CONFIG_BT_CTLR_JIT_SCHEDULING)
+	hdr->score = 0U;
+	hdr->latency = 0U;
+#endif /* CONFIG_BT_CTLR_JIT_SCHEDULING */
 }
+
+void lll_done_score(void *param, uint8_t too_late, uint8_t aborted);
 
 int lll_init(void);
 int lll_reset(void);
@@ -401,7 +415,7 @@ int lll_rand_isr_get(void *buf, size_t len);
 int ull_prepare_enqueue(lll_is_abort_cb_t is_abort_cb,
 			       lll_abort_cb_t abort_cb,
 			       struct lll_prepare_param *prepare_param,
-			       lll_prepare_cb_t prepare_cb, int prio,
+			       lll_prepare_cb_t prepare_cb,
 			       uint8_t is_resume);
 void *ull_prepare_dequeue_get(void);
 void *ull_prepare_dequeue_iter(uint8_t *idx);
@@ -418,3 +432,13 @@ void ull_rx_sched(void);
 void ull_rx_sched_done(void);
 void *ull_event_done_extra_get(void);
 void *ull_event_done(void *param);
+
+int lll_prepare(lll_is_abort_cb_t is_abort_cb,
+		lll_abort_cb_t abort_cb,
+		lll_prepare_cb_t prepare_cb, int8_t event_prio,
+		struct lll_prepare_param *prepare_param);
+int lll_resume_enqueue(lll_prepare_cb_t resume_cb, int resume_prio);
+int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
+			lll_prepare_cb_t prepare_cb,
+			struct lll_prepare_param *prepare_param,
+			uint8_t is_resume, uint8_t is_dequeue);

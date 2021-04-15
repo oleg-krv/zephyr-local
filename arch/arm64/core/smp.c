@@ -30,8 +30,7 @@ volatile struct {
 	void *sp; /* Fixed at the first entry */
 	arch_cpustart_t fn;
 	void *arg;
-	char pad[] __aligned(L1_CACHE_BYTES);
-} arm64_cpu_init[CONFIG_MP_NUM_CPUS];
+} __aligned(L1_CACHE_BYTES) arm64_cpu_init[CONFIG_MP_NUM_CPUS];
 
 extern void __start(void);
 
@@ -65,6 +64,9 @@ void z_arm64_secondary_start(void)
 {
 	arch_cpustart_t fn;
 	int cpu_num = MPIDR_TO_CORE(GET_MPIDR());
+
+	/* Initialize tpidrro_el0 with our struct _cpu instance address */
+	write_tpidrro_el0((uintptr_t)&_kernel.cpus[cpu_num]);
 
 	z_arm64_mmu_init();
 

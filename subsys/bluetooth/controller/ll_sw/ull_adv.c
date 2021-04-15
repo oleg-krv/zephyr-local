@@ -60,12 +60,12 @@ inline uint16_t ull_adv_handle_get(struct ll_adv_set *adv);
 static int init_reset(void);
 static inline struct ll_adv_set *is_disabled_get(uint8_t handle);
 static void ticker_cb(uint32_t ticks_at_expire, uint32_t remainder,
-		      uint16_t lazy, void *param);
+		      uint16_t lazy, uint8_t force, void *param);
 static void ticker_op_update_cb(uint32_t status, void *params);
 
 #if defined(CONFIG_BT_PERIPHERAL)
 static void ticker_stop_cb(uint32_t ticks_at_expire, uint32_t remainder,
-			   uint16_t lazy, void *param);
+			   uint16_t lazy, uint8_t force, void *param);
 static void ticker_op_stop_cb(uint32_t status, void *params);
 static void disabled_cb(void *param);
 static void conn_release(struct ll_adv_set *adv);
@@ -874,6 +874,7 @@ uint8_t ll_adv_enable(uint8_t enable)
 		/* FIXME: BEGIN: Move to ULL? */
 		conn_lll->role = 1;
 		conn_lll->slave.initiated = 0;
+		conn_lll->slave.cancelled = 0;
 		conn_lll->data_chan_sel = 0;
 		conn_lll->data_chan_use = 0;
 		conn_lll->event_counter = 0;
@@ -1277,13 +1278,13 @@ uint8_t ll_adv_enable(uint8_t enable)
 				   HAL_TICKER_US_TO_TICKS((uint64_t)interval *
 							  ADV_INT_UNIT_US),
 				   TICKER_NULL_REMAINDER,
-#if !defined(CONFIG_BT_TICKER_COMPATIBILITY_MODE) && \
+#if !defined(CONFIG_BT_TICKER_LOW_LAT) && \
 	!defined(CONFIG_BT_CTLR_LOW_LAT)
 				   /* Force expiry to ensure timing update */
 				   TICKER_LAZY_MUST_EXPIRE,
 #else
 				   TICKER_NULL_LAZY,
-#endif
+#endif /* !CONFIG_BT_TICKER_LOW_LAT && !CONFIG_BT_CTLR_LOW_LAT */
 				   ticks_slot,
 				   ticker_cb, adv,
 				   ull_ticker_status_give,
@@ -1707,7 +1708,7 @@ static inline struct ll_adv_set *is_disabled_get(uint8_t handle)
 }
 
 static void ticker_cb(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
-		      void *param)
+		      uint8_t force, void *param)
 {
 	static memq_link_t link;
 	static struct mayfly mfy = {0, 0, &link, NULL, lll_adv_prepare};
@@ -1721,7 +1722,7 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t remainder, uint16_t laz
 
 	lll = &adv->lll;
 
-	if (IS_ENABLED(CONFIG_BT_TICKER_COMPATIBILITY_MODE) ||
+	if (IS_ENABLED(CONFIG_BT_TICKER_LOW_LAT) ||
 	    (lazy != TICKER_LAZY_MUST_EXPIRE)) {
 		/* Increment prepare reference count */
 		ref = ull_ref_inc(&adv->ull);
@@ -1731,6 +1732,7 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t remainder, uint16_t laz
 		p.ticks_at_expire = ticks_at_expire;
 		p.remainder = remainder;
 		p.lazy = lazy;
+		p.force = force;
 		p.param = lll;
 		mfy.param = &p;
 
@@ -1798,7 +1800,7 @@ static void ticker_op_update_cb(uint32_t status, void *param)
 
 #if defined(CONFIG_BT_PERIPHERAL)
 static void ticker_stop_cb(uint32_t ticks_at_expire, uint32_t remainder,
-			   uint16_t lazy, void *param)
+			   uint16_t lazy, uint8_t force, void *param)
 {
 	struct ll_adv_set *adv = param;
 	uint8_t handle;
@@ -1994,6 +1996,21 @@ static inline uint8_t disable(uint8_t handle)
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
 
+#if defined(CONFIG_BT_PERIPHERAL)
+	if (adv->lll.conn) {
+		/* Indicate to LLL that a cancellation is requested */
+		adv->lll.conn->slave.cancelled = 1U;
+		cpu_dmb();
+
+		/* Check if a connection was initiated (connection
+		 * establishment race between LLL and ULL).
+		 */
+		if (unlikely(adv->lll.conn->slave.initiated)) {
+			return BT_HCI_ERR_CMD_DISALLOWED;
+		}
+	}
+#endif /* CONFIG_BT_PERIPHERAL */
+
 	mark = ull_disable_mark(adv);
 	LL_ASSERT(mark == adv);
 
@@ -2011,7 +2028,7 @@ static inline uint8_t disable(uint8_t handle)
 			return BT_HCI_ERR_CMD_DISALLOWED;
 		}
 	}
-#endif
+#endif /* CONFIG_BT_PERIPHERAL */
 
 	ret_cb = TICKER_STATUS_BUSY;
 	ret = ticker_stop(TICKER_INSTANCE_ID_CTLR, TICKER_USER_ID_THREAD,

@@ -23,6 +23,7 @@
 /arch/arm/include/aarch32/cortex_m/cmse.h @ioannisg
 /arch/arm/core/aarch32/cortex_a_r/        @MaureenHelm @galak @ioannisg @bbolen @stephanosio
 /arch/arm64/                              @carlocaione
+/arch/arm64/core/cortex_r/                @povergoing
 /arch/common/                             @ioannisg @andyross
 /soc/arc/snps_*/                          @abrodkin @ruuddw @evgeniy-paltsev
 /soc/nios2/                               @nashif
@@ -58,6 +59,7 @@
 /soc/arm64/bcm_vk/                        @abhishek-brcm
 /soc/arm64/nxp_layerscape/                @JiafeiPan
 /soc/arm64/xenvm/                         @lorc
+/soc/arm64/arm/                           @povergoing
 /arch/x86/                                @jhedberg @nashif @jenmwms @aasthagr
 /arch/nios2/                              @nashif
 /arch/posix/                              @aescolar @daor-oti
@@ -148,6 +150,7 @@
 /boards/arm64/bcm958402m2_a72/            @abhishek-brcm
 /boards/arm64/nxp_ls1046ardb/             @JiafeiPan
 /boards/arm64/xenvm/                      @lorc
+/boards/arm64/fvp_baser_aemv8r/           @povergoing
 # All cmake related files
 /cmake/                                   @tejlmand @nashif
 /cmake/*/arcmwdt/                         @abrodkin @evgeniy-paltsev @tejlmand
@@ -331,6 +334,7 @@
 /dts/arm/cypress/                         @nandojve
 /dts/arm/infineon/                        @parthitce
 /dts/arm64/                               @carlocaione
+/dts/arm64/armv8-r.dtsi                   @povergoing
 /dts/arm/quicklogic/                      @wtatarski @kowalewskijan @kgugala
 /dts/arm/st/                              @erwango
 /dts/arm/ti/cc13?2*                       @bwitherspoon
@@ -416,6 +420,7 @@
 /include/arch/arm/aarch32/                @MaureenHelm @galak @ioannisg
 /include/arch/arm/aarch32/cortex_a_r/     @stephanosio
 /include/arch/arm64/                      @carlocaione
+/include/arch/arm64/cortex_r/             @povergoing
 /include/arch/arm/aarch32/irq.h           @carlocaione
 /include/arch/nios2/                      @nashif
 /include/arch/nios2/arch.h                @nashif

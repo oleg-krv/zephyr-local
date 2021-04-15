@@ -46,11 +46,11 @@
 
 static int init_reset(void);
 static int prepare_cb(struct lll_prepare_param *p);
-static int is_abort_cb(void *next, int prio, void *curr,
-		       lll_prepare_cb_t *resume_cb, int *resume_prio);
+static int is_abort_cb(void *next, void *curr,
+		       lll_prepare_cb_t *resume_cb);
 static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
 static void ticker_stop_cb(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
-			   void *param);
+			   uint8_t force, void *param);
 static void ticker_op_start_cb(uint32_t status, void *param);
 static void isr_rx(void *param);
 static void isr_tx(void *param);
@@ -315,8 +315,7 @@ static int resume_prepare_cb(struct lll_prepare_param *p)
 	return prepare_cb(p);
 }
 
-static int is_abort_cb(void *next, int prio, void *curr,
-		       lll_prepare_cb_t *resume_cb, int *resume_prio)
+static int is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb)
 {
 	struct lll_scan *lll = curr;
 
@@ -330,7 +329,6 @@ static int is_abort_cb(void *next, int prio, void *curr,
 
 			/* wrap back after the pre-empter */
 			*resume_cb = resume_prepare_cb;
-			*resume_prio = 0; /* TODO: */
 
 			/* Retain HF clock */
 			err = lll_hfclock_on();
@@ -392,7 +390,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 }
 
 static void ticker_stop_cb(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
-			   void *param)
+			   uint8_t force, void *param)
 {
 	radio_isr_set(isr_done_cleanup, param);
 	radio_disable();

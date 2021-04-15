@@ -72,7 +72,7 @@ manifest:
       revision: b52fdbf4b62439be9fab9bb4bae9690a42d2fb14
       path: modules/hal/st
     - name: hal_stm32
-      revision: 50283e0438d882a80fb681907664491c7042c817
+      revision: 68bfdabe97aa60934e1519e98593abaa9745501e
       path: modules/hal/stm32
     - name: hal_ti
       revision: 3da6fae25fc44ec830fac4a92787b585ff55435e
@@ -91,16 +91,16 @@ manifest:
       revision: 53044168b43f06ec5654b906a2cdd260bf477edd
       path: modules/crypto/mbedtls
     - name: mcuboot
-      revision: 846b104e67c46f9428fd020ba8dccf94f786d94d
+      revision: 5f004461f9ad4041080a1975f58b043aa3031b65
       path: bootloader/mcuboot
     - name: mcumgr
       revision: 9f09bae7c0ad7df5e0a72731061125913fba61c7
       path: modules/lib/mcumgr
     - name: net-tools
-      revision: 244d685184e7e983f47569be276d9d4c1b133016
+      revision: f49bd1354616fae4093bf36e5eaee43c51a55127
       path: tools/net-tools
     - name: hal_nxp
-      revision: ad8de4f9743aa7500f184bcf6c2cea07c041fe69
+      revision: 4560b0a0106bbe47eded4d7af775998c4f6d05c0
       path: modules/hal/nxp
     - name: open-amp
       revision: de1b85a13032a2de1d8b6695ae5f800b613e739d
@@ -140,7 +140,7 @@ manifest:
       revision: 7dd56fc100d79cc45c33d43e7401d1803e26f6e7
     - name: trusted-firmware-m
       path: modules/tee/tfm
-      revision: d07d72c64e4b3d8594829eea302b88e51709861f
+      revision: 33216b0d61a6bc585a87e548c4a345d3fd0d2177
     - name: tfm-mcuboot # This is used by the trusted-firmware-m module.
       repo-path: mcuboot
       path: modules/tee/tfm-mcuboot
