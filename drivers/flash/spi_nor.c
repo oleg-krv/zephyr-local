@@ -80,6 +80,9 @@ struct spi_nor_config {
 	/* Expected JEDEC ID, from jedec-id property */
 	uint8_t jedec_id[SPI_NOR_MAX_ID_LEN];
 
+	/* Optional bits in SR to be cleared on startup */
+	uint8_t has_lock;
+
 #if defined(CONFIG_SPI_NOR_SFDP_DEVICETREE)
 	/* Length of BFP structure, in 32-bit words. */
 	uint8_t bfp_len;
@@ -90,7 +93,6 @@ struct spi_nor_config {
 	const struct jesd216_bfp *bfp;
 #endif /* CONFIG_SPI_NOR_SFDP_DEVICETREE */
 #endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
-
 };
 
 /**
@@ -134,8 +136,6 @@ struct spi_nor_data {
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 #endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
-	/* Type device driver */
-	uint8_t type_device;
 };
 
 #ifdef CONFIG_SPI_NOR_SFDP_MINIMAL
@@ -309,12 +309,39 @@ static int spi_nor_access(const struct device *const dev,
 	spi_nor_access(dev, opcode, false, 0, NULL, 0, true)
 #define spi_nor_cmd_addr_write(dev, opcode, addr, src, length) \
 	spi_nor_access(dev, opcode, true, addr, (void *)src, length, true)
-#define spi_nor_cmd_write_data(dev, opcode, dest) \
-	spi_nor_access(dev, opcode, false, 0, dest, 1, true)
+
+/**
+ * @brief Wait until the flash is ready
+ *
+ * @note The device must be externally acquired before invoking this
+ * function.
+ *
+ * This function should be invoked after every ERASE, PROGRAM, or
+ * WRITE_STATUS operation before continuing.  This allows us to assume
+ * that the device is ready to accept new commands at any other point
+ * in the code.
+ *
+ * @param dev The device structure
+ * @return 0 on success, negative errno code otherwise
+ */
+static int spi_nor_wait_until_ready(const struct device *dev)
+{
+	int ret;
+	uint8_t reg;
+
+	do {
+		ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &reg, sizeof(reg));
+	} while (!ret && (reg & SPI_NOR_WIP_BIT));
+
+	return ret;
+}
 
 #if defined(CONFIG_SPI_NOR_SFDP_RUNTIME) || defined(CONFIG_FLASH_JESD216_API)
 /*
  * @brief Read content from the SFDP hierarchy
+ *
+ * @note The device must be externally acquired before invoking this
+ * function.
  *
  * @param dev Device struct
  * @param addr The address to send
@@ -436,19 +463,48 @@ static void release_device(const struct device *dev)
 }
 
 /**
- * @brief Wait until the flash is ready
+ * @brief Read the status register.
  *
- * @param dev The device structure
- * @return 0 on success, negative errno code otherwise
+ * @note The device must be externally acquired before invoking this
+ * function.
+ *
+ * @param dev Device struct
+ *
+ * @return the non-negative value of the status register, or an error code.
  */
-static int spi_nor_wait_until_ready(const struct device *dev)
+static int spi_nor_rdsr(const struct device *dev)
 {
-	int ret;
 	uint8_t reg;
+	int ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &reg, sizeof(reg));
 
-	do {
-		ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &reg, 1);
-	} while (!ret && (reg & SPI_NOR_WIP_BIT));
+	if (ret == 0) {
+		ret = reg;
+	}
+
+	return ret;
+}
+
+/**
+ * @brief Write the status register.
+ *
+ * @note The device must be externally acquired before invoking this
+ * function.
+ *
+ * @param dev Device struct
+ * @param sr The new value of the status register
+ *
+ * @return 0 on success or a negative error code.
+ */
+static int spi_nor_wrsr(const struct device *dev,
+			uint8_t sr)
+{
+	int ret = spi_nor_cmd_write(dev, SPI_NOR_CMD_WREN);
+
+	if (ret == 0) {
+		ret = spi_nor_access(dev, SPI_NOR_CMD_WRSR, false, 0, &sr,
+				     sizeof(sr), true);
+		spi_nor_wait_until_ready(dev);
+	}
 
 	return ret;
 }
@@ -465,8 +521,6 @@ static int spi_nor_read(const struct device *dev, off_t addr, void *dest,
 	}
 
 	acquire_device(dev);
-
-	spi_nor_wait_until_ready(dev);
 
 	ret = spi_nor_cmd_addr_read(dev, SPI_NOR_CMD_READ, addr, dest, size);
 
@@ -600,22 +654,17 @@ static int spi_nor_erase(const struct device *dev, off_t addr, size_t size)
 	return ret;
 }
 
+/* @note The device must be externally acquired before invoking this
+ * function.
+ */
 static int spi_nor_write_protection_set(const struct device *dev,
 					bool write_protect)
 {
 	int ret;
 
-	spi_nor_wait_until_ready(dev);
-
 	ret = spi_nor_cmd_write(dev, (write_protect) ?
 	      SPI_NOR_CMD_WRDI : SPI_NOR_CMD_WREN);
 
-//	if (!write_protect) {
-//		uint8_t reg;
-//		do {
-//			ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &reg, 1);
-//		} while (!ret && (reg & SPI_NOR_WEL_BIT));
-//	}
 	if (IS_ENABLED(DT_INST_PROP(0, requires_ulbpr))
 	    && (ret == 0)
 	    && !write_protect) {
@@ -631,8 +680,6 @@ static int spi_nor_sfdp_read(const struct device *dev, off_t addr,
 			     void *dest, size_t size)
 {
 	acquire_device(dev);
-
-	spi_nor_wait_until_ready(dev);
 
 	int ret = read_sfdp(dev, addr, dest, size);
 
@@ -651,8 +698,6 @@ static int spi_nor_read_jedec_id(const struct device *dev,
 	}
 
 	acquire_device(dev);
-
-	spi_nor_wait_until_ready(dev);
 
 	int ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDID, id, SPI_NOR_MAX_ID_LEN);
 
@@ -843,49 +888,6 @@ static int setup_pages_layout(const struct device *dev)
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 
-//static int spi_nor_get_status(const struct device *dev, void *data, size_t len) {
-//    int ret;
-//
-//#ifdef SPI_NOR_STATUS_BIT2
-//    /* device has two status bytes */
-//    if (len > 2) {
-//        len = 2;
-//    }
-//#else
-//    if (len > 1) {
-//        len = 1;
-//    }
-//#endif
-//
-//    ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, data, len);
-//
-//    return ret;
-//}
-
-#ifdef SPI_NOR_AT25DF321A
-static int spi_nor_unprotect_sectors(const struct device *dev) {
-	int ret;
-	const size_t flash_size = dev_flash_size(dev);
-	uint32_t addr = 0x01;
-	uint8_t status = 0x00;
-	while (addr < flash_size) {
-
-		do {
-			spi_nor_cmd_write(dev,SPI_NOR_CMD_WREN);
-			spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &status, 1);
-		} while (!(status & SPI_NOR_SB1_WEL_BIT));
-		ret = spi_nor_cmd_addr_write(dev, SPI_NOR_CMD_PSDI, addr, NULL, 0);
-		if (ret != 0) {
-			LOG_ERR("Can't unprotect sector 0x%lx : %u", (long)addr, ret);
-			return ret;
-		}
-		spi_nor_wait_until_ready(dev);
-		addr += 0X10000;
-	}
-	return 0;
-}
-#endif
-
 /**
  * @brief Configure the flash
  *
@@ -952,14 +954,24 @@ static int spi_nor_configure(const struct device *dev)
 	}
 #endif
 
-	/* Check type device driver */
-	data->type_device = SPI_NOR_TYPE_DEVICE_DEF;
-#ifdef SPI_NOR_AT25DF321A
-	uint8_t jdec_adesto_at25df321a[3] = {SPI_NOR_AT25DF321A_ID1, SPI_NOR_AT25DF321A_ID2, SPI_NOR_AT25DF321A_ID3};
-	if (memcmp(cfg->jedec_id, jdec_adesto_at25df321a, 3) == 0) {
-		data->type_device = SPI_NOR_TYPE_DEVICE_AT25DF321A;
+	/* Check for block protect bits that need to be cleared. */
+	if (cfg->has_lock != 0) {
+		acquire_device(dev);
+
+		rc = spi_nor_rdsr(dev);
+
+		/* Only clear if RDSR worked and something's set. */
+		if (rc > 0) {
+			rc = spi_nor_wrsr(dev, rc & ~cfg->has_lock);
+		}
+
+		if (rc != 0) {
+			LOG_ERR("BP clear failed: %d\n", rc);
+			return -ENODEV;
+		}
+
+		release_device(dev);
 	}
-#endif
 
 #ifndef CONFIG_SPI_NOR_SFDP_MINIMAL
 	/* For devicetree and runtime we need to process BFP data and
@@ -984,34 +996,6 @@ static int spi_nor_configure(const struct device *dev)
 	    && (enter_dpd(dev) != 0)) {
 		return -ENODEV;
 	}
-#ifdef SPI_NOR_AT25DF321A
-	if (data->type_device == SPI_NOR_TYPE_DEVICE_AT25DF321A) {
-		/* Check device status */
-		uint8_t status;
-		rc = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &status, 1);
-		if (rc != 0) {
-			LOG_ERR("Status read failed: %d", rc);
-			return -ENODEV;
-		}
-		if (status & SPI_NOR_SB1_SPF_BIT) {
-			rc = spi_nor_unprotect_sectors(dev);
-			if (rc != 0) {
-				LOG_ERR("Unprotect failed: %d", rc);
-				return -ENODEV;
-			}
-		}
-//		k_sleep(K_SECONDS(1));
-//		rc = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &status, 1);
-//		if (rc != 0) {
-//			LOG_ERR("Status read failed: %d", rc);
-//			return -ENODEV;
-//		}
-		if (status & SPI_NOR_SB1_SPF_BIT) {
-			LOG_ERR("Unprotect failed (read): %d %d", rc, status);
-			return -ENODEV;
-		}
-	}
-#endif
 
 	return 0;
 }
@@ -1118,6 +1102,14 @@ static const __aligned(4) uint8_t bfp_data_0[] = DT_INST_PROP(0, sfdp_bfp);
 
 #endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
 
+#if DT_INST_NODE_HAS_PROP(0, has_lock)
+/* Currently we only know of devices where the BP bits are present in
+ * the first byte of the status register.  Complain if that changes.
+ */
+BUILD_ASSERT(DT_INST_PROP(0, has_lock) == (DT_INST_PROP(0, has_lock) & 0xFF),
+	     "Need support for lock clear beyond SR1");
+#endif
+
 static const struct spi_nor_config spi_nor_config_0 = {
 #if !defined(CONFIG_SPI_NOR_SFDP_RUNTIME)
 
@@ -1132,6 +1124,9 @@ static const struct spi_nor_config spi_nor_config_0 = {
 	.flash_size = DT_INST_PROP(0, size) / 8,
 	.jedec_id = DT_INST_PROP(0, jedec_id),
 
+#if DT_INST_NODE_HAS_PROP(0, has_lock)
+	.has_lock = DT_INST_PROP(0, has_lock),
+#endif
 #ifdef CONFIG_SPI_NOR_SFDP_DEVICETREE
 	.bfp_len = sizeof(bfp_data_0) / 4,
 	.bfp = (const struct jesd216_bfp *)bfp_data_0,
