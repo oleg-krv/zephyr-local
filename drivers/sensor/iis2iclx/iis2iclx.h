@@ -37,6 +37,7 @@
 #define SENSOR_G_DOUBLE				(SENSOR_G / 1000000.0)
 
 struct iis2iclx_config {
+	stmdev_ctx_t ctx;
 	union {
 #if DT_ANY_INST_ON_BUS_STATUS_OKAY(i2c)
 		const struct stmemsc_cfg_i2c i2c;
@@ -45,14 +46,11 @@ struct iis2iclx_config {
 		const struct stmemsc_cfg_spi spi;
 #endif
 	} stmemsc_cfg;
-	int (*bus_init)(const struct device *dev);
 	uint8_t odr;
 	uint8_t range;
 #ifdef CONFIG_IIS2ICLX_TRIGGER
-	const char *irq_dev_name;
-	uint8_t irq_pin;
-	uint8_t irq_flags;
 	uint8_t int_pin;
+	const struct gpio_dt_spec gpio_drdy;
 #endif /* CONFIG_IIS2ICLX_TRIGGER */
 };
 
@@ -82,13 +80,10 @@ struct iis2iclx_data {
 	bool shub_inited;
 #endif /* CONFIG_IIS2ICLX_SENSORHUB */
 
-	stmdev_ctx_t ctx;
-
 	uint16_t accel_freq;
 	uint8_t accel_fs;
 
 #ifdef CONFIG_IIS2ICLX_TRIGGER
-	const struct device *gpio;
 	struct gpio_callback gpio_cb;
 	sensor_trigger_handler_t handler_drdy_acc;
 	sensor_trigger_handler_t handler_drdy_temp;

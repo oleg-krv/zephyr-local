@@ -53,6 +53,7 @@
 /soc/arm/ti_simplelink/cc32xx/            @vanti
 /soc/arm/ti_simplelink/msp432p4xx/        @Mani-Sadhasivam
 /soc/arm/xilinx_zynqmp/                   @stephanosio
+/soc/arm/renesas_rcar/                    @julien-massot
 /soc/xtensa/intel_s1000/                  @sathishkuttan @dcpleung
 /soc/arm64/                               @carlocaione
 /soc/arm64/qemu_cortex_a53/               @carlocaione
@@ -129,6 +130,7 @@
 /boards/arm/stm32*_disco/                 @erwango @ABOSTM @FRASTM
 /boards/arm/stm32f3_disco/                @ydamigos
 /boards/arm/stm32*_eval/                  @erwango @ABOSTM @FRASTM
+/boards/arm/rcar_h3ulcb/                  @julien-massot
 /boards/common/                           @mbolivar-nordic
 /boards/deprecated.cmake                  @tejlmand
 /boards/nios2/                            @nashif
@@ -182,6 +184,7 @@
 /drivers/can/*mcp2515*                    @karstenkoenig
 /drivers/clock_control/*nrf*              @nordic-krch
 /drivers/clock_control/*esp32*            @extremegtx
+/drivers/clock_control/*rcar*             @julien-massot
 /drivers/counter/                         @nordic-krch
 /drivers/console/ipm_console.c            @finikorg
 /drivers/console/semihost_console.c       @luozhongyao
@@ -214,6 +217,7 @@
 /drivers/gpio/*lmp90xxx*                  @henrikbrixandersen
 /drivers/gpio/*stm32*                     @erwango
 /drivers/gpio/*eos_s3*                    @wtatarski @kowalewskijan @kgugala
+/drivers/gpio/*rcar*                      @julien-massot
 /drivers/hwinfo/                          @alexanderwachter
 /drivers/i2s/i2s_ll_stm32*                @avisconti
 /drivers/i2c/i2c_common.c                 @sjg20
@@ -305,6 +309,7 @@
 /drivers/timer/cavs_timer.c               @dcpleung
 /drivers/timer/stm32_lptim_timer.c        @FRASTM
 /drivers/timer/leon_gptimer.c             @martin-aberg
+/drivers/timer/rcar_cmt_timer.c           @julien-massot
 /drivers/usb/                             @jfischer-no
 /drivers/usb/device/usb_dc_stm32.c        @ydamigos @loicpoulain
 /drivers/video/                           @loicpoulain
@@ -336,6 +341,7 @@
 /dts/arm/infineon/                        @parthitce
 /dts/arm64/                               @carlocaione
 /dts/arm64/armv8-r.dtsi                   @povergoing
+/dts/arm64/nxp/                           @JiafeiPan
 /dts/arm/quicklogic/                      @wtatarski @kowalewskijan @kgugala
 /dts/arm/st/                              @erwango
 /dts/arm/ti/cc13?2*                       @bwitherspoon
@@ -364,6 +370,7 @@
 /dts/arm/armv*m.dtsi                      @galak @ioannisg
 /dts/arm/armv7-r.dtsi                     @bbolen @stephanosio
 /dts/arm/xilinx/                          @bbolen @stephanosio
+/dts/arm/renesas/                         @julien-massot
 /dts/x86/                                 @jhedberg
 /dts/xtensa/xtensa.dtsi                   @ydamigos
 /dts/xtensa/intel/                        @dcpleung
@@ -448,7 +455,7 @@
 /include/dt-bindings/dma/stm32_dma.h      @cybertale
 /include/dt-bindings/pcie/                @dcpleung
 /include/dt-bindings/usb/usb.h            @galak
-/include/emul.h                           @sjg20
+/include/drivers/emul.h                   @sjg20
 /include/fs/                              @nashif @nvlsianpu @de-nordic
 /include/init.h                           @nashif @andyross
 /include/irq.h                            @dcpleung @nashif @andyross
@@ -486,8 +493,7 @@
 /lib/os/                                  @dcpleung @nashif @andyross
 /lib/os/cbprintf_packaged.c               @npitre
 /lib/posix/                               @pfalcon
-/lib/cmsis_rtos_v2/                       @nashif
-/lib/cmsis_rtos_v1/                       @nashif
+/subsys/portability/                      @nashif
 /lib/libc/                                @nashif
 /modules/                                 @nashif
 /modules/trusted-firmware-m/              @ioannisg @microbuilder
