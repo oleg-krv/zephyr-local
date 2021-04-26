@@ -316,15 +316,15 @@ struct net_stats {
 	struct net_stats_tc tc;
 #endif
 
-#if defined(CONFIG_NET_CONTEXT_TIMESTAMP) && \
-	defined(CONFIG_NET_PKT_TXTIME_STATS)
-#error \
-"Cannot define both CONFIG_NET_CONTEXT_TIMESTAMP and CONFIG_NET_PKT_TXTIME_STATS"
-#endif
-#if defined(CONFIG_NET_CONTEXT_TIMESTAMP) || \
-					defined(CONFIG_NET_PKT_TXTIME_STATS)
+#if defined(CONFIG_NET_PKT_TXTIME_STATS)
 	/** Network packet TX time statistics */
 	struct net_stats_tx_time tx_time;
+#endif
+
+#if defined(CONFIG_NET_PKT_RXTIME_STATS)
+	/** Network packet RX time statistics */
+	struct net_stats_rx_time rx_time;
+#endif
 
 #if defined(CONFIG_NET_PKT_TXTIME_STATS_DETAIL)
 	/** Network packet TX time detail statistics */
@@ -332,13 +332,7 @@ struct net_stats {
 #endif
 #if defined(CONFIG_NET_PKT_RXTIME_STATS_DETAIL)
 	/** Network packet RX time detail statistics */
-	struct net_stats_tx_time rx_time_detail[NET_PKT_DETAIL_STATS_COUNT];
-#endif
-#endif
-
-#if defined(CONFIG_NET_PKT_RXTIME_STATS)
-	/** Network packet RX time statistics */
-	struct net_stats_rx_time rx_time;
+	struct net_stats_rx_time rx_time_detail[NET_PKT_DETAIL_STATS_COUNT];
 #endif
 
 #if defined(CONFIG_NET_STATISTICS_POWER_MANAGEMENT)
