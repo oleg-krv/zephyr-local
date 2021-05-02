@@ -43,6 +43,9 @@ uint32_t __noinit z_timestamp_main;  /* timestamp when main task starts */
 uint32_t __noinit z_timestamp_idle;  /* timestamp when CPU goes idle */
 #endif
 
+/* the only struct z_kernel instance */
+struct z_kernel _kernel;
+
 /* init/main and idle threads */
 K_THREAD_STACK_DEFINE(z_main_stack, CONFIG_MAIN_STACK_SIZE);
 struct k_thread z_main_thread;
@@ -382,9 +385,6 @@ FUNC_NORETURN void z_cstart(void)
 	struct k_thread dummy_thread;
 
 	z_dummy_thread_init(&dummy_thread);
-#endif
-#if defined(CONFIG_MMU) && defined(CONFIG_USERSPACE)
-	z_kernel_map_fixup();
 #endif
 	/* do any necessary initialization of static devices */
 	z_device_state_init();

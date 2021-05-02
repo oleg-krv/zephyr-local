@@ -1646,6 +1646,34 @@ struct net_if_mcast_addr *net_if_ipv4_maddr_lookup(const struct in_addr *addr,
 						   struct net_if **iface);
 
 /**
+ * @brief Mark a given multicast address to be joined.
+ *
+ * @param addr IPv4 multicast address
+ */
+void net_if_ipv4_maddr_join(struct net_if_mcast_addr *addr);
+
+/**
+ * @brief Check if given multicast address is joined or not.
+ *
+ * @param addr IPv4 multicast address
+ *
+ * @return True if address is joined, False otherwise.
+ */
+static inline bool net_if_ipv4_maddr_is_joined(struct net_if_mcast_addr *addr)
+{
+	NET_ASSERT(addr);
+
+	return addr->is_joined;
+}
+
+/**
+ * @brief Mark a given multicast address to be left.
+ *
+ * @param addr IPv4 multicast address
+ */
+void net_if_ipv4_maddr_leave(struct net_if_mcast_addr *addr);
+
+/**
  * @brief Get the IPv4 address of the given router
  * @param router a network router
  *
@@ -2235,7 +2263,7 @@ struct net_if_api {
  * the system.
  * @param init_fn Address to the init function of the driver.
  * @param pm_control_fn Pointer to device_pm_control function.
- * Can be empty function (device_pm_control_nop) if not implemented.
+ * Can be NULL if not implemented.
  * @param data Pointer to the device's private data.
  * @param cfg The address to the structure containing the
  * configuration information for this instance of the driver.
@@ -2262,7 +2290,7 @@ struct net_if_api {
  * @param node_id The devicetree node identifier.
  * @param init_fn Address to the init function of the driver.
  * @param pm_control_fn Pointer to device_pm_control function.
- * Can be empty function (device_pm_control_nop) if not implemented.
+ * Can be NULL if not implemented.
  * @param data Pointer to the device's private data.
  * @param cfg The address to the structure containing the
  * configuration information for this instance of the driver.
@@ -2317,7 +2345,7 @@ struct net_if_api {
  * @param instance Instance identifier.
  * @param init_fn Address to the init function of the driver.
  * @param pm_control_fn Pointer to device_pm_control function.
- * Can be empty function (device_pm_control_nop) if not implemented.
+ * Can be NULL if not implemented.
  * @param data Pointer to the device's private data.
  * @param cfg The address to the structure containing the
  * configuration information for this instance of the driver.
@@ -2349,7 +2377,7 @@ struct net_if_api {
  * @param instance Instance identifier.
  * @param init_fn Address to the init function of the driver.
  * @param pm_control_fn Pointer to device_pm_control function.
- * Can be empty function (device_pm_control_nop) if not implemented.
+ * Can be NULL if not implemented.
  * @param data Pointer to the device's private data.
  * @param cfg The address to the structure containing the
  * configuration information for this instance of the driver.
@@ -2401,7 +2429,7 @@ struct net_if_api {
  * the system.
  * @param init_fn Address to the init function of the driver.
  * @param pm_control_fn Pointer to device_pm_control function.
- * Can be empty function (device_pm_control_nop) if not implemented.
+ * Can be NULL if not implemented.
  * @param data Pointer to the device's private data.
  * @param cfg The address to the structure containing the
  * configuration information for this instance of the driver.
@@ -2427,7 +2455,7 @@ struct net_if_api {
  * @param node_id The devicetree node identifier.
  * @param init_fn Address to the init function of the driver.
  * @param pm_control_fn Pointer to device_pm_control function.
- * Can be empty function (device_pm_control_nop) if not implemented.
+ * Can be NULL if not implemented.
  * @param data Pointer to the device's private data.
  * @param cfg The address to the structure containing the
  * configuration information for this instance of the driver.

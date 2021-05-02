@@ -1492,9 +1492,8 @@ static void dns_work_cb(struct k_work *work)
 	/* set new DNS addr in DNS resolver */
 	LOG_DBG("Refresh DNS resolver");
 	dnsCtx = dns_resolve_get_default();
-	dns_resolve_close(dnsCtx);
 
-	ret = dns_resolve_init(dnsCtx, dns_servers_str, NULL);
+	ret = dns_resolve_reconfigure(dnsCtx, dns_servers_str, NULL);
 	if (ret < 0) {
 		LOG_ERR("dns_resolve_init fail (%d)", ret);
 		return;
@@ -4878,6 +4877,6 @@ static struct net_if_api api_funcs = {
 	.init = offload_iface_init,
 };
 
-NET_DEVICE_DT_INST_OFFLOAD_DEFINE(0, hl7800_init, device_pm_control_nop, &ictx,
+NET_DEVICE_DT_INST_OFFLOAD_DEFINE(0, hl7800_init, NULL, &ictx,
 				  NULL, CONFIG_MODEM_HL7800_INIT_PRIORITY,
 				  &api_funcs, MDM_MTU);

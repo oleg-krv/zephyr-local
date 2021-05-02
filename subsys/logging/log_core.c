@@ -152,16 +152,13 @@ uint32_t z_log_get_s_mask(const char *str, uint32_t nargs)
  */
 static bool is_rodata(const void *addr)
 {
-#if defined(CONFIG_ARM) || defined(CONFIG_ARC) || defined(CONFIG_X86) || defined(CONFIG_ARM64)
+#if defined(CONFIG_ARM) || defined(CONFIG_ARC) || defined(CONFIG_X86) || \
+	defined(CONFIG_ARM64) || defined(CONFIG_NIOS2) || \
+	defined(CONFIG_RISCV) || defined(CONFIG_SPARC)
 	extern const char *_image_rodata_start[];
 	extern const char *_image_rodata_end[];
 	#define RO_START _image_rodata_start
 	#define RO_END _image_rodata_end
-#elif defined(CONFIG_NIOS2) || defined(CONFIG_RISCV) || defined(CONFIG_SPARC)
-	extern const char *_image_rom_start[];
-	extern const char *_image_rom_end[];
-	#define RO_START _image_rom_start
-	#define RO_END _image_rom_end
 #elif defined(CONFIG_XTENSA)
 	extern const char *_rodata_start[];
 	extern const char *_rodata_end[];
@@ -928,7 +925,7 @@ uint32_t z_vrfy_log_filter_set(struct log_backend const *const backend,
 			    int16_t src_id,
 			    uint32_t level)
 {
-	Z_OOPS(Z_SYSCALL_VERIFY_MSG(backend == 0,
+	Z_OOPS(Z_SYSCALL_VERIFY_MSG(backend == NULL,
 		"Setting per-backend filters from user mode is not supported"));
 	Z_OOPS(Z_SYSCALL_VERIFY_MSG(domain_id == CONFIG_LOG_DOMAIN_ID,
 		"Invalid log domain_id"));
@@ -969,7 +966,7 @@ void log_backend_enable(struct log_backend const *const backend,
 	/* Wakeup logger thread after attaching first backend. It might be
 	 * blocked with log messages pending.
 	 */
-	if (!backend_attached) {
+	if (IS_ENABLED(CONFIG_LOG_PROCESS_THREAD) && !backend_attached) {
 		k_sem_give(&log_process_thread_sem);
 	}
 

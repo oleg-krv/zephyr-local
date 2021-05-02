@@ -143,7 +143,7 @@ static inline const struct device *z_vrfy_device_get_binding(const char *name)
 
 	if (z_user_string_copy(name_copy, (char *)name, sizeof(name_copy))
 	    != 0) {
-		return 0;
+		return NULL;
 	}
 
 	return z_impl_device_get_binding(name_copy);
@@ -193,15 +193,6 @@ int device_required_foreach(const struct device *dev,
 }
 
 #ifdef CONFIG_PM_DEVICE
-int device_pm_control_nop(const struct device *unused_device,
-			  uint32_t unused_ctrl_command,
-			  void *unused_context,
-			  device_pm_cb cb,
-			  void *unused_arg)
-{
-	return -ENOTSUP;
-}
-
 int device_any_busy_check(void)
 {
 	const struct device *dev = __device_start;

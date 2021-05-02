@@ -61,6 +61,7 @@
 /soc/arm64/nxp_layerscape/                @JiafeiPan
 /soc/arm64/xenvm/                         @lorc
 /soc/arm64/arm/                           @povergoing
+/soc/arm64/arm/fvp_aemv8a/                @carlocaione
 /arch/x86/                                @jhedberg @nashif @jenmwms @aasthagr
 /arch/nios2/                              @nashif
 /arch/posix/                              @aescolar @daor-oti
@@ -84,6 +85,8 @@
 /boards/arm/96b_stm32_sensor_mez/         @Mani-Sadhasivam
 /boards/arm/96b_wistrio/                  @Mani-Sadhasivam
 /boards/arm/arduino_due/                  @ioannisg
+/boards/arm/blackpill_f401ce/             @coderkalyan
+/boards/arm/blackpill_f411ce/             @coderkalyan
 /boards/arm/bmd_345_eval/                 @Navin-Sankar
 /boards/arm/cc1352r1_launchxl/            @bwitherspoon
 /boards/arm/cc26x2r1_launchxl/            @bwitherspoon
@@ -154,6 +157,7 @@
 /boards/arm64/nxp_ls1046ardb/             @JiafeiPan
 /boards/arm64/xenvm/                      @lorc
 /boards/arm64/fvp_baser_aemv8r/           @povergoing
+/boards/arm64/fvp_base_revc_2xaemv8a/     @carlocaione
 # All cmake related files
 /cmake/                                   @tejlmand @nashif
 /cmake/*/arcmwdt/                         @abrodkin @evgeniy-paltsev @tejlmand
@@ -396,6 +400,7 @@
 /dts/posix/                               @aescolar @vanwinkeljan @daor-oti
 /dts/bindings/sensor/*bme680*             @BoschSensortec
 /dts/bindings/sensor/st*                  @avisconti
+/dts/common/                              @galak
 /include/                                 @nashif @carlescufi @galak @MaureenHelm
 /include/drivers/*/*litex*                @mateusz-holenko @kgugala @pgielda
 /include/drivers/adc.h                    @anangl
@@ -534,6 +539,7 @@
 /scripts/coccinelle/                      @himanshujha199640 @JuliaLawall
 /scripts/coredump/                        @dcpleung
 /scripts/kconfig/                         @ulfalizer
+/scripts/logging/dictionary/              @dcpleung
 /scripts/pylib/twister/expr_parser.py     @nashif
 /scripts/schemas/twister/                 @nashif
 /scripts/gen_app_partitions.py            @dcpleung @nashif
@@ -544,6 +550,7 @@
 /arch/x86/gen_gdt.py                      @dcpleung @nashif
 /arch/x86/gen_idt.py                      @dcpleung @nashif
 /scripts/gen_kobject_list.py              @dcpleung @nashif
+/scripts/gen_kobject_placeholders.py      @dcpleung
 /scripts/gen_syscalls.py                  @dcpleung @nashif
 /scripts/list_boards.py                   @mbolivar-nordic
 /scripts/net/                             @jukkar

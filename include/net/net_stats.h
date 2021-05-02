@@ -206,6 +206,20 @@ struct net_stats_ipv6_mld {
 };
 
 /**
+ * @brief IPv4 IGMP daemon statistics
+ */
+struct net_stats_ipv4_igmp {
+	/** Number of received IPv4 IGMP queries */
+	net_stats_t recv;
+
+	/** Number of sent IPv4 IGMP reports */
+	net_stats_t sent;
+
+	/** Number of dropped IPv4 IGMP packets */
+	net_stats_t drop;
+};
+
+/**
  * @brief Network packet transfer times for calculating average TX time
  */
 struct net_stats_tx_time {
@@ -221,6 +235,18 @@ struct net_stats_rx_time {
 	net_stats_t count;
 };
 
+#if NET_TC_TX_COUNT == 0
+#define NET_TC_TX_STATS_COUNT 1
+#else
+#define NET_TC_TX_STATS_COUNT NET_TC_TX_COUNT
+#endif
+
+#if NET_TC_RX_COUNT == 0
+#define NET_TC_RX_STATS_COUNT 1
+#else
+#define NET_TC_RX_STATS_COUNT NET_TC_RX_COUNT
+#endif
+
 /**
  * @brief Traffic class statistics
  */
@@ -234,7 +260,7 @@ struct net_stats_tc {
 		net_stats_t pkts;
 		net_stats_t bytes;
 		uint8_t priority;
-	} sent[NET_TC_TX_COUNT];
+	} sent[NET_TC_TX_STATS_COUNT];
 
 	struct {
 		struct net_stats_rx_time rx_time;
@@ -245,7 +271,7 @@ struct net_stats_tc {
 		net_stats_t pkts;
 		net_stats_t bytes;
 		uint8_t priority;
-	} recv[NET_TC_RX_COUNT];
+	} recv[NET_TC_RX_STATS_COUNT];
 };
 
 
@@ -309,6 +335,11 @@ struct net_stats {
 #if defined(CONFIG_NET_STATISTICS_MLD)
 	/** IPv6 MLD statistics */
 	struct net_stats_ipv6_mld ipv6_mld;
+#endif
+
+#if defined(CONFIG_NET_STATISTICS_IGMP)
+	/** IPv4 IGMP statistics */
+	struct net_stats_ipv4_igmp ipv4_igmp;
 #endif
 
 #if NET_TC_COUNT > 1

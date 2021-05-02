@@ -136,11 +136,11 @@ static int get_tim_clk(const struct stm32_pclken *pclken, uint32_t *tim_clk)
 	}
 #else
 	if (pclken->bus == STM32_CLOCK_BUS_APB1) {
-		apb_psc = CONFIG_CLOCK_STM32_APB1_PRESCALER;
+		apb_psc = STM32_APB1_PRESCALER;
 	}
 #if !defined(CONFIG_SOC_SERIES_STM32F0X) && !defined(CONFIG_SOC_SERIES_STM32G0X)
 	else {
-		apb_psc = CONFIG_CLOCK_STM32_APB2_PRESCALER;
+		apb_psc = STM32_APB2_PRESCALER;
 	}
 #endif
 #endif
@@ -355,7 +355,7 @@ static int pwm_stm32_init(const struct device *dev)
 		.pinctrl_len = ARRAY_SIZE(pwm_pins_##index),                   \
 	};                                                                     \
 									       \
-	DEVICE_DT_INST_DEFINE(index, &pwm_stm32_init, device_pm_control_nop,   \
+	DEVICE_DT_INST_DEFINE(index, &pwm_stm32_init, NULL,                    \
 			    &pwm_stm32_data_##index,                           \
 			    &pwm_stm32_config_##index, POST_KERNEL,            \
 			    CONFIG_KERNEL_INIT_PRIORITY_DEVICE,                \

@@ -632,8 +632,13 @@ static int nvs_startup(struct nvs_fs *fs)
 		if (!nvs_ate_crc8_check(&last_ate)) {
 			/* crc8 is ok, complete write of ate was performed */
 			fs->data_wra = addr & ADDR_SECT_MASK;
-			fs->data_wra += last_ate.offset;
-			fs->data_wra += nvs_al_size(fs, last_ate.len);
+			/* Align the data write address to the current
+			 * write block size so that it is possible to write to
+			 * the sector even if the block size has changed after
+			 * a software upgrade (unless the physical ATE size
+			 * will change)."
+			 */
+			fs->data_wra += nvs_al_size(fs, last_ate.offset + last_ate.len);
 
 			/* ate on the last possition within the sector is
 			 * reserved for deletion an entry
