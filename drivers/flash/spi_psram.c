@@ -464,6 +464,6 @@ static const struct spi_psram_config spi_psram_config_0 = {
 
 static struct spi_psram_data spi_psram_data_0;
 
-DEVICE_DT_INST_DEFINE(0, &spi_psram_init, device_pm_control_nop,
+DEVICE_DT_INST_DEFINE(0, &spi_psram_init, NULL,
 		      &spi_psram_data_0, &spi_psram_config_0, POST_KERNEL,
 		      CONFIG_SPI_PSRAM_INIT_PRIORITY, &spi_psram_api);
