@@ -86,6 +86,10 @@
 #define EVENT_MAFS_US           300
 /* Standard allows 2 us timing uncertainty inside the event */
 #define EVENT_MAFS_MAX_US       (EVENT_MAFS_US + 2)
+/* Minimum Subevent Space timings */
+#define EVENT_MSS_US            150
+/* Standard allows 2 us timing uncertainty inside the event */
+#define EVENT_MSS_MAX_US        (EVENT_MSS_US + 2)
 
 /* Offset Units field encoding */
 #define OFFS_UNIT_30_US         30
@@ -152,6 +156,8 @@
 #define PKT_US(octets, phy) PKT_DC_US((octets), (PDU_MIC_SIZE), (phy))
 
 #define PKT_AC_US(octets, mic, phy) PKT_DC_US((octets), (mic), (phy))
+
+#define PKT_BIS_US(octets, mic, phy) PKT_DC_US((octets), (mic), (phy))
 
 /* Extra bytes for enqueued node_rx metadata: rssi (always), resolving
  * index, directed adv report, and mesh channel and instant.
@@ -823,7 +829,7 @@ struct pdu_bis {
 #else
 #error "Unsupported endianness"
 #endif /* __BYTE_ORDER__ */
-	uint8_t length;
+	uint8_t len;
 	union {
 		uint8_t payload[0];
 		struct pdu_big_ctrl ctrl;
@@ -832,8 +838,8 @@ struct pdu_bis {
 
 struct pdu_big_info {
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-	uint32_t offset:14;
-	uint32_t offset_units:1;
+	uint32_t offs:14;
+	uint32_t offs_units:1;
 	uint32_t iso_interval:12;
 	uint32_t num_bis:5;
 
@@ -855,8 +861,8 @@ struct pdu_big_info {
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 	uint32_t num_bis:5;
 	uint32_t iso_interval:12;
-	uint32_t offset_units:1;
-	uint32_t offset:14;
+	uint32_t offs_units:1;
+	uint32_t offs:14;
 
 	uint32_t pto:4;
 	uint32_t sub_interval:20;

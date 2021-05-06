@@ -84,17 +84,26 @@
 #if defined(CONFIG_BT_CTLR_ADV_PERIODIC)
 #define BT_ADV_SYNC_TICKER_NODES ((TICKER_ID_ADV_SYNC_LAST) - \
 				  (TICKER_ID_ADV_SYNC_BASE) + 1)
+#if defined(CONFIG_BT_CTLR_ADV_ISO)
+#define BT_ADV_ISO_TICKER_NODES ((TICKER_ID_ADV_ISO_LAST) - \
+				  (TICKER_ID_ADV_ISO_BASE) + 1)
+#else /* !CONFIG_BT_CTLR_ADV_ISO */
+#define BT_ADV_ISO_TICKER_NODES 0
+#endif /* !CONFIG_BT_CTLR_ADV_ISO */
 #else /* !CONFIG_BT_CTLR_ADV_PERIODIC */
 #define BT_ADV_SYNC_TICKER_NODES 0
+#define BT_ADV_ISO_TICKER_NODES 0
 #endif /* !CONFIG_BT_CTLR_ADV_PERIODIC */
 #else /* (CONFIG_BT_CTLR_ADV_AUX_SET > 0) */
 #define BT_ADV_AUX_TICKER_NODES 0
 #define BT_ADV_SYNC_TICKER_NODES 0
+#define BT_ADV_ISO_TICKER_NODES 0
 #endif /* (CONFIG_BT_CTLR_ADV_AUX_SET > 0) */
 #else /* !CONFIG_BT_BROADCASTER */
 #define BT_ADV_TICKER_NODES 0
 #define BT_ADV_AUX_TICKER_NODES 0
 #define BT_ADV_SYNC_TICKER_NODES 0
+#define BT_ADV_ISO_TICKER_NODES 0
 #endif /* !CONFIG_BT_BROADCASTER */
 
 #if defined(CONFIG_BT_OBSERVER)
@@ -105,17 +114,26 @@
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
 #define BT_SCAN_SYNC_TICKER_NODES ((TICKER_ID_SCAN_SYNC_LAST) - \
 				   (TICKER_ID_SCAN_SYNC_BASE) + 1)
+#if defined(CONFIG_BT_CTLR_SYNC_ISO)
+#define BT_SCAN_SYNC_ISO_TICKER_NODES ((TICKER_ID_SCAN_SYNC_ISO_LAST) - \
+				       (TICKER_ID_SCAN_SYNC_ISO_BASE) + 1)
+#else /* !CONFIG_BT_CTLR_SYNC_ISO */
+#define BT_SCAN_SYNC_ISO_TICKER_NODES 0
+#endif /* !CONFIG_BT_CTLR_SYNC_ISO */
 #else /* !CONFIG_BT_CTLR_SYNC_PERIODIC */
 #define BT_SCAN_SYNC_TICKER_NODES 0
+#define BT_SCAN_SYNC_ISO_TICKER_NODES 0
 #endif /* !CONFIG_BT_CTLR_SYNC_PERIODIC */
 #else /* !CONFIG_BT_CTLR_ADV_EXT */
 #define BT_SCAN_AUX_TICKER_NODES 0
 #define BT_SCAN_SYNC_TICKER_NODES 0
+#define BT_SCAN_SYNC_ISO_TICKER_NODES 0
 #endif /* !CONFIG_BT_CTLR_ADV_EXT */
 #else
 #define BT_SCAN_TICKER_NODES 0
 #define BT_SCAN_AUX_TICKER_NODES 0
 #define BT_SCAN_SYNC_TICKER_NODES 0
+#define BT_SCAN_SYNC_ISO_TICKER_NODES 0
 #endif
 
 #if defined(CONFIG_BT_CONN)
@@ -162,9 +180,11 @@
 				   BT_ADV_TICKER_NODES + \
 				   BT_ADV_AUX_TICKER_NODES + \
 				   BT_ADV_SYNC_TICKER_NODES + \
+				   BT_ADV_ISO_TICKER_NODES + \
 				   BT_SCAN_TICKER_NODES + \
 				   BT_SCAN_AUX_TICKER_NODES + \
 				   BT_SCAN_SYNC_TICKER_NODES + \
+				   BT_SCAN_SYNC_ISO_TICKER_NODES + \
 				   BT_CONN_TICKER_NODES + \
 				   BT_CIG_TICKER_NODES + \
 				   USER_TICKER_NODES + \
@@ -181,9 +201,15 @@
 #define BT_CTLR_MAX_CONNECTABLE 1
 #endif
 #define BT_CTLR_MAX_CONN        CONFIG_BT_MAX_CONN
+#if defined(CONFIG_BT_CTLR_ADV_EXT) && defined(CONFIG_BT_CENTRAL)
+#define BT_CTLR_ADV_EXT_RX_CNT  1
+#else
+#define BT_CTLR_ADV_EXT_RX_CNT  0
+#endif
 #else
 #define BT_CTLR_MAX_CONNECTABLE 0
 #define BT_CTLR_MAX_CONN        0
+#define BT_CTLR_ADV_EXT_RX_CNT  0
 #endif
 
 #if !defined(TICKER_USER_LLL_VENDOR_OPS)
@@ -285,7 +311,7 @@ static struct {
 /* No. of node rx for LLL to ULL.
  * Reserve 3, 1 for adv data, 1 for scan response and 1 for empty PDU reception.
  */
-#define PDU_RX_CNT    (CONFIG_BT_CTLR_RX_BUFFERS + 3)
+#define PDU_RX_CNT    (3 + BT_CTLR_ADV_EXT_RX_CNT + CONFIG_BT_CTLR_RX_BUFFERS)
 
 /* Part sum of LLL to ULL and ULL to LL/HCI thread node rx count.
  * Will be used below in allocating node rx pool.
@@ -955,12 +981,32 @@ void ll_rx_dequeue(void)
 			ARG_UNUSED(cc);
 #endif /* !CONFIG_BT_PERIPHERAL */
 
-		} else if (IS_ENABLED(CONFIG_BT_CENTRAL)) {
+#if defined(CONFIG_BT_CENTRAL)
+		} else {
 			struct ll_scan_set *scan = HDR_LLL2ULL(ftr->param);
 
+#if defined(CONFIG_BT_CTLR_ADV_EXT) && defined(CONFIG_BT_CTLR_PHY_CODED)
+			struct ll_scan_set *scan_other =
+				ull_scan_is_enabled_get(SCAN_HANDLE_PHY_CODED);
+
+			if (scan_other) {
+				if (scan_other == scan) {
+					scan_other = ull_scan_is_enabled_get(SCAN_HANDLE_1M);
+				}
+
+				if (scan_other) {
+					scan_other->lll.conn = NULL;
+					scan_other->is_enabled = 0U;
+				}
+			}
+#endif /* CONFIG_BT_CTLR_ADV_EXT && CONFIG_BT_CTLR_PHY_CODED */
+
+			scan->lll.conn = NULL;
 			scan->is_enabled = 0U;
+#else /* !CONFIG_BT_CENTRAL */
 		} else {
 			LL_ASSERT(0);
+#endif /* !CONFIG_BT_CENTRAL */
 		}
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_PRIVACY)) {
@@ -2346,8 +2392,12 @@ static inline void rx_demux_event_done(memq_link_t *link,
 	struct ull_hdr *ull_hdr;
 	void *release;
 
-	/* Get the ull instance */
+	/* Decrement prepare reference if ULL will not resume */
 	ull_hdr = done->param;
+	if (ull_hdr) {
+		LL_ASSERT(ull_ref_get(ull_hdr));
+		ull_ref_dec(ull_hdr);
+	}
 
 	/* Process role dependent event done */
 	switch (done->extra.type) {
@@ -2416,17 +2466,8 @@ static inline void rx_demux_event_done(memq_link_t *link,
 	lll_done_sync();
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL_DONE */
 
-	/* ull instance will resume, dont decrement ref */
-	if (!ull_hdr) {
-		return;
-	}
-
-	/* Decrement prepare reference */
-	LL_ASSERT(ull_ref_get(ull_hdr));
-	ull_ref_dec(ull_hdr);
-
 	/* If disable initiated, signal the semaphore */
-	if (!ull_ref_get(ull_hdr) && ull_hdr->disabled_cb) {
+	if (ull_hdr && !ull_ref_get(ull_hdr) && ull_hdr->disabled_cb) {
 		ull_hdr->disabled_cb(ull_hdr->disabled_param);
 	}
 }

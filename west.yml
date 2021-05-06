@@ -48,7 +48,7 @@ manifest:
       revision: 1d1fcc725aa1cb3c32f366e0c53d7490d0fe1109
       path: modules/fs/fatfs
     - name: hal_cypress
-      revision: a12d92816a53a521d79cefcf5c38b9dc8a4fed6e
+      revision: 81a059f21435bc7e315bccd720da5a9b615bbb50
       path: modules/hal/cypress
     - name: hal_infineon
       revision: f1fa8241f8786198ba41155413243de36ed878a5
@@ -78,7 +78,7 @@ manifest:
       revision: 3da6fae25fc44ec830fac4a92787b585ff55435e
       path: modules/hal/ti
     - name: libmetal
-      revision: 9d4ee2c3cfd5f49861939447990f3b7d7bf9bf94
+      revision: 39d049d4ae68e6f6d595fce7de1dcfc1024fb4eb
       path: modules/hal/libmetal
     - name: hal_quicklogic
       repo-path: hal_quicklogic
@@ -100,10 +100,10 @@ manifest:
       revision: f49bd1354616fae4093bf36e5eaee43c51a55127
       path: tools/net-tools
     - name: hal_nxp
-      revision: 27a464e4885f393dc376a53d9fc8d52078848496
+      revision: 0d11138724959e1162777d9206f841ccdf64348e
       path: modules/hal/nxp
     - name: open-amp
-      revision: de1b85a13032a2de1d8b6695ae5f800b613e739d
+      revision: 6010f0523cbc75f551d9256cf782f173177acdef
       path: modules/lib/open-amp
     - name: loramac-node
       revision: 2cee5f7295ff0ff804bf06fea5de006bc7cd121e

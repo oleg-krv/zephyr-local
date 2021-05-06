@@ -101,6 +101,14 @@ Deprecated in this release
   This means that support for the SO_TIMESTAMPING socket option is also removed
   as it was used by the removed config option.
 
+* The device power management (PM) APIs and data structures have been renamed
+  from ``device_pm_*`` to ``pm_device_*`` since they are not device APIs but PM
+  subsystem APIs. The same applies to enumerations and definitions, they now
+  follow the ``PM_DEVICE_*`` convention. Some other API calls such as
+  ``device_set_power_state`` and ``device_get_power_state`` have been renamed to
+  ``pm_device_state_set`` and ``pm_device_state_get`` in order to align with
+  the naming of other device PM APIs.
+
 ==========================
 
 Removed APIs in this release
@@ -133,6 +141,8 @@ Architectures
     * Added support for null pointer dereferencing detection in Cortex-M.
 
     * Added initial support for Arm v8.1-m and Cortex-M55
+
+    * Added support for preempting threads while they are performing secure calls in Cortex-M.
 
   * AARCH64
 
@@ -222,6 +232,17 @@ Drivers and Sensors
     removed when the deprecation period ends.
 
 * GPIO
+
+  * :c:struct:`gpio_dt_spec`: a new structure which makes it more convenient to
+    access GPIO configuration in the :ref:`devicetree <dt-guide>`.
+  * New macros for initializing ``gpio_dt_spec`` values:
+    :c:macro:`GPIO_DT_SPEC_GET_BY_IDX`, :c:macro:`GPIO_DT_SPEC_GET_BY_IDX_OR`,
+    :c:macro:`GPIO_DT_SPEC_GET`, :c:macro:`GPIO_DT_SPEC_GET_OR`,
+    :c:macro:`GPIO_DT_SPEC_INST_GET_BY_IDX`,
+    :c:macro:`GPIO_DT_SPEC_INST_GET_BY_IDX_OR`,
+    :c:macro:`GPIO_DT_SPEC_INST_GET`, and :c:macro:`GPIO_DT_SPEC_INST_GET_OR`
+  * New helper functions for using ``gpio_dt_spec`` values:
+    :c:func:`gpio_pin_configure_dt`, :c:func:`gpio_pin_interrupt_configure_dt`
 
 * Hardware Info
 
