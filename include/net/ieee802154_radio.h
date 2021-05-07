@@ -162,6 +162,19 @@ enum ieee802154_config_type {
 
 	/** Configure a radio reception slot */
 	IEEE802154_CONFIG_RX_SLOT,
+
+	/** Enable CSL receiver (Endpoint) */
+	IEEE802154_CONFIG_CSL_RECEIVER,
+
+	/** Configure the next CSL receive window center, in units of microseconds,
+	 *  based on the radio time.
+	 */
+	IEEE802154_CONFIG_CSL_RX_TIME,
+
+	/** Enable/disable or update Enhanced-ACK Based Probing in radio
+	 *  for a specific Initiator.
+	 */
+	IEEE802154_CONFIG_ENH_ACK_PROBING,
 };
 
 /** IEEE802.15.4 driver configuration data. */
@@ -208,6 +221,24 @@ struct ieee802154_config {
 			uint32_t start;
 			uint32_t duration;
 		} rx_slot;
+
+		/** ``IEEE802154_CONFIG_CSL_RECEIVER`` */
+		struct {
+			uint32_t period;
+			uint8_t *addr;
+		} csl_recv;
+
+		/** ``IEEE802154_CONFIG_CSL_RX_TIME`` */
+		uint32_t csl_rx_time;
+
+		/** ``IEEE802154_CONFIG_ENH_ACK_PROBING`` */
+		struct {
+			bool lqi : 1;
+			bool link_margin : 1;
+			bool rssi : 1;
+			uint16_t short_addr;
+			const uint8_t *ext_addr;
+		} enh_ack;
 	};
 };
 
@@ -270,6 +301,13 @@ struct ieee802154_radio_api {
 
 	/** Get the current radio time in microseconds */
 	uint64_t (*get_time)(const struct device *dev);
+
+	/** Get the current accuracy, in units of ± ppm, of the clock used for
+	 *  scheduling CSL transmissions or receive windows.
+	 *  Note: Implementations may optimize this value based on operational
+	 *  conditions (i.e.: temperature).
+	 */
+	uint8_t (*get_csl_acc)(const struct device *dev);
 };
 
 /* Make sure that the network interface API is properly setup inside

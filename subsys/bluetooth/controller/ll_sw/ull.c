@@ -35,6 +35,7 @@
 #include "lll_adv.h"
 #include "lll/lll_adv_pdu.h"
 #include "lll_scan.h"
+#include "lll/lll_df_types.h"
 #include "lll_sync.h"
 #include "lll_sync_iso.h"
 #include "lll_conn.h"
@@ -45,7 +46,8 @@
 #include "ull_sync_types.h"
 #include "ull_conn_types.h"
 #include "ull_filter.h"
-#include "ull_df.h"
+#include "ull_df_types.h"
+#include "ull_df_internal.h"
 
 #include "isoal.h"
 #include "ull_internal.h"
@@ -144,7 +146,10 @@
 
 #if defined(CONFIG_BT_CTLR_CONN_ISO)
 #define BT_CIG_TICKER_NODES ((TICKER_ID_CONN_ISO_LAST) - \
-			     (TICKER_ID_CONN_ISO_BASE) + 1)
+			     (TICKER_ID_CONN_ISO_BASE) + 1 + \
+			     (TICKER_ID_CONN_ISO_RESUME_LAST) - \
+			     (TICKER_ID_CONN_ISO_RESUME_BASE) + 1)
+
 #else
 #define BT_CIG_TICKER_NODES 0
 #endif
@@ -368,10 +373,11 @@ static struct {
  * happen due to supervision timeout and other reasons that dont have an
  * incoming Rx-ed PDU).
  */
-#define LINK_RX_POOL_SIZE (sizeof(memq_link_t) * \
-			   (RX_CNT + 2 + BT_CTLR_MAX_CONN + BT_CTLR_ADV_SET + \
-			    (BT_CTLR_SCAN_SYNC_SET * 2) + \
-			    (BT_CTLR_SCAN_SYNC_ISO_SET * 2)))
+#define LINK_RX_POOL_SIZE                                                      \
+	(sizeof(memq_link_t) *                                                 \
+	 (RX_CNT + 2 + BT_CTLR_MAX_CONN + BT_CTLR_ADV_SET +                    \
+	  (BT_CTLR_SCAN_SYNC_SET * 2) + (BT_CTLR_SCAN_SYNC_ISO_SET * 2) +      \
+	  (IQ_REPORT_CNT)))
 static struct {
 	uint8_t quota_pdu; /* Number of un-utilized buffers */
 
@@ -388,7 +394,7 @@ static MEMQ_DECLARE(ull_done);
 #if defined(CONFIG_BT_CONN)
 static MFIFO_DEFINE(ll_pdu_rx_free, sizeof(void *), LL_PDU_RX_CNT);
 static MFIFO_DEFINE(tx_ack, sizeof(struct lll_tx),
-		    CONFIG_BT_CTLR_TX_BUFFERS);
+		    CONFIG_BT_BUF_ACL_TX_COUNT);
 
 static void *mark_update;
 #endif /* CONFIG_BT_CONN */
@@ -1098,6 +1104,10 @@ void ll_rx_dequeue(void)
 	case NODE_RX_TYPE_ISO_PDU:
 #endif
 
+#if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX)
+	case NODE_RX_TYPE_IQ_SAMPLE_REPORT:
+#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX */
+
 	/* Ensure that at least one 'case' statement is present for this
 	 * code block.
 	 */
@@ -1303,6 +1313,15 @@ void ll_rx_mem_release(void **node_rx)
 			ull_sync_release(sync);
 		}
 		break;
+#if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX)
+		case NODE_RX_TYPE_IQ_SAMPLE_REPORT:
+		{
+			ull_iq_report_link_inc_quota(1);
+			ull_df_iq_report_mem_release(rx_free);
+			ull_df_rx_iq_report_alloc(1);
+		}
+		break;
+#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX */
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 
 #if defined(CONFIG_BT_CONN)
@@ -1637,18 +1656,18 @@ void ull_rx_sched_done(void)
 }
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL */
 
-int ull_prepare_enqueue(lll_is_abort_cb_t is_abort_cb,
-			lll_abort_cb_t abort_cb,
-			struct lll_prepare_param *prepare_param,
-			lll_prepare_cb_t prepare_cb,
-			uint8_t is_resume)
+struct lll_event *ull_prepare_enqueue(lll_is_abort_cb_t is_abort_cb,
+				      lll_abort_cb_t abort_cb,
+				      struct lll_prepare_param *prepare_param,
+				      lll_prepare_cb_t prepare_cb,
+				      uint8_t is_resume)
 {
 	struct lll_event *e;
 	uint8_t idx;
 
 	idx = MFIFO_ENQUEUE_GET(prep, (void **)&e);
 	if (!e) {
-		return -ENOBUFS;
+		return NULL;
 	}
 
 	memcpy(&e->prepare_param, prepare_param, sizeof(e->prepare_param));
@@ -1660,7 +1679,7 @@ int ull_prepare_enqueue(lll_is_abort_cb_t is_abort_cb,
 
 	MFIFO_ENQUEUE(prep, idx);
 
-	return 0;
+	return e;
 }
 
 void *ull_prepare_dequeue_get(void)
@@ -2241,6 +2260,9 @@ static inline int rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
 	case NODE_RX_TYPE_EXT_AUX_REPORT:
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
 	case NODE_RX_TYPE_SYNC_REPORT:
+#if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX)
+	case NODE_RX_TYPE_IQ_SAMPLE_REPORT:
+#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX */
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 	{
 		struct pdu_adv *adv;
