@@ -154,14 +154,18 @@
 
 #if defined(CONFIG_BT_CTLR_ADV_ISO)
 #define LL_FEAT_BIT_ISO_BROADCASTER BIT64(BT_LE_FEAT_BIT_ISO_BROADCASTER)
+#define LL_BIS_OCTETS_TX_MAX CONFIG_BT_CTLR_ADV_ISO_PDU_LEN_MAX
 #else /* !CONFIG_BT_CTLR_ADV_ISO */
 #define LL_FEAT_BIT_ISO_BROADCASTER 0
+#define LL_BIS_OCTETS_TX_MAX 0
 #endif /* !CONFIG_BT_CTLR_ADV_ISO */
 
 #if defined(CONFIG_BT_CTLR_SYNC_ISO)
 #define LL_FEAT_BIT_SYNC_RECEIVER BIT64(BT_LE_FEAT_BIT_SYNC_RECEIVER)
+#define LL_BIS_OCTETS_RX_MAX CONFIG_BT_CTLR_SYNC_ISO_PDU_LEN_MAX
 #else /* !CONFIG_BT_CTLR_SYNC_ISO */
 #define LL_FEAT_BIT_SYNC_RECEIVER 0
+#define LL_BIS_OCTETS_RX_MAX 0
 #endif /* !CONFIG_BT_CTLR_SYNC_ISO */
 
 /* All defined feature bits */
@@ -172,6 +176,9 @@
 
 /* Mask to filter away octet 0 for feature exchange */
 #define LL_FEAT_FILTER_OCTET0    (LL_FEAT_BIT_MASK & ~0xFFULL)
+
+/* Mask for host controlled features */
+#define LL_FEAT_HOST_BIT_MASK    0x100000000ULL
 
 /* Feature bits of this controller */
 #define LL_FEAT                  (LL_FEAT_BIT_ENC | \

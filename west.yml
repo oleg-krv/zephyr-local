@@ -72,7 +72,7 @@ manifest:
       revision: b52fdbf4b62439be9fab9bb4bae9690a42d2fb14
       path: modules/hal/st
     - name: hal_stm32
-      revision: 68bfdabe97aa60934e1519e98593abaa9745501e
+      revision: f8ff8d25aa0a9e65948040c7b47ec67f3fa300df
       path: modules/hal/stm32
     - name: hal_ti
       revision: 3da6fae25fc44ec830fac4a92787b585ff55435e
@@ -88,10 +88,10 @@ manifest:
       revision: 31acbaa36e9e74ab88ac81e3d21e7f1d00a71136
       path: modules/lib/gui/lvgl
     - name: mbedtls
-      revision: 53044168b43f06ec5654b906a2cdd260bf477edd
+      revision: pull/20/head
       path: modules/crypto/mbedtls
     - name: mcuboot
-      revision: 6eca8bbc2bdbf16d5ebbfd89ca27aaa9b3d88400
+      revision: 3ad36f82d5884c9792d6470b1e7f55011a03c4f1
       path: bootloader/mcuboot
     - name: mcumgr
       revision: 5c5055f5a7565f8152d75fcecf07262928b4d56e
@@ -115,8 +115,7 @@ manifest:
       revision: 38c79a447e4a47d413b4e8d34448316a5cece77c
       path: modules/debug/segger
     - name: sof
-      url: https://github.com/nordic-krch/sof
-      revision: 2f8ef204454d278f0c189e8c7cc70e84f745561a
+      revision: 52dc9c5ad8d0d2a5df0bb51ea30e54f8d7890639
       path: modules/audio/sof
     - name: tinycbor
       path: modules/lib/tinycbor
@@ -133,6 +132,9 @@ manifest:
     - name: nrf_hw_models
       path: modules/bsim_hw_models/nrf_hw_models
       revision: a47e326ca772ddd14cc3b9d4ca30a9ab44ecca16
+    - name: TraceRecorderSource
+      path: modules/debug/TraceRecorder
+      revision: 41daf89c15ff841ed63fa882a916ec97089141ce
     - name: hal_xtensa
       revision: 2f04b615cd5ad3a1b8abef33f9bdd10cc1990ed6
       path: modules/hal/xtensa

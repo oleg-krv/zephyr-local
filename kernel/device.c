@@ -30,12 +30,8 @@ static inline void device_pm_state_init(const struct device *dev)
 #ifdef CONFIG_PM_DEVICE
 	*dev->pm = (struct pm_device){
 		.usage = ATOMIC_INIT(0),
-		.lock = Z_SEM_INITIALIZER(dev->pm->lock, 1, 1),
-		.signal = K_POLL_SIGNAL_INITIALIZER(dev->pm->signal),
-		.event = K_POLL_EVENT_INITIALIZER(
-			K_POLL_TYPE_SIGNAL,
-			K_POLL_MODE_NOTIFY_ONLY,
-			&dev->pm->signal),
+		.lock = {},
+		.condvar = Z_CONDVAR_INITIALIZER(dev->pm->condvar),
 	};
 #endif /* CONFIG_PM_DEVICE */
 }

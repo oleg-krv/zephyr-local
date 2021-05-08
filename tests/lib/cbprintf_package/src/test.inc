@@ -37,7 +37,7 @@ static char static_buf[512];
 static char runtime_buf[512];
 static char compare_buf[128];
 
-void dump(const char *desc, uint8_t *package, size_t len)
+static void dump(const char *desc, uint8_t *package, size_t len)
 {
 	printk("%s package %p:\n", desc, package);
 	for (size_t i = 0; i < len; i++) {
@@ -46,7 +46,7 @@ void dump(const char *desc, uint8_t *package, size_t len)
 	printk("\n");
 }
 
-void unpack(const char *desc, struct out_buffer *buf,
+static void unpack(const char *desc, struct out_buffer *buf,
 	    uint8_t *package, size_t len)
 {
 	cbpprintf((cbprintf_cb)out, buf, package);
@@ -57,7 +57,9 @@ void unpack(const char *desc, struct out_buffer *buf,
 }
 
 #define TEST_PACKAGING(fmt, ...) do { \
-	snprintf(compare_buf, sizeof(compare_buf), fmt, __VA_ARGS__); \
+	int must_runtime = CBPRINTF_MUST_RUNTIME_PACKAGE(0, fmt, __VA_ARGS__); \
+	zassert_equal(must_runtime, !Z_C_GENERIC, NULL); \
+	snprintfcb(compare_buf, sizeof(compare_buf), fmt, __VA_ARGS__); \
 	printk("-----------------------------------------\n"); \
 	printk("%s\n", compare_buf); \
 	uint8_t *pkg; \
@@ -105,6 +107,7 @@ void test_cbprintf_package(void)
 	unsigned short us = 0x1234;
 	unsigned long ul = 0xaabbaabb;
 	unsigned long long ull = 0xaabbaabbaabb;
+	void *vp = NULL;
 
 
 	/* tests to exercize different element alignments */
@@ -115,7 +118,7 @@ void test_cbprintf_package(void)
 	TEST_PACKAGING("test %d %hd %hhd", i, s, sc);
 	TEST_PACKAGING("test %ld %llx %hhu %hu %u", li, lli, uc, us, ui);
 	TEST_PACKAGING("test %lu %llu", ul, ull);
-	TEST_PACKAGING("test %c %p", c, &c);
+	TEST_PACKAGING("test %c %p", c, vp);
 
 	if (IS_ENABLED(CONFIG_CBPRINTF_FP_SUPPORT)) {
 		float f = -1.234;

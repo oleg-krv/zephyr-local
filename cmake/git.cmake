@@ -13,7 +13,7 @@
 
 # https://cmake.org/cmake/help/latest/module/FindGit.html
 find_package(Git QUIET)
-if(NOT BUILD_VERSION AND GIT_FOUND)
+if(NOT DEFINED BUILD_VERSION AND GIT_FOUND)
   execute_process(
     COMMAND ${GIT_EXECUTABLE} describe --abbrev=12 --always
     WORKING_DIRECTORY                ${ZEPHYR_BASE}
@@ -28,5 +28,4 @@ if(NOT BUILD_VERSION AND GIT_FOUND)
   elseif(NOT "${stderr}" STREQUAL "")
     message(STATUS "git describe warned: ${stderr}")
   endif()
-  message(STATUS "BUILD_VERSION=${BUILD_VERSION}")
 endif()

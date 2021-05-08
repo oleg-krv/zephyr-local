@@ -9,14 +9,13 @@
 #include "dummy_parent.h"
 #include "dummy_driver.h"
 
-static struct k_poll_event async_evt;
 uint32_t device_power_state;
 static const struct device *parent;
 
 static int dummy_open(const struct device *dev)
 {
 	int ret;
-	int signaled = 0, result;
+	struct k_mutex wait_mutex;
 
 	printk("open()\n");
 
@@ -33,16 +32,12 @@ static int dummy_open(const struct device *dev)
 
 	printk("Async wakeup request queued\n");
 
-	do {
-		(void)k_poll(&async_evt, 1, K_FOREVER);
-		k_poll_signal_check(&dev->pm->signal,
-						&signaled, &result);
-	} while (!signaled);
+	k_mutex_init(&wait_mutex);
+	k_mutex_lock(&wait_mutex, K_FOREVER);
+	(void) k_condvar_wait(&dev->pm->condvar, &wait_mutex, K_FOREVER);
+	k_mutex_unlock(&wait_mutex);
 
-	async_evt.state = K_POLL_STATE_NOT_READY;
-	k_poll_signal_reset(&dev->pm->signal);
-
-	if (result == PM_DEVICE_ACTIVE_STATE) {
+	if (atomic_get(&dev->pm->state) == PM_DEVICE_STATE_ACTIVE) {
 		printk("Dummy device resumed\n");
 		ret = 0;
 	} else {
@@ -102,7 +97,7 @@ static uint32_t dummy_get_power_state(const struct device *dev)
 static int dummy_suspend(const struct device *dev)
 {
 	printk("child suspending..\n");
-	device_power_state = PM_DEVICE_SUSPEND_STATE;
+	device_power_state = PM_DEVICE_STATE_SUSPEND;
 
 	return 0;
 }
@@ -110,34 +105,34 @@ static int dummy_suspend(const struct device *dev)
 static int dummy_resume_from_suspend(const struct device *dev)
 {
 	printk("child resuming..\n");
-	device_power_state = PM_DEVICE_ACTIVE_STATE;
+	device_power_state = PM_DEVICE_STATE_ACTIVE;
 
 	return 0;
 }
 
 static int dummy_device_pm_ctrl(const struct device *dev,
 				uint32_t ctrl_command,
-				void *context, pm_device_cb cb, void *arg)
+				uint32_t *state, pm_device_cb cb, void *arg)
 {
 	int ret = 0;
 
 	switch (ctrl_command) {
 	case PM_DEVICE_STATE_SET:
-		if (*((uint32_t *)context) == PM_DEVICE_ACTIVE_STATE) {
+		if (*state == PM_DEVICE_STATE_ACTIVE) {
 			ret = dummy_resume_from_suspend(dev);
 		} else {
 			ret = dummy_suspend(dev);
 		}
 		break;
 	case PM_DEVICE_STATE_GET:
-		*((uint32_t *)context) = dummy_get_power_state(dev);
+		*state = dummy_get_power_state(dev);
 		break;
 	default:
 		ret = -EINVAL;
 
 	}
 
-	cb(dev, ret, context, arg);
+	cb(dev, ret, state, arg);
 
 	return ret;
 }
@@ -157,10 +152,8 @@ int dummy_init(const struct device *dev)
 	}
 
 	pm_device_enable(dev);
-	device_power_state = PM_DEVICE_ACTIVE_STATE;
+	device_power_state = PM_DEVICE_STATE_ACTIVE;
 
-	k_poll_event_init(&async_evt, K_POLL_TYPE_SIGNAL,
-			K_POLL_MODE_NOTIFY_ONLY, &dev->pm->signal);
 	return 0;
 }
 

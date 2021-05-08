@@ -131,16 +131,25 @@ static int i2c_nrfx_twim_transfer(const struct device *dev,
 				 I2C_TRANSFER_TIMEOUT_MSEC);
 		if (ret != 0) {
 			/* Whatever the frequency, completion_sync should have
-			 * been give by the event handler.
+			 * been given by the event handler.
 			 *
-			 * If it hasn't it's probably due to an hardware issue
+			 * If it hasn't, it's probably due to an hardware issue
 			 * on the I2C line, for example a short between SDA and
 			 * GND.
+			 * This is issue has also been when trying to use the
+			 * I2C bus during MCU internal flash erase.
 			 *
-			 * Note to fully recover from this issue one should
-			 * reinit nrfx twim.
+			 * In many situation, a retry is sufficient.
+			 * However, some time the I2C device get stuck and need
+			 * help to recover.
+			 * Therefore we always call nrfx_twim_bus_recover() to
+			 * make sure everything has been done to restore the
+			 * bus from this error.
 			 */
 			LOG_ERR("Error on I2C line occurred for message %d", i);
+			nrfx_twim_disable(&get_dev_config(dev)->twim);
+			nrfx_twim_bus_recover(get_dev_config(dev)->config.scl,
+					      get_dev_config(dev)->config.sda);
 			ret = -EIO;
 			break;
 		}
@@ -245,7 +254,7 @@ static int init_twim(const struct device *dev)
 	}
 
 #ifdef CONFIG_PM_DEVICE
-	get_dev_data(dev)->pm_state = PM_DEVICE_ACTIVE_STATE;
+	get_dev_data(dev)->pm_state = PM_DEVICE_STATE_ACTIVE;
 #endif
 
 	return 0;
@@ -254,17 +263,17 @@ static int init_twim(const struct device *dev)
 #ifdef CONFIG_PM_DEVICE
 static int twim_nrfx_pm_control(const struct device *dev,
 				uint32_t ctrl_command,
-				void *context, pm_device_cb cb, void *arg)
+				uint32_t *state, pm_device_cb cb, void *arg)
 {
 	int ret = 0;
 	uint32_t pm_current_state = get_dev_data(dev)->pm_state;
 
 	if (ctrl_command == PM_DEVICE_STATE_SET) {
-		uint32_t new_state = *((const uint32_t *)context);
+		uint32_t new_state = *state;
 
 		if (new_state != pm_current_state) {
 			switch (new_state) {
-			case PM_DEVICE_ACTIVE_STATE:
+			case PM_DEVICE_STATE_ACTIVE:
 				init_twim(dev);
 				if (get_dev_data(dev)->dev_config) {
 					i2c_nrfx_twim_configure(
@@ -273,10 +282,10 @@ static int twim_nrfx_pm_control(const struct device *dev,
 				}
 				break;
 
-			case PM_DEVICE_LOW_POWER_STATE:
-			case PM_DEVICE_SUSPEND_STATE:
-			case PM_DEVICE_OFF_STATE:
-				if (pm_current_state != PM_DEVICE_ACTIVE_STATE) {
+			case PM_DEVICE_STATE_LOW_POWER:
+			case PM_DEVICE_STATE_SUSPEND:
+			case PM_DEVICE_STATE_OFF:
+				if (pm_current_state != PM_DEVICE_STATE_ACTIVE) {
 					break;
 				}
 				nrfx_twim_uninit(&get_dev_config(dev)->twim);
@@ -291,11 +300,11 @@ static int twim_nrfx_pm_control(const struct device *dev,
 		}
 	} else {
 		__ASSERT_NO_MSG(ctrl_command == PM_DEVICE_STATE_GET);
-		*((uint32_t *)context) = get_dev_data(dev)->pm_state;
+		*state = get_dev_data(dev)->pm_state;
 	}
 
 	if (cb) {
-		cb(dev, ret, context, arg);
+		cb(dev, ret, state, arg);
 	}
 
 	return ret;

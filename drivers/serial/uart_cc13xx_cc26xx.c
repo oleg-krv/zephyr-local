@@ -402,7 +402,7 @@ static int uart_cc13xx_cc26xx_set_power_state(const struct device *dev,
 {
 	int ret = 0;
 
-	if ((new_state == PM_DEVICE_ACTIVE_STATE) &&
+	if ((new_state == PM_DEVICE_STATE_ACTIVE) &&
 		(new_state != get_dev_data(dev)->pm_state)) {
 		if (get_dev_conf(dev)->regs ==
 			DT_INST_REG_ADDR(0)) {
@@ -417,11 +417,11 @@ static int uart_cc13xx_cc26xx_set_power_state(const struct device *dev,
 			get_dev_data(dev)->pm_state = new_state;
 		}
 	} else {
-		__ASSERT_NO_MSG(new_state == PM_DEVICE_LOW_POWER_STATE ||
-			new_state == PM_DEVICE_SUSPEND_STATE ||
-			new_state == PM_DEVICE_OFF_STATE);
+		__ASSERT_NO_MSG(new_state == PM_DEVICE_STATE_LOW_POWER ||
+			new_state == PM_DEVICE_STATE_SUSPEND ||
+			new_state == PM_DEVICE_STATE_OFF);
 
-		if (get_dev_data(dev)->pm_state == PM_DEVICE_ACTIVE_STATE) {
+		if (get_dev_data(dev)->pm_state == PM_DEVICE_STATE_ACTIVE) {
 			UARTDisable(get_dev_conf(dev)->regs);
 			/*
 			 * Release power dependency - i.e. potentially power
@@ -444,13 +444,13 @@ static int uart_cc13xx_cc26xx_set_power_state(const struct device *dev,
 
 static int uart_cc13xx_cc26xx_pm_control(const struct device *dev,
 					 uint32_t ctrl_command,
-					 void *context, pm_device_cb cb,
+					 uint32_t *state, pm_device_cb cb,
 					 void *arg)
 {
 	int ret = 0;
 
 	if (ctrl_command == PM_DEVICE_STATE_SET) {
-		uint32_t new_state = *((const uint32_t *)context);
+		uint32_t new_state = *state;
 
 		if (new_state != get_dev_data(dev)->pm_state) {
 			ret = uart_cc13xx_cc26xx_set_power_state(dev,
@@ -458,11 +458,11 @@ static int uart_cc13xx_cc26xx_pm_control(const struct device *dev,
 		}
 	} else {
 		__ASSERT_NO_MSG(ctrl_command == PM_DEVICE_STATE_GET);
-		*((uint32_t *)context) = get_dev_data(dev)->pm_state;
+		*state = get_dev_data(dev)->pm_state;
 	}
 
 	if (cb) {
-		cb(dev, ret, context, arg);
+		cb(dev, ret, state, arg);
 	}
 
 	return ret;
@@ -581,7 +581,7 @@ static const struct uart_driver_api uart_cc13xx_cc26xx_driver_api = {
 
 #define UART_CC13XX_CC26XX_INIT_PM_STATE				\
 	do {								\
-		get_dev_data(dev)->pm_state = PM_DEVICE_ACTIVE_STATE;	\
+		get_dev_data(dev)->pm_state = PM_DEVICE_STATE_ACTIVE;	\
 	} while (0)
 #else
 #define UART_CC13XX_CC26XX_INIT_PM_STATE

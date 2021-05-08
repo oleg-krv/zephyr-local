@@ -24,24 +24,24 @@ extern "C" {
 
 struct device;
 
-/** @def PM_DEVICE_ACTIVE_STATE
+/** @def PM_DEVICE_STATE_ACTIVE
  *
  * @brief device is in ACTIVE power state
  *
  * @details Normal operation of the device. All device context is retained.
  */
-#define PM_DEVICE_ACTIVE_STATE          1
+#define PM_DEVICE_STATE_ACTIVE          1
 
-/** @def PM_DEVICE_LOW_POWER_STATE
+/** @def PM_DEVICE_STATE_LOW_POWER
  *
  * @brief device is in LOW power state
  *
  * @details Device context is preserved by the HW and need not be
  * restored by the driver.
  */
-#define PM_DEVICE_LOW_POWER_STATE       2
+#define PM_DEVICE_STATE_LOW_POWER       2
 
-/** @def PM_DEVICE_SUSPEND_STATE
+/** @def PM_DEVICE_STATE_SUSPEND
  *
  * @brief device is in SUSPEND power state
  *
@@ -49,9 +49,9 @@ struct device;
  * Device drivers must save and restore or reinitialize any context
  * lost by the hardware
  */
-#define PM_DEVICE_SUSPEND_STATE         3
+#define PM_DEVICE_STATE_SUSPEND         3
 
-/** @def PM_DEVICE_FORCE_SUSPEND_STATE
+/** @def PM_DEVICE_STATE_FORCE_SUSPEND
  *
  * @brief device is in force SUSPEND power state
  *
@@ -61,9 +61,9 @@ struct device;
  * Most device context is lost by the hardware. Device drivers must
  * save and restore or reinitialize any context lost by the hardware.
  */
-#define PM_DEVICE_FORCE_SUSPEND_STATE	4
+#define PM_DEVICE_STATE_FORCE_SUSPEND	4
 
-/** @def PM_DEVICE_OFF_STATE
+/** @def PM_DEVICE_STATE_OFF
  *
  * @brief device is in OFF power state
  *
@@ -71,14 +71,32 @@ struct device;
  * The device context is lost when this state is entered, so the OS
  * software will reinitialize the device when powering it back on
  */
-#define PM_DEVICE_OFF_STATE             5
+#define PM_DEVICE_STATE_OFF             5
+
+/** @def PM_DEVICE_STATE_RESUMING
+ *
+ * @brief device is resuming to active state.
+ *
+ * @details - The device was previously suspended and is now
+ * transitioning to become ACTIVE.
+ */
+#define PM_DEVICE_STATE_RESUMING             6
+
+/** @def PM_DEVICE_STATE_SUSPENDING
+ *
+ * @brief device is suspending.
+ *
+ * @details - The device is currently transitioning from ACTIVE
+ * to SUSPEND.
+ */
+#define PM_DEVICE_STATE_SUSPENDING             7
 
 /* Constants defining support device power commands */
 #define PM_DEVICE_STATE_SET       1
 #define PM_DEVICE_STATE_GET       2
 
 typedef void (*pm_device_cb)(const struct device *dev,
-			     int status, void *context, void *arg);
+			     int status, uint32_t *state, void *arg);
 
 /**
  * @brief Device PM info
@@ -87,7 +105,7 @@ struct pm_device {
 	/** Pointer to the device */
 	const struct device *dev;
 	/** Lock to synchronize the get/put operations */
-	struct k_sem lock;
+	struct k_spinlock lock;
 	/* Following are packed fields protected by #lock. */
 	/** Device pm enable flag */
 	bool enable : 1;
@@ -96,13 +114,11 @@ struct pm_device {
 	/** Device usage count */
 	atomic_t usage;
 	/** Device idle internal power state */
-	atomic_t fsm_state;
+	atomic_t state;
 	/** Work object for asynchronous calls */
-	struct k_work work;
-	/** Event object to listen to the sync request events */
-	struct k_poll_event event;
-	/** Signal to notify the Async API callers */
-	struct k_poll_signal signal;
+	struct k_work_delayable work;
+	/** Event conditional var to listen to the sync request events */
+	struct k_condvar condvar;
 };
 
 /** Bit position in device_pm::atomic_flags that records whether the

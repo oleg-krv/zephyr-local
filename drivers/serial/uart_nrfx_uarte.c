@@ -51,6 +51,7 @@ LOG_MODULE_REGISTER(uart_nrfx_uarte, LOG_LEVEL_ERR);
 	(defined(CONFIG_UART_3_NRF_UARTE) && !defined(CONFIG_UART_3_ASYNC))
 #define UARTE_ANY_NONE_ASYNC 1
 #endif
+
 /*
  * RX timeout is divided into time slabs, this define tells how many divisions
  * should be made. More divisions - higher timeout accuracy and processor usage.
@@ -1376,7 +1377,7 @@ static void uarte_nrfx_poll_out(const struct device *dev, unsigned char c)
 	int key;
 
 #ifdef CONFIG_PM_DEVICE
-	if (data->pm_state != PM_DEVICE_ACTIVE_STATE) {
+	if (data->pm_state != PM_DEVICE_STATE_ACTIVE) {
 		return;
 	}
 #endif
@@ -1669,10 +1670,11 @@ static int uarte_instance_init(const struct device *dev,
 	}
 
 #ifdef CONFIG_PM_DEVICE
-	data->pm_state = PM_DEVICE_ACTIVE_STATE;
+	data->pm_state = PM_DEVICE_STATE_ACTIVE;
 #endif
 
-	if (get_dev_config(dev)->flags & UARTE_CFG_FLAG_PPI_ENDTX) {
+	if (IS_ENABLED(CONFIG_UART_ENHANCED_POLL_OUT) &&
+	    get_dev_config(dev)->flags & UARTE_CFG_FLAG_PPI_ENDTX) {
 		err = endtx_stoptx_ppi_init(uarte, data);
 		if (err < 0) {
 			return err;
@@ -1773,7 +1775,7 @@ static void uarte_nrfx_set_power_state(const struct device *dev,
 	NRF_UARTE_Type *uarte = get_uarte_instance(dev);
 	struct uarte_nrfx_data *data = get_dev_data(dev);
 
-	if (new_state == PM_DEVICE_ACTIVE_STATE) {
+	if (new_state == PM_DEVICE_STATE_ACTIVE) {
 		uarte_nrfx_pins_enable(dev, true);
 		nrf_uarte_enable(uarte);
 
@@ -1801,14 +1803,14 @@ static void uarte_nrfx_set_power_state(const struct device *dev,
 #endif
 		}
 	} else {
-		__ASSERT_NO_MSG(new_state == PM_DEVICE_LOW_POWER_STATE ||
-				new_state == PM_DEVICE_SUSPEND_STATE ||
-				new_state == PM_DEVICE_OFF_STATE);
+		__ASSERT_NO_MSG(new_state == PM_DEVICE_STATE_LOW_POWER ||
+				new_state == PM_DEVICE_STATE_SUSPEND ||
+				new_state == PM_DEVICE_STATE_OFF);
 
 		/* if pm is already not active, driver will stay indefinitely
 		 * in while loop waiting for event NRF_UARTE_EVENT_RXTO
 		 */
-		if (data->pm_state != PM_DEVICE_ACTIVE_STATE) {
+		if (data->pm_state != PM_DEVICE_STATE_ACTIVE) {
 			return;
 		}
 
@@ -1863,23 +1865,23 @@ static void uarte_nrfx_set_power_state(const struct device *dev,
 
 static int uarte_nrfx_pm_control(const struct device *dev,
 				 uint32_t ctrl_command,
-				 void *context, pm_device_cb cb, void *arg)
+				 uint32_t *state, pm_device_cb cb, void *arg)
 {
 	struct uarte_nrfx_data *data = get_dev_data(dev);
 
 	if (ctrl_command == PM_DEVICE_STATE_SET) {
-		uint32_t new_state = *((const uint32_t *)context);
+		uint32_t new_state = *state;
 
 		if (new_state != data->pm_state) {
 			uarte_nrfx_set_power_state(dev, new_state);
 		}
 	} else {
 		__ASSERT_NO_MSG(ctrl_command == PM_DEVICE_STATE_GET);
-		*((uint32_t *)context) = data->pm_state;
+		*state = data->pm_state;
 	}
 
 	if (cb) {
-		cb(dev, 0, context, arg);
+		cb(dev, 0, state, arg);
 	}
 
 	return 0;
