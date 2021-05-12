@@ -317,6 +317,10 @@ static void spi_stm32_shift_m(SPI_TypeDef *spi, struct spi_stm32_data *data)
 		}
 		spi_context_update_rx(&data->ctx, 2, 1);
 	}
+	while (!ll_func_tx_is_empty(spi)) {
+		/* NOP */
+	}
+
 }
 
 /* Shift a SPI frame as slave. */

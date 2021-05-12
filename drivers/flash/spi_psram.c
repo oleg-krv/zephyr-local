@@ -123,32 +123,22 @@ static const struct flash_parameters spi_psram_parameters = {
  * @param length The size of the buffer
  * @return 0 on success, negative errno code otherwise
  */
-static int spi_psram_access(const struct device *const dev,
-			  uint8_t opcode, unsigned int access,
-			  off_t addr, void *data, size_t length)
+static int spi_psram_access(const struct device *const dev, uint8_t opcode, unsigned int access,
+			    off_t addr, void *data, size_t length)
 {
 	struct spi_psram_data *const driver_data = dev->data;
 	bool is_addressed = (access & NOR_ACCESS_ADDRESSED) != 0U;
 	bool is_write = (access & NOR_ACCESS_WRITE) != 0U;
 	uint8_t buf[5] = { 0 };
-	struct spi_buf spi_buf[2] = {
-		{
-			.buf = buf,
-			.len = 1,
-		},
-		{
-			.buf = data,
-			.len = length
-		}
-	};
+	struct spi_buf spi_buf[2] = { {
+					      .buf = buf,
+					      .len = 1,
+				      },
+				      { .buf = data, .len = length } };
 
 	buf[0] = opcode;
 	if (is_addressed) {
-		bool access_24bit = (access & NOR_ACCESS_24BIT_ADDR) != 0;
-		bool access_32bit = (access & NOR_ACCESS_32BIT_ADDR) != 0;
-		bool use_32bit = (access_32bit);
-//			|| (!access_24bit
-//				&& driver_data->flag_access_32bit));
+		// access 24bit addr
 		union {
 			uint32_t u32;
 			uint8_t u8[4];
@@ -156,13 +146,8 @@ static int spi_psram_access(const struct device *const dev,
 			.u32 = sys_cpu_to_be32(addr),
 		};
 
-		if (use_32bit) {
-			memcpy(&buf[1], &addr32.u8[0], 4);
-			spi_buf[0].len += 4;
-		} else {
-			memcpy(&buf[1], &addr32.u8[1], 3);
-			spi_buf[0].len += 3;
-		}
+		memcpy(&buf[1], &addr32.u8[1], 3);
+		spi_buf[0].len += 3;
 	};
 
 	const struct spi_buf_set tx_set = {
@@ -176,73 +161,20 @@ static int spi_psram_access(const struct device *const dev,
 	};
 
 	if (is_write) {
-		return spi_write(driver_data->spi,
-				 &driver_data->spi_cfg, &tx_set);
+		return spi_write(driver_data->spi, &driver_data->spi_cfg, &tx_set);
 	}
 
-	return spi_transceive(driver_data->spi,
-			      &driver_data->spi_cfg, &tx_set, &rx_set);
+	return spi_transceive(driver_data->spi, &driver_data->spi_cfg, &tx_set, &rx_set);
 }
 
-#define spi_psram_cmd_read(dev, opcode, dest, length) \
+#define spi_psram_cmd_read(dev, opcode, dest, length)                                              \
 	spi_psram_access(dev, opcode, 0, 0, dest, length)
-#define spi_psram_cmd_addr_read(dev, opcode, addr, dest, length) \
+#define spi_psram_cmd_addr_read(dev, opcode, addr, dest, length)                                   \
 	spi_psram_access(dev, opcode, NOR_ACCESS_ADDRESSED, addr, dest, length)
-#define spi_psram_cmd_write(dev, opcode) \
-	spi_psram_access(dev, opcode, NOR_ACCESS_WRITE, 0, NULL, 0)
-#define spi_psram_cmd_addr_write(dev, opcode, addr, src, length) \
-	spi_psram_access(dev, opcode, NOR_ACCESS_WRITE | NOR_ACCESS_ADDRESSED, \
-		       addr, (void *)src, length)
-
-///*
-// * @brief Send an SPI command
-// *
-// * @param dev Device struct
-// * @param opcode The command to send
-// * @param is_addressed A flag to define if the command is addressed
-// * @param addr The address to send
-// * @param data The buffer to store or read the value
-// * @param length The size of the buffer
-// * @param is_write A flag to define if it's a read or a write command
-// * @return 0 on success, negative errno code otherwise
-// */
-//static int spi_psram_access(const struct device *const dev, uint8_t opcode, bool is_addressed,
-//			    off_t addr, void *data, size_t length, bool is_write)
-//{
-//	struct spi_psram_data *const driver_data = dev->data;
-//
-//	uint8_t buf[4] = {
-//		opcode,
-//		(addr & 0xFF0000) >> 16,
-//		(addr & 0xFF00) >> 8,
-//		(addr & 0xFF),
-//	};
-//
-//	struct spi_buf spi_buf[2] = { {
-//					      .buf = buf,
-//					      .len = (is_addressed) ? 4 : 1,
-//				      },
-//				      { .buf = data, .len = length } };
-//	const struct spi_buf_set tx_set = { .buffers = spi_buf, .count = (length) ? 2 : 1 };
-//
-//	const struct spi_buf_set rx_set = { .buffers = spi_buf, .count = 2 };
-//
-//	if (is_write) {
-//		return spi_write(driver_data->spi, &driver_data->spi_cfg, &tx_set);
-//	}
-//
-//	return spi_transceive(driver_data->spi, &driver_data->spi_cfg, &tx_set, &rx_set);
-//}
-//
-//#define spi_psram_cmd_read(dev, opcode, dest, length)                                              \
-//	spi_psram_access(dev, opcode, false, 0, dest, length, false)
-//#define spi_psram_cmd_addr_read(dev, opcode, addr, dest, length)                                   \
-//	spi_psram_access(dev, opcode, true, addr, dest, length, false)
-//#define spi_psram_cmd_addr_read_wait(dev, opcode, addr, dest, length)                              \
-//	spi_psram_access(dev, opcode, true, addr, dest, length, false)
-//#define spi_psram_cmd_write(dev, opcode) spi_psram_access(dev, opcode, false, 0, NULL, 0, true)
-//#define spi_psram_cmd_addr_write(dev, opcode, addr, src, length)                                   \
-//	spi_psram_access(dev, opcode, true, addr, (void *)src, length, true)
+#define spi_psram_cmd_write(dev, opcode) spi_psram_access(dev, opcode, NOR_ACCESS_WRITE, 0, NULL, 0)
+#define spi_psram_cmd_addr_write(dev, opcode, addr, src, length)                                   \
+	spi_psram_access(dev, opcode, NOR_ACCESS_WRITE | NOR_ACCESS_ADDRESSED, addr, (void *)src,  \
+			 length)
 
 /* Everything necessary to acquire owning access to the device.
  *
@@ -274,7 +206,7 @@ static void release_device(const struct device *dev)
 
 static int spi_psram_read(const struct device *dev, off_t addr, void *dest, size_t size)
 {
-	struct spi_psram_data *data = dev->data;
+	//struct spi_psram_data *data = dev->data;
 	const size_t psram_size = dev_spi_psram_size(dev);
 
 	/* should be between 0 and psram size */
@@ -284,13 +216,13 @@ static int spi_psram_read(const struct device *dev, off_t addr, void *dest, size
 
 	acquire_device(dev);
 
-//	/* ToDo: realise wait read */
-//	if (data->spi_cfg.frequency >= DT_INST_PROP(0, read_not_wait_max_frequency)) {
-//		LOG_ERR("Not realise wait read");
-//		return -EINVAL;
-//	}
+	//	/* ToDo: realise wait read */
+	//	if (data->spi_cfg.frequency >= DT_INST_PROP(0, read_not_wait_max_frequency)) {
+	//		LOG_ERR("Not realise wait read");
+	//		return -EINVAL;
+	//	}
 
-	int ret = 0;//spi_psram_cmd_addr_read(dev, SPI_PSRAM_CMD_READ, addr, dest, size);
+	int ret = spi_psram_cmd_addr_read(dev, SPI_PSRAM_CMD_READ, addr, dest, size);
 
 	release_device(dev);
 	return ret;
@@ -301,7 +233,7 @@ static int spi_psram_write(const struct device *dev, off_t addr, const void *src
 	//struct spi_psram_data *data = dev->data;
 	const size_t psram_size = dev_spi_psram_size(dev);
 	const uint16_t page_size = dev_page_size(dev);
-	int ret=0;
+	int ret = 0;
 
 	/* should be between 0 and flash size */
 	if ((addr < 0) || ((size + addr) > psram_size)) {
