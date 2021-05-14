@@ -233,6 +233,8 @@ Boards & SoC Support
 
 * Made these changes in other SoC series:
 
+  * Added Cypress PSoC-6 pinctrl support.
+
 * Changes for ARC boards:
 
 * Added support for these ARM boards:
@@ -251,6 +253,13 @@ Boards & SoC Support
    * Nordic nRF5340 PDK
 
 * Made these changes in other boards:
+
+  * cy8ckit_062_ble: Refactored to configure by pinctrl.
+  * cy8ckit_062_ble: Added support to SCB[uart] with interrupt.
+  * cy8ckit_062_ble: Added support to SCB[spi].
+  * cy8ckit_062_ble: Added board revision schema.
+  * cy8ckit_062_wifi_bt: Refactored to configure by pinctrl.
+  * cy8ckit_062_wifi_bt: Added support to SCB[uart] with interrupt.
 
 * Added support for these following shields:
 
@@ -332,6 +341,13 @@ Drivers and Sensors
 
 * IEEE 802.15.4
 
+  * rf2xx:
+
+    * Added support for tx mode direct.
+    * Added support for tx mode CCA.
+    * Added support to enable promiscuous mode.
+    * Added support to enable pan coordinator mode.
+
 * Interrupt Controller
 
 * IPM
@@ -358,7 +374,11 @@ Drivers and Sensors
 
 * Serial
 
+  * Extended Cypress PSoC-6 SCB[uart] driver to support interrupts.
+
 * SPI
+
+  * Added Cypress PSoC-6 SCB[spi] driver.
 
 * Timer
 
@@ -392,6 +412,13 @@ Build and Infrastructure
 * Devicetree
 
   - :c:macro:`DT_COMPAT_GET_ANY_STATUS_OKAY`: new macro
+
+* West
+
+  * Improve bossac runner.  Added legacy mode option into extended SAM-BA
+    bootloader selection.  This extends compatibility between Zephyr and
+    some Arduino IDE bootloaders.
+
 
 Libraries / Subsystems
 **********************
