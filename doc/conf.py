@@ -82,6 +82,7 @@ extensions = [
     "sphinx_tabs.tabs",
     "zephyr.warnings_filter",
     "zephyr.doxyrunner",
+    "notfound.extension",
 ]
 
 # Only use SVG converter when it is really needed, e.g. LaTeX.
@@ -116,7 +117,10 @@ rst_epilog = """
 
 html_theme = "sphinx_rtd_theme"
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
-html_theme_options = {"prev_next_buttons_location": None}
+html_theme_options = {
+    "logo_only": True,
+    "prev_next_buttons_location": None
+}
 html_title = "Zephyr Project Documentation"
 html_logo = "_static/images/logo.svg"
 html_favicon = "images/zp_favicon.png"
@@ -134,7 +138,6 @@ html_context = {
     "show_license": True,
     "docs_title": docs_title,
     "is_release": is_release,
-    "theme_logo_only": False,
     "current_version": version,
     "versions": (
         ("latest", "/"),
@@ -175,8 +178,8 @@ breathe_domain_by_extension = {
     "h": "c",
     "c": "c",
 }
-breathe_separate_member_pages = True
 breathe_show_enumvalue_initializer = True
+breathe_default_members = ("members", )
 
 cpp_id_attributes = [
     "__syscall",
@@ -201,6 +204,10 @@ html_redirect_pages = redirects.REDIRECTS
 warnings_filter_config = str(ZEPHYR_BASE / "doc" / "known-warnings.txt")
 warnings_filter_silent = False
 
+# -- Options for notfound.extension ---------------------------------------
+
+notfound_urls_prefix = f"/{version}/"
+
 # -- Linkcheck options ----------------------------------------------------
 
 extlinks = {
@@ -216,7 +223,6 @@ linkcheck_anchors = False
 def setup(app):
     # theme customizations
     app.add_css_file("css/custom.css")
-    app.add_js_file("js/custom.js")
     app.add_js_file("js/dark-mode-toggle.min.mjs", type="module")
 
     app.add_js_file("https://www.googletagmanager.com/gtag/js?id=UA-831873-47")
