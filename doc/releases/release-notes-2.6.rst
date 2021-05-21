@@ -263,6 +263,8 @@ Boards & SoC Support
   * lpcxpresso55s16: Board renamed from lpcxpresso55s16_ns to
     lpcxpresso55s16 since the board does not have Trusted Firmware M
     (TF-M) support.
+  * lpcxpresso55s28: Removed lpcxpresso55s28_ns config since the board
+    does not have Trusted Firmware M (TF-M) support.
 
 * Added support for these following shields:
 
@@ -654,6 +656,11 @@ Trusted Firmware-m
    * BL5340 DVK
    * STM32L562E DK
 
+* NOTE: Trusted-Firmware-M can not currently be used with mbedtls 2.26.0 when
+  PSA APIs are enabled in mbedtls (``MBEDTLS_USE_PSA_CRYPTO`` and
+  ``MBEDTLS_PSA_CRYPTO_C``). If both TF-M and mbedtls are required, mbedtls
+  must be used without the PSA APIs. This will be resolved in a future
+  update to mbedtls.
 
 Documentation
 *************

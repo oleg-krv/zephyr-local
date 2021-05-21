@@ -122,15 +122,15 @@ html_theme_options = {
     "prev_next_buttons_location": None
 }
 html_title = "Zephyr Project Documentation"
-html_logo = "_static/images/logo.svg"
-html_favicon = "images/zp_favicon.png"
+html_logo = str(ZEPHYR_BASE / "doc" / "_static" / "images" / "logo.svg")
+html_favicon = str(ZEPHYR_BASE / "doc" / "images" / "zp_favicon.png")
 html_static_path = [str(ZEPHYR_BASE / "doc" / "_static")]
 html_last_updated_fmt = "%b %d, %Y"
 html_domain_indices = False
 html_split_index = True
 html_show_sourcelink = False
 html_show_sphinx = False
-html_search_scorer = "_static/js/scorer.js"
+html_search_scorer = str(ZEPHYR_BASE / "doc" / "_static" / "js" / "scorer.js")
 
 is_release = tags.has("release")  # pylint: disable=undefined-variable
 docs_title = "Docs / {}".format(version if is_release else "Latest")
@@ -169,10 +169,7 @@ doxyrunner_fmt_vars = {"ZEPHYR_BASE": str(ZEPHYR_BASE)}
 
 # -- Options for Breathe plugin -------------------------------------------
 
-breathe_projects = {
-    "Zephyr": str(doxyrunner_outdir / "xml"),
-    "doc-examples": str(doxyrunner_outdir / "xml"),
-}
+breathe_projects = {"Zephyr": str(doxyrunner_outdir / "xml")}
 breathe_default_project = "Zephyr"
 breathe_domain_by_extension = {
     "h": "c",
