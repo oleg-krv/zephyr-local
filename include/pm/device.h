@@ -105,16 +105,16 @@ struct pm_device {
 	/** Pointer to the device */
 	const struct device *dev;
 	/** Lock to synchronize the get/put operations */
-	struct k_spinlock lock;
+	struct k_mutex lock;
 	/* Following are packed fields protected by #lock. */
 	/** Device pm enable flag */
 	bool enable : 1;
 	/* Following are packed fields accessed with atomic bit operations. */
 	atomic_t atomic_flags;
 	/** Device usage count */
-	atomic_t usage;
+	uint32_t usage;
 	/** Device idle internal power state */
-	atomic_t state;
+	uint8_t state;
 	/** Work object for asynchronous calls */
 	struct k_work_delayable work;
 	/** Event conditional var to listen to the sync request events */

@@ -15,29 +15,25 @@ static const struct device *parent;
 static int dummy_open(const struct device *dev)
 {
 	int ret;
-	struct k_mutex wait_mutex;
 
 	printk("open()\n");
 
 	/* Make sure parent is resumed */
-	ret = pm_device_get_sync(parent);
+	ret = pm_device_get(parent);
 	if (ret < 0) {
 		return ret;
 	}
 
-	ret = pm_device_get(dev);
+	ret = pm_device_get_async(dev);
 	if (ret < 0) {
 		return ret;
 	}
 
 	printk("Async wakeup request queued\n");
 
-	k_mutex_init(&wait_mutex);
-	k_mutex_lock(&wait_mutex, K_FOREVER);
-	(void) k_condvar_wait(&dev->pm->condvar, &wait_mutex, K_FOREVER);
-	k_mutex_unlock(&wait_mutex);
+	(void) pm_device_wait(dev, K_FOREVER);
 
-	if (atomic_get(&dev->pm->state) == PM_DEVICE_STATE_ACTIVE) {
+	if (dev->pm->state == PM_DEVICE_STATE_ACTIVE) {
 		printk("Dummy device resumed\n");
 		ret = 0;
 	} else {
@@ -76,14 +72,14 @@ static int dummy_close(const struct device *dev)
 	int ret;
 
 	printk("close()\n");
-	ret = pm_device_put_sync(dev);
+	ret = pm_device_put(dev);
 	if (ret == 1) {
 		printk("Async suspend request ququed\n");
 	}
 
 	/* Parent can be suspended */
 	if (parent) {
-		pm_device_put_sync(parent);
+		pm_device_put(parent);
 	}
 
 	return ret;
