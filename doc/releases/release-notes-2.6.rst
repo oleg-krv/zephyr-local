@@ -9,6 +9,11 @@ We are pleased to announce the release of Zephyr RTOS version 2.6.0.
 
 Major enhancements with this release include:
 
+* Added support for 64-bit ARCv3
+* Split ARM32 and ARM64, ARM64 is now a top-level architecture
+* Added initial support for Arm v8.1-m and Cortex-M55
+* Removed legacy TCP stack support which was deprecated in 2.4
+
 The following sections provide detailed lists of changes by component.
 
 Security Vulnerability Related
@@ -180,31 +185,26 @@ Architectures
   * AARCH32
 
     * Added support for null pointer dereferencing detection in Cortex-M.
-
-    * Added initial support for Arm v8.1-m and Cortex-M55
-
+    * Added initial support for Arm v8.1-m and Cortex-M55.
     * Added support for preempting threads while they are performing secure calls in Cortex-M.
+    * Added support for memory region generation by the linker based on device tree node information in Cortex-M.
+    * Cleaned up definitions of SoC-specific memory regions in the common Cortex-M linker script.
+    * Added support for clearing NXP MPU region configuration during Zephyr early boot stage.
+    * Disallowed fpu hard ABI when building Non-Secure applications with TF-M on Cortex-M33.
+    * Enhanced register information dump in fault exceptions in Cortex-R.
+    * Fixed spurious interrupt handling in Cortex-R.
 
   * AARCH64
 
     * SMP support
-
     * MMU dynamic mappings with page table sharing.
-
     * Userspace (unprivileged) thread support.
-
     * Standalone SMCCC support.
-
     * XIP support.
-
     * ARM64 is now a top-level standalone architecture.
-
     * Support for Cortex-R82 and Armv8-R AArch64 MPU.
-
     * Cache management support.
-
     * Revamped boot code.
-
     * Full FPU context switching.
 
 * POSIX
@@ -214,18 +214,102 @@ Architectures
 * x86
 
   * Added SoC configuration for Lakemont SoC.
-
   * Removed kconfig ``CONFIG_CPU_MINUTEIA`` as there is no user of this option.
-
   * Renamed kconfig ``CONFIG_SSE*`` to ``CONFIG_X86_SSE*``.
-
   * Extended the pagetable generation script to allow specifying additional
     memory mapping during build.
-
   * x86-32
 
     * Added support for kernel image to reside in virtual address space, allowing
       code execution and data manipulation via virtual addresses.
+
+Bluetooth
+*********
+
+* Audio
+
+  * Split up ISO handling from audio handling, and moved the latter to its
+    own directory.
+  * Added the Volume Offset Control Service and client.
+  * Added the Audio Input Control Service and client.
+  * Added the Volume Control Service and client.
+
+* Host
+
+  * Added basic support for Direction Finding.
+  * Added support for CTE connectionless transimission and reception over
+    periodic advertising.
+  * Refactored the HCI and ECC handling implementations.
+  * Stopped auto updating the device name in the adv data.
+  * Added support for logging security keys to be used by an air sniffer.
+  * Fixed a bonding issue where the local bond data was not being updated after
+    the remote device had removed it when the peer was not using the IRK stored
+    in the bonding information.
+  * Implemented the directory listing object to OTS.
+  * Added a function to access the ``bt_conn_iso`` object.
+  * Added a new configuration option for writeable device name.
+  * Added a new configuration option for minimum encryption key size.
+  * Added support for keypress notifications as an SMP responder.
+  * Added a new option, ``BT_LE_ADV_OPT_FORCE_NAME_IN_AD``, which forces the
+    device name to appear in the adv packet instead of the scan response.
+  * Added a security level check when sending a notification or indication.
+  * Added the ability to send HCI monitor traces over RTT.
+  * Refactored the Bluetooth buffer configuration for simplicity. See the
+    commit message of 6483e12a8ac4f495b28279a6b84014f633b0d374 for more info.
+  * Added support for concurrent advertising with multiple identities.
+  * Changed the logic to disable scanning before setting the random address.
+  * Fixed a crash where an ATT timeout occurred on a disconnected ATT channel.
+  * Changed the pairing procedure to fail pairing when both sides have the same
+    public key.
+  * Fixed an issue where GATT requests could deadlock the RX thread.
+  * Fixed an issue where a fixed passkey that was previously set could not be
+    cleared.
+  * Fixed an issue where callbacks for "security changed" and "pairing failed"
+    were not always called.
+  * Changed the pairing procedure to fail early if the remote device could not
+    reach the required security level.
+  * Fixed an issue where GATT notifications and Writes Without Response could
+    be sent out of order.
+  * Changed buffer ownership of ``bt_l2cap_chan_send``.
+    The application must now release the buffer for all returned errors.
+
+* Mesh
+
+  * Added CDB handle key refresh phase.
+  * Added the ability to perform replay checks on SeqAuth.
+  * Added the sending of a Link Close message when closing a link.
+  * Added a Proxy callback structure for Node ID enabling and disabling.
+  * Added a check for the response address in the Configuration Client.
+  * Introduced a new acknowledged messages API.
+  * Reworked the periodic publication timer and poll timeout scheduling logic.
+  * Added reporting configured ``LPNTimeout`` in ``cfg_srv``.
+  * Ensured that provisioning output count number is at least 1.
+  * Ensured to encrypt initial friend poll with friend credentials.
+  * Stopped resetting the PB ADV reliable timer on retransmission.
+
+* Bluetooth LE split software Controller
+
+  * Removed support for the nRF5340 PDK. Use the nRF5340 DK instead.
+  * Added basic support for Direction Finding.
+  * Added support for CTE connectionless transimission and reception over
+    periodic advertising.
+  * Added support for antenna switching in the context of Direction Finding.
+  * Added an invalid ACL data length check.
+  * Added basic support for the ISO Adaptation Layer.
+  * Added experimental support for Broadcast Isochronous Groups and Streams.
+  * Added partial experimental support for Connected Isochronous Groups and
+    Streams.
+  * Implemented extended connection creation and cancellation.
+  * Changed the policy to ignore connection requests from an already-connected
+    peer.
+  * Added a control procedure locking system.
+  * Added GPIO PA/LNA support for the Nordic nRF53x SoC series.
+  * Added FEM support for the nRF21540 IC.
+  * Added a new radio API to configure the CTE RX path.
+
+* HCI Driver
+
+  * Added support for the Espressif ESP32 platform.
 
 Boards & SoC Support
 ********************
@@ -358,6 +442,10 @@ Drivers and Sensors
     deprecated.
 
 * Console
+
+  * Added ``UART_CONSOLE_INPUT_EXPIRED`` and ``UART_CONSOLE_INPUT_EXPIRED_TIMEOUT``
+    Kconfig options to notify the power management module that UART console is
+    in use now and forbid it to enter low-power states.
 
 * Counter
 
@@ -656,6 +744,7 @@ Build and Infrastructure
 ************************
 
 * Improved support for additional toolchains:
+  * Support for the Intel oneApi toolchain.
 
 * Devicetree
 
@@ -724,8 +813,16 @@ Libraries / Subsystems
     ``CONFIG_THREAD_RUNTIME_STATS`` which provides per thread statistics. The
     same functionality is also available when Thread analyzer is enabled with
     the runtime statistics enabled.
+  * Expanded and overhauled tracing hooks with more coverage and support for
+    tracing all kernel objects and basic power management operations.
+  * Added support for Percepio Tracealyzer, a commercial tracing tool which now
+    has built-in support for Zephyr. We now have the Percepio tracerecorder
+    integrated as a module.
+  * Expanded support for the new hooks in SEGGER Systemview and enhanced the
+    description file with support for all APIs.
 
 * Debug
+  * SEGGER Systemview and RTT SDK updated to version v3.30
 
 * OS
 
@@ -766,6 +863,21 @@ Trusted Firmware-m
 Documentation
 *************
 
+* Documentation look and feel has been improved by using a new stylesheet.
+* Doxygen is now run by Sphinx using the ``doxyrunner`` custom extension. The
+  new extension centralizes multiple scattered workarounds that existed before
+  in a single place.
+* Doxygen now runs with ``WARN_AS_ERROR`` enabled.
+* Documentation known warnings are now filtered using a custom Sphinx extension:
+  ``warnings_filter``. This extension removes the need of post-processing
+  the Sphinx output and allows to use the ``-W`` option (treat warnings as
+  errors) which has been enabled by default.
+* External content, e.g. samples and boards documentation is now handled by
+  the ``external_content`` extension.
+* Sphinx is now run in parallel mode by default (``-j auto``).
+* The documentation helper ``Makefile`` has been moved from the repository root
+  to the ``doc`` folder.
+
 Tests and Samples
 *****************
 
@@ -784,6 +896,22 @@ Tests and Samples
   .. code-block:: yaml
 
      filter: dt_enabled_alias_with_parent_compat("led0", "gpio-leds")
+
+* Add a feature which handles pytest script in twister and provide an example.
+* Provide test excution time per ztest testcase.
+* Added and refined some testcases, most of them are negative testcases, to
+  improve the test code coverage:
+
+   * Testcases of x86's regular/direct interrupts and offload job from ISR.
+   * Testcases of SMP, and enabled SMP for existed testing of semaphore, condvar, etc.
+   * Testcases of memory protection, userspace and memory heap.
+   * Testcases of data structure include stack, queue, ringbuffer and rbtree.
+   * Testcases of IPC include pipe, poll, mailbox, message queue.
+   * Testcases of synchronization include mutex, semaphore, atomic operations.
+   * Testcases of scheduling and thread.
+   * Testcases of testing for arch_nop() and errno.
+   * Testcases of libc and posix API.
+   * Testcases of log and sensor subsystem.
 
 Issue Related Items
 *******************

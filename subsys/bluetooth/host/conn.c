@@ -339,6 +339,32 @@ static void tx_complete_work(struct k_work *work)
 	tx_notify(conn);
 }
 
+static struct bt_conn *conn_lookup_iso(struct bt_conn *conn)
+{
+#if defined(CONFIG_BT_ISO)
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(iso_conns); i++) {
+		struct bt_conn *iso_conn = bt_conn_ref(&iso_conns[i]);
+
+		if (!iso_conn) {
+			continue;
+		}
+
+		if (iso_conn == conn) {
+			return iso_conn;
+		}
+
+		if (bt_conn_iso(iso_conn)->acl == conn) {
+			return iso_conn;
+		}
+
+		bt_conn_unref(iso_conn);
+	}
+#endif /* CONFIG_BT_ISO */
+	return NULL;
+}
+
 static void deferred_work(struct k_work *work)
 {
 	struct bt_conn *conn = CONTAINER_OF(work, struct bt_conn, deferred_work);
@@ -347,6 +373,23 @@ static void deferred_work(struct k_work *work)
 	BT_DBG("conn %p", conn);
 
 	if (conn->state == BT_CONN_DISCONNECTED) {
+		if (IS_ENABLED(CONFIG_BT_ISO)) {
+			struct bt_conn *iso;
+
+			iso = conn_lookup_iso(conn);
+			if (iso) {
+				iso->err = conn->err;
+
+				bt_iso_disconnected(iso);
+				bt_conn_unref(iso);
+			}
+
+			/* Stop if only ISO was Disconnected */
+			if (conn->type == BT_CONN_TYPE_ISO) {
+				return;
+			}
+		}
+
 		bt_l2cap_disconnected(conn);
 		notify_disconnected(conn);
 
@@ -411,23 +454,15 @@ struct bt_conn *bt_conn_new(struct bt_conn *conns, size_t size)
 
 	(void)memset(conn, 0, offsetof(struct bt_conn, ref));
 
+	k_work_init_delayable(&conn->deferred_work, deferred_work);
+	k_work_init(&conn->tx_complete_work, tx_complete_work);
+
 	return conn;
 }
 
 static struct bt_conn *acl_conn_new(void)
 {
-	struct bt_conn *conn;
-
-	conn = bt_conn_new(acl_conns, ARRAY_SIZE(acl_conns));
-	if (!conn) {
-		return conn;
-	}
-
-	k_work_init_delayable(&conn->deferred_work, deferred_work);
-
-	k_work_init(&conn->tx_complete_work, tx_complete_work);
-
-	return conn;
+	return bt_conn_new(acl_conns, ARRAY_SIZE(acl_conns));
 }
 
 #if defined(CONFIG_BT_BREDR)
@@ -1478,35 +1513,6 @@ struct bt_conn *conn_lookup_handle(struct bt_conn *conns, size_t size,
 	return NULL;
 }
 
-struct bt_conn *conn_lookup_iso(struct bt_conn *conn)
-{
-#if defined(CONFIG_BT_ISO)
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(iso_conns); i++) {
-		struct bt_conn *iso_conn = bt_conn_ref(&iso_conns[i]);
-
-		if (!iso_conn) {
-			continue;
-		}
-
-		if (iso_conn == conn) {
-			return iso_conn;
-		}
-
-		if (bt_conn_iso(iso_conn)->acl == conn) {
-			return iso_conn;
-		}
-
-		bt_conn_unref(iso_conn);
-	}
-
-	return NULL;
-#else
-	return NULL;
-#endif /* CONFIG_BT_ISO */
-}
-
 void bt_conn_connected(struct bt_conn *conn)
 {
 	bt_l2cap_connected(conn);
@@ -1534,7 +1540,9 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 		 * bt_conn_add_le() and keep it until reaching DISCONNECTED
 		 * again.
 		 */
-		bt_conn_ref(conn);
+		if (conn->type != BT_CONN_TYPE_ISO) {
+			bt_conn_ref(conn);
+		}
 		break;
 	case BT_CONN_CONNECT:
 		if (IS_ENABLED(CONFIG_BT_CENTRAL) &&
@@ -1576,24 +1584,6 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 			/* TODO: Notify sco disconnected */
 			bt_conn_unref(conn);
 			break;
-		}
-
-		if (IS_ENABLED(CONFIG_BT_ISO)) {
-			struct bt_conn *iso;
-
-			iso = conn_lookup_iso(conn);
-			if (iso) {
-				iso->err = conn->err;
-
-				bt_iso_disconnected(iso);
-				bt_iso_cleanup(iso);
-				bt_conn_unref(iso);
-
-				/* Stop if only ISO was Disconnected */
-				if (iso == conn) {
-					break;
-				}
-			}
 		}
 
 		/* Notify disconnection and queue a dummy buffer to wake
@@ -1881,14 +1871,24 @@ struct bt_conn *bt_conn_ref(struct bt_conn *conn)
 
 void bt_conn_unref(struct bt_conn *conn)
 {
-	atomic_val_t old = atomic_dec(&conn->ref);
+	atomic_val_t old;
+
+	/* Cleanup ISO before releasing the last reference to prevent other
+	 * threads reallocating the same connection while cleanup is ongoing.
+	 */
+	if (IS_ENABLED(CONFIG_BT_ISO) && conn->type == BT_CONN_TYPE_ISO &&
+	    atomic_get(&conn->ref) == 1) {
+		bt_iso_cleanup(conn);
+	}
+
+	old = atomic_dec(&conn->ref);
 
 	BT_DBG("handle %u ref %u -> %u", conn->handle, old,
 	       atomic_get(&conn->ref));
 
 	__ASSERT(old > 0, "Conn reference counter is 0");
 
-	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) &&
+	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && conn->type == BT_CONN_TYPE_LE &&
 	    atomic_get(&conn->ref) == 0) {
 		bt_le_adv_resume();
 	}
@@ -1929,6 +1929,17 @@ int bt_conn_get_info(const struct bt_conn *conn, struct bt_conn_info *info)
 #if defined(CONFIG_BT_BREDR)
 	case BT_CONN_TYPE_BR:
 		info->br.dst = &conn->br.dst;
+		return 0;
+#endif
+#if defined(CONFIG_BT_ISO)
+	case BT_CONN_TYPE_ISO:
+		if (!conn->iso.is_bis) {
+			info->le.dst = &conn->iso.acl->le.dst;
+			info->le.src = &bt_dev.id_addr[conn->iso.acl->id];
+		} else {
+			info->le.src = BT_ADDR_LE_NONE;
+			info->le.dst = BT_ADDR_LE_NONE;
+		}
 		return 0;
 #endif
 	}
