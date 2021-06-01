@@ -1302,7 +1302,7 @@ static void cleanup_big(struct bt_iso_big *big)
 		struct bt_iso_chan *bis = big->bis[i];
 
 		if (bis->conn) {
-			bt_iso_cleanup(bis->conn);
+			bt_conn_unref(bis->conn);
 			bis->conn = NULL;
 		}
 	}
@@ -1342,6 +1342,7 @@ static int big_init_bis(struct bt_iso_big *big, bool broadcaster)
 		bis->conn = iso_new();
 
 		if (!bis->conn) {
+			BT_ERR("Unable to allocate BIS connection");
 			return -ENOMEM;
 		}
 
@@ -1571,8 +1572,8 @@ void hci_le_big_complete(struct net_buf *buf)
 	BT_DBG("BIG[%u] %p completed, status %u", big->handle, big, evt->status);
 
 	if (evt->status || evt->num_bis != big->num_bis) {
-		if (evt->num_bis != big->num_bis) {
-			BT_ERR("Invalid number of BIS, was %u expected %u",
+		if (evt->status == BT_HCI_ERR_SUCCESS && evt->num_bis != big->num_bis) {
+			BT_ERR("Invalid number of BIS created, was %u expected %u",
 			       evt->num_bis, big->num_bis);
 		}
 		big_disconnect(big, evt->status ? evt->status : BT_HCI_ERR_UNSPECIFIED);
@@ -1585,7 +1586,6 @@ void hci_le_big_complete(struct net_buf *buf)
 
 		bis->conn->handle = sys_le16_to_cpu(evt->handle[i]);
 		bt_conn_set_state(bis->conn, BT_CONN_CONNECTED);
-		bt_conn_unref(bis->conn);
 	}
 }
 
@@ -1626,11 +1626,11 @@ void hci_le_big_sync_established(struct net_buf *buf)
 	big = &bigs[evt->big_handle];
 	atomic_clear_bit(big->flags, BT_BIG_SYNCING);
 
-	BT_DBG("BIG[%u] %p sync established", big->handle, big);
+	BT_DBG("BIG[%u] %p sync established, status %u", big->handle, big, evt->status);
 
 	if (evt->status || evt->num_bis != big->num_bis) {
-		if (evt->num_bis != big->num_bis) {
-			BT_ERR("Invalid number of BIS, was %u expected %u",
+		if (evt->status == BT_HCI_ERR_SUCCESS && evt->num_bis != big->num_bis) {
+			BT_ERR("Invalid number of BIS synced, was %u expected %u",
 			       evt->num_bis, big->num_bis);
 		}
 		big_disconnect(big, evt->status ? evt->status : BT_HCI_ERR_UNSPECIFIED);
@@ -1645,7 +1645,6 @@ void hci_le_big_sync_established(struct net_buf *buf)
 		bis->conn->handle = bis_handle;
 
 		bt_conn_set_state(bis->conn, BT_CONN_CONNECTED);
-		bt_conn_unref(bis->conn);
 	}
 
 	/* TODO: Deal with the rest of the fields in the event,
