@@ -672,7 +672,11 @@ static uint8_t adv_sync_hdr_set_clear(struct lll_adv_sync *lll_sync,
 	/* Get common pointers from reference to previous tertiary PDU data */
 	ter_com_hdr_prev = (void *)&ter_pdu_prev->adv_ext_ind;
 	ter_hdr = (void *)ter_com_hdr_prev->ext_hdr_adv_data;
-	ter_hdr_prev = *ter_hdr;
+	if (ter_com_hdr_prev->ext_hdr_len) {
+		ter_hdr_prev = *ter_hdr;
+	} else {
+		*(uint8_t *)&ter_hdr_prev = 0U;
+	}
 	ter_dptr_prev = ter_hdr->data;
 
 	/* Set common fields in reference to new tertiary PDU data buffer */
@@ -800,6 +804,11 @@ static uint8_t adv_sync_hdr_set_clear(struct lll_adv_sync *lll_sync,
 
 	/* Fill AdvData in tertiary PDU */
 	memmove(ter_dptr, ad_data, ad_len);
+
+	/* Early exit if no flags set */
+	if (!ter_com_hdr->ext_hdr_len) {
+		return 0;
+	}
 
 	/* Fill ACAD in tertiary PDU */
 	ter_dptr_prev -= acad_len_prev;

@@ -46,9 +46,9 @@ API Changes
 * Added disconnect reason to the :c:func:`disconnected` callback of :c:struct:`bt_iso_chan_ops`.
 
 * Align error handling of :c:func:bt_l2cap_chan_send and
-  :c:func:bt_iso_chan_send so when an error occur the buffer is not unref.
+  :c:func:`bt_iso_chan_send` so when an error occur the buffer is not unref.
 
-* Added c:func:`lwm2m_engine_delete_obj_inst` function to the LwM2M library API.
+* Added :c:func:`lwm2m_engine_delete_obj_inst` function to the LwM2M library API.
 
 Deprecated in this release
 
@@ -118,6 +118,11 @@ Deprecated in this release
   ``device_set_power_state`` and ``device_get_power_state`` have been renamed to
   ``pm_device_state_set`` and ``pm_device_state_get`` in order to align with
   the naming of other device PM APIs.
+
+* The runtime device power management (PM) APIs is now synchronous by default
+  and the asynchronous API has the **_async** sufix. This change aligns the API
+  with the convention used in Zephyr. The affected APIs are
+  :c:func:`pm_device_put` and :c:func:`pm_device_get`.
 
 * The following functions, macros, and structures related to the kernel
   work queue API:
@@ -388,6 +393,12 @@ Boards & SoC Support
 
    * ARM V2M Musca-A
    * Nordic nRF5340 PDK
+
+* Removed support for these X86 boards:
+
+   * up_squared_32
+   * qemu_x86_coverage
+   * minnowboard
 
 * Made these changes in other boards:
 
@@ -827,6 +838,24 @@ Libraries / Subsystems
     out-of-tree users a macro with the same name is provided as an alias to
     ``NULL``. The macro is flagged as deprecated to make users aware of the
     change.
+
+  * Devices set as busy are no longer suspended by the system power management.
+
+  * The time necessary to exit a sleep state and return to the active state was
+    added in ``zephyr,power-state`` binding and accounted when the system
+    changes to a power state.
+
+  * Device runtime power management (PM), former IDLE runtime, was
+    completely overhauled.
+
+    * Multiple threads can wait an operation (:c:func:`pm_device_get_async` and
+      :c:func:`pm_device_put_async`) to finish.
+    * A new API :c:func:`pm_device_wait` was added so that drivers can easily
+      wait for an async request to finish.
+    * The API can be used in  :ref:`pre-kernel <api_term_pre-kernel-ok>` stages.
+    * Several concurrence issues related with atomics access and the usage
+      of the polling API have been fixed. Condition variables are now used to
+      handle notification.
 
 * Logging
 
