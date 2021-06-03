@@ -14,6 +14,10 @@ Major enhancements with this release include:
 * Split ARM32 and ARM64, ARM64 is now a top-level architecture
 * Added initial support for Arm v8.1-m and Cortex-M55
 * Removed legacy TCP stack support which was deprecated in 2.4
+* Tracing subsystem overhaul including expansion for tracing points and
+  added support for Percepio Tracealyzer
+* Device runtime power management (PM), former IDLE runtime, was
+  completely overhauled.
 
 The following sections provide detailed lists of changes by component.
 
@@ -213,10 +217,6 @@ Architectures
     * Revamped boot code.
     * Full FPU context switching.
 
-* POSIX
-
-* RISC-V
-
 * x86
 
   * Added SoC configuration for Lakemont SoC.
@@ -327,7 +327,7 @@ Boards & SoC Support
   * STM32G4x1, STM32G4x3 and STM32G484xE
   * STM32WL55xx
   * Nuvoton npcx7m6fc, and npcx7m6fc
-  * Renesas RCar Gen3
+  * Renesas R-Car Gen3
   * Silicon Labs EFR32FG13P
   * ARM MPS3-AN547
   * ARM FVP-AEMv8A
@@ -452,6 +452,7 @@ Drivers and Sensors
   * On STM32 series, system clock configuration has been moved from Kconfig to DTS.
     Usage of existing Kconfig dedicated symbols (CONFIG_CLOCK_STM32_FOO) is now
     deprecated.
+  * Added clock control driver for Renesas R-Car platform
 
 * Console
 
@@ -480,6 +481,8 @@ Drivers and Sensors
   * Added support on STM32G0 and STM32H7
 
 * EEPROM
+
+  * Added support for EEPROM emulated in flash.
 
 * ESPI
 
@@ -528,6 +531,7 @@ Drivers and Sensors
     flags are now accepted by :c:func:`gpio_pin_interrupt_configure()`
     function only.
   * STM32 GPIO driver now supports clock gating using PM_DEVICE and PM_DEVICE_RUNTIME
+  * Added GPIO driver for Renesas R-Car platform
 
 * Hardware Info
 
@@ -560,6 +564,9 @@ Drivers and Sensors
 
 * Interrupt Controller
 
+  * Moved shared interrupt controller configuration to be based
+    on devicetree.
+
 * LED
 
   * Add support for LED GPIO
@@ -583,8 +590,6 @@ Drivers and Sensors
   * Fixed build errors on 64-bit platforms.
   * Added support for dialup modem in PPP driver.
 
-* Pinmux
-
 * PWM
 
   * Added support on STM32F2 and STM32L1.
@@ -597,6 +602,7 @@ Drivers and Sensors
 * Serial
 
   * Extended Cypress PSoC-6 SCB[uart] driver to support interrupts.
+  * Added UART driver for Renesas R-Car platform
 
 * SPI
 
@@ -606,11 +612,18 @@ Drivers and Sensors
 
 * Timer
 
+  * Added x86 APIC TSC_DEADLINE driver.
+  * Added support for NXP MCUX OS Timer.
+  * Added support for Nuvoton NPCX system timer.
+  * Added CMT driver for Renesas R-Car platform.
+
 * USB
 
   * Added support on STM32H7
 
 * Watchdog
+
+  * Added support for TI CC32xx watchdog.
 
 * WiFi
 
@@ -741,17 +754,6 @@ Networking
   * Fixed userspace access to TLS socket.
   * Added socket option support for setting and getting DTLS handshake timeout.
 
-Bluetooth
-*********
-
-* Host
-
-* Mesh
-
-* BLE split software Controller
-
-* HCI Driver
-
 Build and Infrastructure
 ************************
 
@@ -823,13 +825,17 @@ Libraries / Subsystems
 
   * MCUmgr
 
-  * updatehub
+    * Fixed an issue with the file system management failing to
+      open files due to missing initializations of `fs_file_t` structures.
+    * Fixed an issue where multiple SMP commands sent one after the other would
+      corrupt CBOR payload.
+    * Fixed problem where mcumgr over shell would stall and wait for
+      retransmissions of frames.
 
-* Settings
+* CMSIS subsystem
 
-* Random
-
-* POSIX subsystem
+  * Moved CMSIS portability layer headers to include/portability/cmsis_os.h
+    and include/portability/cmsis_os2.h
 
 * Power management
 
@@ -867,9 +873,12 @@ Libraries / Subsystems
     logging v2. Logging backend API is extended to support v2 and the most
     popular backends (UART, shell) are updated.
 
-* LVGL
-
 * Shell
+
+  * Added ``CONFIG_SHELL_BACKEND_DUMMY_BUF_SIZE`` option that allows to set
+    size of the dummy backend buffer; changing this parameter allows to work
+    around issue, where output from command, shell that is gathered by the dummy
+    backend, gets cut to the size of buffer.
 
 * Storage
 
