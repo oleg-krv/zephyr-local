@@ -14,6 +14,19 @@ set(TFM_VALID_PARTITIONS
   TFM_PARTITION_AUDIT_LOG
   )
 
+# List of all crypto modules that can be enabled/disabled
+# Corresponds to the *_MODULE_DISABLED configs in 'trusted-firmware-m/config/config_default.cmake'
+set(TFM_CRYPTO_MODULES
+  CRYPTO_KEY_MODULE
+  CRYPTO_AEAD_MODULE
+  CRYPTO_MAC_MODULE
+  CRYPTO_HASH_MODULE
+  CRYPTO_CIPHER_MODULE
+  CRYPTO_GENERATOR_MODULE
+  CRYPTO_ASYMMETRIC_MODULE
+  CRYPTO_KEY_DERIVATION_MODULE
+  )
+
 # Adds trusted-firmware-m as an external project.
 # Also creates a target called 'tfm_api'
 # which can be linked into the app.
@@ -53,12 +66,14 @@ set(TFM_VALID_PARTITIONS
 #                        REGRESSION_NS
 #                        BL2
 #                        BUILD_PROFILE profile_small
-#                        ENABLED_PARTITIONS TFM_PARTITION_PLATFORM TFM_PARTITION_CRYPTO)
+#                        ENABLED_PARTITIONS TFM_PARTITION_PLATFORM TFM_PARTITION_CRYPTO
+#                        ENABLED_CRYPTO_MODULES CRYPTO_KEY_MODULE CRYPTO_MAC_MODULE
+#                        )
 function(trusted_firmware_build)
   set(options IPC BL2 REGRESSION_S REGRESSION_NS)
   set(oneValueArgs BINARY_DIR BOARD ISOLATION_LEVEL CMAKE_BUILD_TYPE BUILD_PROFILE
     MCUBOOT_IMAGE_NUMBER PSA_TEST_SUITE)
-  set(multiValueArgs ENABLED_PARTITIONS CMAKE_ARGS)
+  set(multiValueArgs ENABLED_PARTITIONS CMAKE_ARGS ENABLED_CRYPTO_MODULES)
   cmake_parse_arguments(TFM "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   foreach(partition ${TFM_VALID_PARTITIONS})
@@ -69,6 +84,19 @@ function(trusted_firmware_build)
       set(val "ON")
     endif()
     list(APPEND TFM_PARTITIONS_ARGS -D${partition}=${val})
+  endforeach()
+
+  foreach(module ${TFM_CRYPTO_MODULES})
+    list(FIND TFM_ENABLED_CRYPTO_MODULES ${module} idx)
+    if (idx EQUAL -1)
+      set(val "TRUE") # Module is not enabled, set DISABLED option to TRUE
+    else()
+      set(val "FALSE") # Module is enabled, set DISABLED option to FALSE
+    endif()
+    list(APPEND
+      TFM_DISABLED_MODULES_ARGS
+      -D${module}_DISABLED=${val}
+      )
   endforeach()
 
   if(TFM_IPC)
@@ -161,6 +189,10 @@ function(trusted_firmware_build)
     set(TFM_TOOLCHAIN_FILE "trusted-firmware-m/toolchain_GNUARM.cmake")
     set(TFM_TOOLCHAIN_PREFIX "arm-none-eabi")
     set(TFM_TOOLCHAIN_PATH ${GNUARMEMB_TOOLCHAIN_PATH}/bin)
+  elseif(${ZEPHYR_TOOLCHAIN_VARIANT} STREQUAL "xtools")
+    set(TFM_TOOLCHAIN_FILE "trusted-firmware-m/toolchain_GNUARM.cmake")
+    set(TFM_TOOLCHAIN_PREFIX "arm-zephyr-eabi")
+    set(TFM_TOOLCHAIN_PATH ${XTOOLS_TOOLCHAIN_PATH}/arm-zephyr-eabi/bin)
   else()
     message(FATAL_ERROR "Unsupported ZEPHYR_TOOLCHAIN_VARIANT: ${ZEPHYR_TOOLCHAIN_VARIANT}")
   endif()
@@ -187,6 +219,7 @@ function(trusted_firmware_build)
       -DMCUBOOT_PATH=${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/../tfm-mcuboot
       -DPSA_ARCH_TESTS_PATH=${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/psa-arch-tests
       ${TFM_PARTITIONS_ARGS}
+      ${TFM_DISABLED_MODULES_ARGS}
       ${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/trusted-firmware-m
     WORKING_DIRECTORY ${TFM_BINARY_DIR}
     COMMAND_EXPAND_LISTS
@@ -312,6 +345,13 @@ if (CONFIG_BUILD_WITH_TFM)
     endif()
   endforeach()
 
+  # Enable TFM crypto modules as specified in Kconfig
+  foreach(module ${TFM_CRYPTO_MODULES})
+    if (CONFIG_TFM_${module}_ENABLED)
+      list(APPEND TFM_ENABLED_CRYPTO_MODULES_ARG ${module})
+    endif()
+  endforeach()
+
   trusted_firmware_build(
     BINARY_DIR ${CMAKE_BINARY_DIR}/tfm
     BOARD ${CONFIG_TFM_BOARD}
@@ -324,6 +364,7 @@ if (CONFIG_BUILD_WITH_TFM)
     ${TFM_REGRESSION_NS_ARG}
     CMAKE_ARGS $<GENEX_EVAL:$<TARGET_PROPERTY:zephyr_property_target,TFM_CMAKE_OPTIONS>>
     ENABLED_PARTITIONS ${TFM_ENABLED_PARTITIONS_ARG}
+    ENABLED_CRYPTO_MODULES ${TFM_ENABLED_CRYPTO_MODULES_ARG}
     ${TFM_PSA_TEST_ARG}
     CMAKE_BUILD_TYPE ${TFM_CMAKE_BUILD_TYPE}
   )
@@ -384,13 +425,21 @@ if (CONFIG_BUILD_WITH_TFM)
   set(NS_SIGNED_FILE ${CMAKE_BINARY_DIR}/zephyr_ns_signed.hex)
   set(S_SIGNED_FILE ${CMAKE_BINARY_DIR}/tfm_s_signed.hex)
 
+  if (CONFIG_TFM_REGRESSION_NS)
+    # Use the TF-M NS binary as the Non-Secure application firmware image
+    set(NS_APP_FILE $<TARGET_PROPERTY:tfm,TFM_NS_HEX_FILE>)
+  else()
+    # Use the Zephyr binary as the Non-Secure application firmware image
+    set(NS_APP_FILE ${CMAKE_BINARY_DIR}/zephyr/${KERNEL_HEX_NAME})
+  endif()
+
   if (NOT CONFIG_TFM_BL2)
     # Merge tfm_s and zephyr (NS) image to a single binary.
     set_property(GLOBAL APPEND PROPERTY extra_post_build_commands
       COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/mergehex.py
         -o ${MERGED_FILE}
         $<TARGET_PROPERTY:tfm,TFM_S_HEX_FILE>
-        ${CMAKE_BINARY_DIR}/zephyr/${KERNEL_HEX_NAME}
+        ${NS_APP_FILE}
     )
 
     set_property(GLOBAL APPEND PROPERTY extra_post_build_byproducts
@@ -399,12 +448,6 @@ if (CONFIG_BUILD_WITH_TFM)
 
   elseif(CONFIG_TFM_MCUBOOT_IMAGE_NUMBER STREQUAL "1")
     tfm_sign(sign_cmd NS TRUE ${S_NS_FILE} ${S_NS_SIGNED_FILE})
-
-    if (CONFIG_TFM_REGRESSION_NS)
-      set(NS_APP_FILE $<TARGET_PROPERTY:tfm,TFM_NS_HEX_FILE>)
-    else()
-      set(NS_APP_FILE ${CMAKE_BINARY_DIR}/zephyr/${KERNEL_HEX_NAME})
-    endif()
 
     set_property(GLOBAL APPEND PROPERTY extra_post_build_commands
       COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/mergehex.py
@@ -428,9 +471,9 @@ if (CONFIG_BUILD_WITH_TFM)
 
   else()
     if (CONFIG_TFM_REGRESSION_NS)
-      tfm_sign(sign_cmd_ns NS TRUE $<TARGET_PROPERTY:tfm,TFM_NS_HEX_FILE> ${NS_SIGNED_FILE})
+      tfm_sign(sign_cmd_ns NS TRUE ${NS_APP_FILE} ${NS_SIGNED_FILE})
     else()
-      tfm_sign(sign_cmd_ns NS FALSE ${CMAKE_BINARY_DIR}/zephyr/${KERNEL_HEX_NAME} ${NS_SIGNED_FILE})
+      tfm_sign(sign_cmd_ns NS FALSE ${NS_APP_FILE} ${NS_SIGNED_FILE})
     endif()
 
     tfm_sign(sign_cmd_s S TRUE $<TARGET_PROPERTY:tfm,TFM_S_HEX_FILE> ${S_SIGNED_FILE})
