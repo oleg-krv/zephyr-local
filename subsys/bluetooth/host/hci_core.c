@@ -2079,6 +2079,18 @@ int bt_hci_get_conn_handle(const struct bt_conn *conn, uint16_t *conn_handle)
 	return 0;
 }
 
+#if defined(CONFIG_BT_EXT_ADV)
+int bt_hci_get_adv_handle(const struct bt_le_ext_adv *adv, uint8_t *adv_handle)
+{
+	if (!atomic_test_bit(adv->flags, BT_ADV_CREATED)) {
+		return -EINVAL;
+	}
+
+	*adv_handle = adv->handle;
+	return 0;
+}
+#endif /* CONFIG_BT_EXT_ADV */
+
 #if defined(CONFIG_BT_HCI_VS_EVT_USER)
 int bt_hci_register_vnd_evt_cb(bt_hci_vnd_evt_cb_t cb)
 {
@@ -2490,7 +2502,6 @@ static void read_buffer_size_v2_complete(struct net_buf *buf)
 {
 #if defined(CONFIG_BT_ISO)
 	struct bt_hci_rp_le_read_buffer_size_v2 *rp = (void *)buf->data;
-	uint8_t max_num;
 
 	BT_DBG("status %u", rp->status);
 
@@ -2502,8 +2513,7 @@ static void read_buffer_size_v2_complete(struct net_buf *buf)
 	BT_DBG("ACL LE buffers: pkts %u mtu %u", rp->acl_max_num,
 		bt_dev.le.acl_mtu);
 
-	max_num = MIN(rp->acl_max_num, CONFIG_BT_CONN_TX_MAX);
-	k_sem_init(&bt_dev.le.acl_pkts, max_num, max_num);
+	k_sem_init(&bt_dev.le.acl_pkts, rp->acl_max_num, rp->acl_max_num);
 
 	bt_dev.le.iso_mtu = sys_le16_to_cpu(rp->iso_max_len);
 	if (!bt_dev.le.iso_mtu) {
@@ -2514,8 +2524,7 @@ static void read_buffer_size_v2_complete(struct net_buf *buf)
 	BT_DBG("ISO buffers: pkts %u mtu %u", rp->iso_max_num,
 		bt_dev.le.iso_mtu);
 
-	max_num = MIN(rp->iso_max_num, CONFIG_BT_ISO_TX_BUF_COUNT);
-	k_sem_init(&bt_dev.le.iso_pkts, max_num, max_num);
+	k_sem_init(&bt_dev.le.iso_pkts, rp->iso_max_num, rp->iso_max_num);
 #endif /* CONFIG_BT_ISO */
 }
 
@@ -2758,6 +2767,11 @@ static int le_set_event_mask(void)
 	/* Enable IQ samples report events receiver */
 	if (IS_ENABLED(CONFIG_BT_DF_CONNECTIONLESS_CTE_RX)) {
 		mask |= BT_EVT_MASK_LE_CONNECTIONLESS_IQ_REPORT;
+	}
+
+	if (IS_ENABLED(CONFIG_BT_DF_CONNECTION_CTE_RX)) {
+		mask |= BT_EVT_MASK_LE_CONNECTION_IQ_REPORT;
+		mask |= BT_EVT_MASK_LE_CTE_REQUEST_FAILED;
 	}
 
 	sys_put_le64(mask, cp_mask->events);

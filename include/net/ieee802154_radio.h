@@ -96,6 +96,14 @@ struct ieee802154_filter {
 /* @endcond */
 };
 
+struct ieee802154_key {
+	uint8_t *key_value;
+	uint32_t key_frame_counter;
+	bool frame_counter_per_key;
+	uint8_t key_id_mode;
+	uint8_t key_index;
+};
+
 /** IEEE802.15.4 Transmission mode. */
 enum ieee802154_tx_mode {
 	/** Transmit packet immediately, no CCA. */
@@ -171,10 +179,11 @@ enum ieee802154_config_type {
 	 */
 	IEEE802154_CONFIG_CSL_RX_TIME,
 
-	/** Enable/disable or update Enhanced-ACK Based Probing in radio
-	 *  for a specific Initiator.
+	/** Indicates whether to inject IE into ENH ACK Frame for specific address
+	 *  or not. Disabling the ENH ACK with no address provided (NULL pointer)
+	 *  should disable it for all enabled addresses.
 	 */
-	IEEE802154_CONFIG_ENH_ACK_PROBING,
+	IEEE802154_CONFIG_ENH_ACK_HEADER_IE,
 };
 
 /** IEEE802.15.4 driver configuration data. */
@@ -203,14 +212,18 @@ struct ieee802154_config {
 		/** ``IEEE802154_CONFIG_EVENT_HANDLER`` */
 		ieee802154_event_cb_t event_handler;
 
-		/** ``IEEE802154_CONFIG_MAC_KEYS`` */
-		struct {
-			uint8_t key_id_mode;
-			uint8_t key_id;
-			uint8_t *prev_key;
-			uint8_t *curr_key;
-			uint8_t *next_key;
-		} mac_keys;
+		/** ``IEEE802154_CONFIG_MAC_KEYS``
+		 *  Pointer to an array containing a list of keys used
+		 *  for MAC encryption. Refer to secKeyIdLookupDescriptor and
+		 *  secKeyDescriptor in IEEE 802.15.4
+		 *
+		 *  key_value field points to a buffer containing the 16 byte
+		 *  key. The buffer is copied by the callee.
+		 *
+		 *  The variable length array is terminated by key_value field
+		 *  set to NULL.
+		 */
+		struct ieee802154_key *mac_keys;
 
 		/** ``IEEE802154_CONFIG_FRAME_COUNTER`` */
 		uint32_t frame_counter;
@@ -231,14 +244,13 @@ struct ieee802154_config {
 		/** ``IEEE802154_CONFIG_CSL_RX_TIME`` */
 		uint32_t csl_rx_time;
 
-		/** ``IEEE802154_CONFIG_ENH_ACK_PROBING`` */
+		/** ``IEEE802154_CONFIG_ENH_ACK_HEADER_IE`` */
 		struct {
-			bool lqi : 1;
-			bool link_margin : 1;
-			bool rssi : 1;
+			const uint8_t *data;
+			uint16_t data_len;
 			uint16_t short_addr;
 			const uint8_t *ext_addr;
-		} enh_ack;
+		} ack_ie;
 	};
 };
 
