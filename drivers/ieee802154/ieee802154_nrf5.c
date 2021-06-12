@@ -216,7 +216,8 @@ static void nrf5_get_capabilities_at_boot(void)
 		IEEE802154_HW_TX_RX_ACK |
 		IEEE802154_HW_ENERGY_SCAN |
 		((caps & NRF_802154_CAPABILITY_DELAYED_TX) ? IEEE802154_HW_TXTIME : 0UL) |
-		IEEE802154_HW_SLEEP_TO_TX;
+		IEEE802154_HW_SLEEP_TO_TX |
+		((caps & NRF_802154_CAPABILITY_SECURITY) ? IEEE802154_HW_TX_SEC : 0UL);
 }
 
 /* Radio device API */
@@ -520,6 +521,20 @@ static int nrf5_tx(const struct device *dev,
 
 	LOG_DBG("Result: %d", nrf5_data.tx_result);
 
+#if NRF_802154_ENCRYPTION_ENABLED
+	/*
+	 * When frame encryption by the radio driver is enabled, the frame stored in
+	 * the tx_psdu buffer is:
+	 * 1) authenticated and encrypted in place which causes that after an unsuccessful
+	 *    TX attempt, this frame must be propagated back to the upper layer for retransmission.
+	 *    The upper layer must ensure that the exact same secured frame is used for
+	 *    retransmission
+	 * 2) frame counters are updated in place and for keeping the link frame counter up to date,
+	 *    this information must be propagated back to the upper layer
+	 */
+	memcpy(payload, nrf5_radio->tx_psdu + 1, payload_len);
+#endif
+
 	switch (nrf5_radio->tx_result) {
 	case NRF_802154_TX_ERROR_NONE:
 		if (nrf5_radio->ack_frame.psdu == NULL) {
@@ -541,18 +556,6 @@ static int nrf5_tx(const struct device *dev,
 	default:
 		result = -EIO;
 	}
-
-#if NRF_802154_ENCRYPTION_ENABLED
-	/*
-	 * When frame encryption by the radio driver is enabled,
-	 * the frame stored in the tx_psdu buffer is authenticated
-	 * and encrypted in place. After an unsuccessful TX attempt,
-	 * this frame must be propagated back to the upper layer
-	 * for retransmission. The upper layer must ensure that the
-	 * excact same secured frame is used for retransmission.
-	 */
-	memcpy(payload, nrf5_radio->tx_psdu + 1, payload_len);
-#endif
 
 	return result;
 }
