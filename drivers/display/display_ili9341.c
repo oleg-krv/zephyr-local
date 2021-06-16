@@ -16,15 +16,16 @@ int ili9341_regs_init(const struct device *dev)
 	const struct ili9341_regs *regs = config->regs;
 
 	int r;
-
-	LOG_HEXDUMP_DBG(ILI9341_SWRESET, 0, "SW RESET");
+	uint8_t tmp[1] = {ILI9341_SWRESET};
+	LOG_HEXDUMP_DBG(tmp, 1, "SW RESET");
 	r = ili9xxx_transmit(dev, ILI9341_SWRESET, NULL,0);
 	if (r < 0) {
 		return r;
 	}
 	k_sleep(K_MSEC(5));
 
-	LOG_HEXDUMP_DBG(ILI9341_SWRESET, 0, "DISPOFF");
+	tmp[0] =  ILI9XXX_DISPOFF;
+	LOG_HEXDUMP_DBG(tmp, 1, "DISPOFF");
 	r = ili9xxx_transmit(dev, ILI9XXX_DISPOFF, NULL, 0);
 	if (r < 0) {
 		return r;
