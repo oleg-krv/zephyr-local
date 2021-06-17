@@ -46,10 +46,10 @@
 #define ILI9XXX_SLEEP_OUT_TIME 120
 
 /** Reset pulse time (ms), ref 15.4 of ILI9XXX manual. */
-#define ILI9XXX_RESET_PULSE_TIME 10
+#define ILI9XXX_RESET_PULSE_TIME 1
 
 /** Reset wait time (ms), ref 15.4 of ILI9XXX manual. */
-#define ILI9XXX_RESET_WAIT_TIME 50
+#define ILI9XXX_RESET_WAIT_TIME 5
 
 struct ili9xxx_config {
 	const char *spi_name;

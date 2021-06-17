@@ -410,9 +410,6 @@ static int ili9xxx_init(const struct device *dev)
 	}
 
 	ili9xxx_hw_reset(dev);
-	k_sleep(K_MSEC(2000));
-
-	ili9xxx_hw_reset(dev);
 
 	r = ili9xxx_configure(dev);
 	if (r < 0) {
