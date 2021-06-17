@@ -73,7 +73,7 @@ struct gatt_sub {
 static struct gatt_sub subscriptions[SUB_MAX];
 static sys_slist_t callback_list;
 
-static uint16_t gap_appearance = CONFIG_BT_DEVICE_APPEARANCE;
+static const uint16_t gap_appearance = CONFIG_BT_DEVICE_APPEARANCE;
 
 #if defined(CONFIG_BT_GATT_DYNAMIC_DB)
 static sys_slist_t db;
