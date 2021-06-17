@@ -9,10 +9,14 @@
  * @brief System/hardware module for stm32f2 processor
  */
 
+#include <kernel.h>
 #include <device.h>
 #include <init.h>
+#include <soc.h>
 #include <arch/cpu.h>
 #include <arch/arm/aarch32/cortex_m/cmsis.h>
+#include <linker/linker-defs.h>
+#include <string.h>
 
 /**
  * @brief Perform basic hardware initialization at boot.
