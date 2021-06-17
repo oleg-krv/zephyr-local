@@ -277,6 +277,35 @@ static void adc_stm32_start_conversion(const struct device *dev)
 #endif
 }
 
+#if !defined(CONFIG_SOC_SERIES_STM32F2X) && \
+	!defined(CONFIG_SOC_SERIES_STM32F4X) && \
+	!defined(CONFIG_SOC_SERIES_STM32F7X) && \
+	!defined(CONFIG_SOC_SERIES_STM32F1X) && \
+	!defined(CONFIG_SOC_SERIES_STM32L1X)
+static void adc_stm32_calib(const struct device *dev)
+{
+	const struct adc_stm32_cfg *config =
+		(const struct adc_stm32_cfg *)dev->config;
+	ADC_TypeDef *adc = config->base;
+
+#if defined(CONFIG_SOC_SERIES_STM32F3X) || \
+	defined(CONFIG_SOC_SERIES_STM32L4X) || \
+	defined(CONFIG_SOC_SERIES_STM32WBX) || \
+	defined(CONFIG_SOC_SERIES_STM32G4X)
+	LL_ADC_StartCalibration(adc, LL_ADC_SINGLE_ENDED);
+#elif defined(CONFIG_SOC_SERIES_STM32F0X) || \
+	defined(CONFIG_SOC_SERIES_STM32G0X) || \
+	defined(CONFIG_SOC_SERIES_STM32L0X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
+	LL_ADC_StartCalibration(adc);
+#elif defined(CONFIG_SOC_SERIES_STM32H7X)
+	LL_ADC_StartCalibration(adc, LL_ADC_CALIB_OFFSET, LL_ADC_SINGLE_ENDED);
+#endif
+	while (LL_ADC_IsCalibrationOnGoing(adc)) {
+	}
+}
+#endif
+
 static int start_read(const struct device *dev,
 		      const struct adc_sequence *sequence)
 {
@@ -383,6 +412,19 @@ static int start_read(const struct device *dev,
 #elif !defined(CONFIG_SOC_SERIES_STM32F1X)
 	LL_ADC_SetResolution(adc, resolution);
 #endif
+
+	if (sequence->calibrate) {
+#if !defined(CONFIG_SOC_SERIES_STM32F2X) && \
+	!defined(CONFIG_SOC_SERIES_STM32F4X) && \
+	!defined(CONFIG_SOC_SERIES_STM32F7X) && \
+	!defined(CONFIG_SOC_SERIES_STM32F1X) && \
+	!defined(CONFIG_SOC_SERIES_STM32L1X)
+		adc_stm32_calib(dev);
+#else
+		LOG_ERR("Calibration not supported");
+		return -ENOTSUP;
+#endif
+	}
 
 #if defined(CONFIG_SOC_SERIES_STM32F0X) || \
 	defined(CONFIG_SOC_SERIES_STM32F3X) || \
@@ -585,35 +627,6 @@ static int adc_stm32_channel_setup(const struct device *dev,
 	return 0;
 }
 
-#if !defined(CONFIG_SOC_SERIES_STM32F2X) && \
-	!defined(CONFIG_SOC_SERIES_STM32F4X) && \
-	!defined(CONFIG_SOC_SERIES_STM32F7X) && \
-	!defined(CONFIG_SOC_SERIES_STM32F1X) && \
-	!defined(CONFIG_SOC_SERIES_STM32L1X)
-static void adc_stm32_calib(const struct device *dev)
-{
-	const struct adc_stm32_cfg *config =
-		(const struct adc_stm32_cfg *)dev->config;
-	ADC_TypeDef *adc = config->base;
-
-#if defined(CONFIG_SOC_SERIES_STM32F3X) || \
-	defined(CONFIG_SOC_SERIES_STM32L4X) || \
-	defined(CONFIG_SOC_SERIES_STM32WBX) || \
-	defined(CONFIG_SOC_SERIES_STM32G4X)
-	LL_ADC_StartCalibration(adc, LL_ADC_SINGLE_ENDED);
-#elif defined(CONFIG_SOC_SERIES_STM32F0X) || \
-	defined(CONFIG_SOC_SERIES_STM32G0X) || \
-	defined(CONFIG_SOC_SERIES_STM32L0X) || \
-	defined(CONFIG_SOC_SERIES_STM32WLX)
-	LL_ADC_StartCalibration(adc);
-#elif defined(CONFIG_SOC_SERIES_STM32H7X)
-	LL_ADC_StartCalibration(adc, LL_ADC_CALIB_OFFSET, LL_ADC_SINGLE_ENDED);
-#endif
-	while (LL_ADC_IsCalibrationOnGoing(adc)) {
-	}
-}
-#endif
-
 static int adc_stm32_init(const struct device *dev)
 {
 	struct adc_stm32_data *data = dev->data;
@@ -786,6 +799,33 @@ static int adc_stm32_init(const struct device *dev)
 	/* Calibration of F1 must starts after two cycles after ADON is set. */
 	LL_ADC_StartCalibration(adc);
 	LL_ADC_REG_SetTriggerSource(adc, LL_ADC_REG_TRIG_SOFTWARE);
+#endif
+
+#ifdef CONFIG_SOC_SERIES_STM32H7X
+	/*
+	 * To ensure linearity the factory calibration values
+	 * should be loaded on initialization.
+	 */
+	uint32_t channel_offset = 0U;
+	uint32_t linear_calib_buffer = 0U;
+
+	if (adc == ADC1) {
+		channel_offset = 0UL;
+	} else if (adc == ADC2) {
+		channel_offset = 8UL;
+	} else   /*Case ADC3*/ {
+		channel_offset = 16UL;
+	}
+	/* Read factory calibration factors */
+	for (uint32_t count = 0UL; count < ADC_LINEAR_CALIB_REG_COUNT; count++) {
+		linear_calib_buffer = *(uint32_t *)(
+			ADC_LINEAR_CALIB_REG_1_ADDR + channel_offset + count
+		);
+		LL_ADC_SetCalibrationLinearFactor(
+			adc, LL_ADC_CALIB_LINEARITY_WORD1 << count,
+			linear_calib_buffer
+		);
+	}
 #endif
 	adc_context_unlock_unconditionally(&data->ctx);
 

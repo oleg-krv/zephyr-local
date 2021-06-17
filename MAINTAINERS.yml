@@ -231,8 +231,23 @@ Build system:
     labels:
         - "area: Build System"
 
+"C++":
+    status: maintained
+    maintainers:
+        - stephanosio
+    collaborators:
+        - alexanderwachter
+    files:
+        - subsys/cpp/
+        - tests/subsys/cpp/
+        - samples/subsys/cpp/
+    labels:
+        - "area: C++"
+
 C library:
-    status: orphaned
+    status: maintained
+    maintainers:
+         - stephanosio
     collaborators:
          - nashif
          - enjiamai
@@ -240,6 +255,7 @@ C library:
     files:
          - lib/libc/
          - tests/lib/c_lib/
+         - tests/lib/newlib/
     labels:
          - "area: C Library"
 
@@ -254,6 +270,20 @@ CMSIS API layer:
          - tests/subsys/portability/cmsis_rtos_v*/
     labels:
         - "area: Portability"
+
+CMSIS-DSP integration:
+    status: maintainer
+    maintainers:
+        - stephanosio
+    collaborators:
+        - galak
+        - ioannisg
+    files:
+        - modules/Kconfig.cmsis_dsp
+        - tests/benchmarks/cmsis_dsp/
+        - tests/lib/cmsis_dsp/
+    labels:
+        - "area: CMSIS-DSP"
 
 Common arch:
     status: orphaned
