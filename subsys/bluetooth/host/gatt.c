@@ -5452,11 +5452,3 @@ void bt_gatt_disconnected(struct bt_conn *conn)
 	remove_cf_cfg(conn);
 #endif
 }
-
-void bt_gatt_set_appearance(uint16_t new_appearance) {
-    gap_appearance = new_appearance;
-}
-
-uint16_t bt_gatt_get_appearance(void) {
-    return gap_appearance;
-}
