@@ -1,5 +1,6 @@
 # Copyright (c) 2018, Jan Van Winkel <jan.van_winkel@dxplore.eu>
 # Copyright (c) 2020, Teslabs Engineering S.L.
+# Copyright (c) 2021, Krivorot Oleg <krivorot.oleg@gmail.com>
 # SPDX-License-Identifier: Apache-2.0
 
 description: ILI9341 320x240 display controller
@@ -39,19 +40,19 @@ properties:
       description:
         Driver timing control B (TIMCTRLB) register value.
 
-    pumpratio:
+    pumpratioctrl:
       type: uint8-array
       default: [0x10]
       description:
         Pump ratio control (PUMPRATIOCTRL) register value.
 
-    en3g:
+    enable3g:
       type: uint8-array
       default: [0x02]
       description:
-        Enable 3G (EN3GCTRL) register value.
+        Enable 3G (ENABLE3G) register value.
 
-    entrymdset:
+    etmod:
       type: uint8-array
       default: [ 0x06 ]
       description:

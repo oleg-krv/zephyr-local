@@ -21,13 +21,22 @@ config APP_LINK_WITH_LVGL
 	  disabled if the include paths for LVGL are causing aliasing
 	  issues for 'app'.
 
-config LVGL_USER_INIT_FILE
-    bool "Use user config file"
-    default n
+config LVGL_USE_USER_CONFIG
+	bool "Use user config file"
+	help
+	  Add custom preferences file, for example to enable custom fonts.
+	  In the file, you can override all values set by variables from
+	  Kconfig or set new ones that cannot be defined using variables
+	  from Kconfig.
 
-config LVGL_USER_INIT_FILE_INCLUDE
-    string "User config file"
-    default "lv_user.h"
+config LVGL_USER_CONFIG_FILE
+	string "User config file name"
+	default "lv_conf_user.h"
+	depends on LVGL_USE_USER_CONFIG
+	help
+	  This file should be located in the root folder of the project,
+	  or in any folder, the path to which is registered in root
+	  CMakeLists.txt using the macro zephyr_include_directories()
 
 rsource "Kconfig.graphical"
 rsource "Kconfig.memory"
