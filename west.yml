@@ -26,7 +26,7 @@ manifest:
   # Please add items below based on alphabetical order
   projects:
     - name: canopennode
-      revision: 468d350028a975b96563e58344de48281a0ab371
+      revision: f167efe85c8c7de886f1bc47f9173cfb8a346bb5
       path: modules/lib/canopennode
     - name: civetweb
       revision: 094aeb41bb93e9199d24d665ee43e9e05d6d7b1c
@@ -130,7 +130,7 @@ manifest:
       revision: 6010f0523cbc75f551d9256cf782f173177acdef
       path: modules/lib/open-amp
     - name: openthread
-      revision: f460532d4afa5d49feba241e5dc31c56123d31a8
+      revision: d7eaf6f421569bb9f6be64db4c8108e53e4278b6
       path: modules/lib/openthread
     - name: segger
       revision: 3a52ab222133193802d3c3b4d21730b9b1f1d2f6
