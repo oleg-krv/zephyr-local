@@ -753,7 +753,7 @@ int lsm6ds3_shub_init(const struct device *dev)
 	struct lsm6ds3_shub_slist *sp;
 
 
-	LOG_INF("shub: start sensorhub for %s", dev->name);
+	LOG_DBG("shub: start sensorhub for %s", dev->name);
 	for (n = 0; n < ARRAY_SIZE(lsm6ds3_shub_slist); n++) {
 		if (data->num_ext_dev >= LSM6DS3_SHUB_MAX_NUM_SLVS)
 			break;
@@ -783,7 +783,7 @@ int lsm6ds3_shub_init(const struct device *dev)
 			LOG_DBG("shub: invalid chip id 0x%x", chip_id);
 			continue;
 		}
-		LOG_INF("shub: Ext Device Chip Id: %02x", chip_id);
+		LOG_DBG("shub: Ext Device Chip Id: %02x", chip_id);
 		sp->ext_i2c_addr = sp->i2c_addr[i];
 
 		data->shub_ext[data->num_ext_dev++] = n;

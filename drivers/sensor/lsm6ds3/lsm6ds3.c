@@ -746,7 +746,7 @@ static int lsm6ds3_init_chip(const struct device *dev)
 		return -EIO;
 	}
 
-	LOG_INF("chip id 0x%x", chip_id);
+	LOG_DBG("chip id 0x%x", chip_id);
 
 	if (chip_id != LSM6DS3_ID) {
 		LOG_DBG("Invalid chip id 0x%x", chip_id);
@@ -806,7 +806,7 @@ static int lsm6ds3_init(const struct device *dev)
 #endif
 	struct lsm6ds3_data *data = dev->data;
 
-	LOG_INF("Initialize device %s", dev->name);
+	LOG_DBG("Initialize device %s", dev->name);
 	data->dev = dev;
 
 #ifdef CONFIG_LSM6DS3_TRIGGER
@@ -826,7 +826,7 @@ static int lsm6ds3_init(const struct device *dev)
 #ifdef CONFIG_LSM6DS3_SENSORHUB
 	data->shub_inited = true;
 	if (lsm6ds3_shub_init(dev) < 0) {
-		LOG_INF("shub: no external chips found");
+		LOG_ERR("shub: no external chips found");
 		data->shub_inited = false;
 	}
 #endif
