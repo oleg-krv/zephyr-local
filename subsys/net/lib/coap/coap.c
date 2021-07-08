@@ -459,13 +459,13 @@ static int parse_option(uint8_t *data, uint16_t offset, uint16_t *pos,
 		return r;
 	}
 
-	*opt_len += 1U;
-
 	/* This indicates that options have ended */
 	if (opt == COAP_MARKER) {
 		/* packet w/ marker but no payload is malformed */
 		return r > 0 ? 0 : -EINVAL;
 	}
+
+	*opt_len += 1U;
 
 	delta = option_header_get_delta(opt);
 	len = option_header_get_len(opt);
@@ -571,7 +571,7 @@ int coap_packet_parse(struct coap_packet *cpkt, uint8_t *data, uint16_t len,
 	}
 
 	cpkt->data = data;
-	cpkt->offset = 0U;
+	cpkt->offset = len;
 	cpkt->max_len = len;
 	cpkt->opt_len = 0U;
 	cpkt->hdr_len = 0U;
@@ -588,12 +588,11 @@ int coap_packet_parse(struct coap_packet *cpkt, uint8_t *data, uint16_t len,
 		return -EINVAL;
 	}
 
-	cpkt->offset = cpkt->hdr_len;
 	if (cpkt->hdr_len == len) {
 		return 0;
 	}
 
-	offset = cpkt->offset;
+	offset = cpkt->hdr_len;
 	opt_len = 0U;
 	delta = 0U;
 	num = 0U;
@@ -613,7 +612,6 @@ int coap_packet_parse(struct coap_packet *cpkt, uint8_t *data, uint16_t len,
 
 	cpkt->opt_len = opt_len;
 	cpkt->delta = delta;
-	cpkt->offset = offset;
 
 	return 0;
 }
@@ -760,15 +758,15 @@ const uint8_t *coap_packet_get_payload(const struct coap_packet *cpkt, uint16_t 
 		return NULL;
 	}
 
-	payload_len = cpkt->max_len - cpkt->hdr_len - cpkt->opt_len;
-	if (payload_len > 0) {
-		*len = payload_len;
+	payload_len = cpkt->offset - cpkt->hdr_len - cpkt->opt_len;
+	if (payload_len > 1) {
+		*len = payload_len - 1;	/* subtract payload marker length */
 	} else {
 		*len = 0U;
 	}
 
-	return !(*len) ? NULL :
-		cpkt->data + cpkt->hdr_len + cpkt->opt_len;
+	return *len == 0 ? NULL :
+		cpkt->data + cpkt->hdr_len + cpkt->opt_len + 1;
 }
 
 static bool uri_path_eq(const struct coap_packet *cpkt,
