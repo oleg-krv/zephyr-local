@@ -47,9 +47,12 @@ const uint8_t *ull_adv_pdu_update_addrs(struct ll_adv_set *adv,
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 
 #define ULL_ADV_PDU_HDR_FIELD_ADVA      BIT(0)
+#define ULL_ADV_PDU_HDR_FIELD_TARGETA   BIT(1)
 #define ULL_ADV_PDU_HDR_FIELD_CTE_INFO  BIT(2)
+#define ULL_ADV_PDU_HDR_FIELD_ADI       BIT(3)
 #define ULL_ADV_PDU_HDR_FIELD_AUX_PTR   BIT(4)
 #define ULL_ADV_PDU_HDR_FIELD_SYNC_INFO BIT(5)
+#define ULL_ADV_PDU_HDR_FIELD_TX_POWER  BIT(7)
 #define ULL_ADV_PDU_HDR_FIELD_AD_DATA   BIT(8)
 
 /* Helper type to store data for extended advertising
@@ -107,14 +110,35 @@ uint8_t ull_adv_aux_hdr_set_clear(struct ll_adv_set *adv,
 /* helper function to release periodic advertising instance */
 void ull_adv_sync_release(struct ll_adv_sync_set *sync);
 
+/* helper function to allocate new PDU data for AUX_SYNC_IND and return
+ * previous and new PDU for further processing.
+ */
+uint8_t ull_adv_sync_pdu_alloc(struct ll_adv_set *adv,
+			       uint16_t hdr_add_fields,
+			       uint16_t hdr_rem_fields,
+			       struct adv_pdu_field_data *data,
+			       struct pdu_adv **ter_pdu_prev,
+			       struct pdu_adv **ter_pdu_new,
+			       void **extra_data_prev,
+			       void **extra_data_new,
+			       uint8_t *ter_idx);
+
 /* helper function to set/clear common extended header format fields
  * for AUX_SYNC_IND PDU.
  */
-uint8_t ull_adv_sync_pdu_set_clear(struct ll_adv_set *adv,
+uint8_t ull_adv_sync_pdu_set_clear(struct lll_adv_sync *lll_sync,
+				   struct pdu_adv *ter_pdu_prev,
+				   struct pdu_adv *ter_pdu,
 				   uint16_t hdr_add_fields,
 				   uint16_t hdr_rem_fields,
-				   struct adv_pdu_field_data *data,
-				   uint8_t *ter_idx);
+				   struct adv_pdu_field_data *data);
+
+/* helper function to update extra_data field */
+void ull_adv_sync_extra_data_set_clear(void *extra_data_prev,
+				       void *extra_data_new,
+				       uint16_t hdr_add_fields,
+				       uint16_t hdr_rem_fields,
+				       void *data);
 
 /* helper function to calculate common ext adv payload header length and
  * adjust the data pointer.
