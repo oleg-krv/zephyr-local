@@ -286,7 +286,7 @@ static int init_spi(const struct device *dev)
 #ifdef CONFIG_PM_DEVICE
 static int spi_nrfx_pm_control(const struct device *dev,
 				uint32_t ctrl_command,
-				enum pm_device_state *state, pm_device_cb cb, void *arg)
+				enum pm_device_state *state)
 {
 	int ret = 0;
 	struct spi_nrfx_data *data = get_dev_data(dev);
@@ -321,10 +321,6 @@ static int spi_nrfx_pm_control(const struct device *dev,
 	} else {
 		__ASSERT_NO_MSG(ctrl_command == PM_DEVICE_STATE_GET);
 		*state = data->pm_state;
-	}
-
-	if (cb) {
-		cb(dev, ret, state, arg);
 	}
 
 	return ret;

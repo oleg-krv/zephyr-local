@@ -410,8 +410,7 @@ static int apds9960_init_interrupt(const struct device *dev)
 #ifdef CONFIG_PM_DEVICE
 static int apds9960_device_ctrl(const struct device *dev,
 				uint32_t ctrl_command,
-				enum pm_device_state *state,
-				pm_device_cb cb, void *arg)
+				enum pm_device_state *state)
 {
 	const struct apds9960_config *config = dev->config;
 	struct apds9960_data *data = dev->data;
@@ -442,10 +441,6 @@ static int apds9960_device_ctrl(const struct device *dev,
 
 	} else if (ctrl_command == PM_DEVICE_STATE_GET) {
 		*state = PM_DEVICE_STATE_ACTIVE;
-	}
-
-	if (cb) {
-		cb(dev, ret, state, arg);
 	}
 
 	return ret;

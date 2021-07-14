@@ -346,17 +346,12 @@ static int pwm_nrfx_pm_control(const struct device *dev,
 #define PWM_NRFX_PM_CONTROL(idx)					\
 	static int pwm_##idx##_nrfx_pm_control(const struct device *dev,	\
 					       uint32_t ctrl_command,	\
-					       enum pm_device_state *state,	\
-					       pm_device_cb cb,		\
-					       void *arg)		\
+					       enum pm_device_state *state)	\
 	{								\
 		static enum pm_device_state current_state = PM_DEVICE_STATE_ACTIVE; \
 		int ret = 0;                                            \
 		ret = pwm_nrfx_pm_control(dev, ctrl_command, state,	\
 					   &current_state);		\
-		if (cb) {                                               \
-			cb(dev, ret, state, arg);                       \
-		}                                                       \
 		return ret;                                             \
 	}
 #else

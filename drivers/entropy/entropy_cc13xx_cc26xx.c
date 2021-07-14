@@ -294,8 +294,7 @@ static int entropy_cc13xx_cc26xx_set_power_state(const struct device *dev,
 
 static int entropy_cc13xx_cc26xx_pm_control(const struct device *dev,
 					    uint32_t ctrl_command,
-					    enum pm_device_state *state, pm_device_cb cb,
-					    void *arg)
+					    enum pm_device_state *state)
 {
 	struct entropy_cc13xx_cc26xx_data *data = get_dev_data(dev);
 	int ret = 0;
@@ -310,10 +309,6 @@ static int entropy_cc13xx_cc26xx_pm_control(const struct device *dev,
 	} else {
 		__ASSERT_NO_MSG(ctrl_command == PM_DEVICE_STATE_GET);
 		*state = data->pm_state;
-	}
-
-	if (cb) {
-		cb(dev, ret, state, arg);
 	}
 
 	return ret;

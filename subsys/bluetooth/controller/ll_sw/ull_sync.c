@@ -366,28 +366,20 @@ void ull_sync_setup(struct ll_scan_set *scan, struct ll_scan_aux_set *aux,
 	uint32_t ret;
 	uint8_t sca;
 
+	/* Populate the LLL context */
 	sync = scan->per_scan.sync;
-	scan->per_scan.sync = NULL;
-	if (IS_ENABLED(CONFIG_BT_CTLR_PHY_CODED)) {
-		struct ll_scan_set *scan_1m;
-
-		scan_1m = ull_scan_set_get(SCAN_HANDLE_1M);
-		if (scan == scan_1m) {
-			struct ll_scan_set *scan_coded;
-
-			scan_coded = ull_scan_set_get(SCAN_HANDLE_PHY_CODED);
-			scan_coded->per_scan.sync = NULL;
-		} else {
-			scan_1m->per_scan.sync = NULL;
-		}
-	}
-
 	lll = &sync->lll;
+
+	/* Copy channel map from sca_chm field in sync_info structure, and
+	 * clear the SCA bits.
+	 */
 	memcpy(lll->data_chan_map, si->sca_chm, sizeof(lll->data_chan_map));
-	lll->data_chan_map[4] &= ~0xE0;
+	lll->data_chan_map[PDU_SYNC_INFO_SCA_CHM_SCA_BYTE_OFFSET] &=
+		~PDU_SYNC_INFO_SCA_CHM_SCA_BIT_MASK;
 	lll->data_chan_count = util_ones_count_get(&lll->data_chan_map[0],
 						   sizeof(lll->data_chan_map));
 	if (lll->data_chan_count < 2) {
+		/* Ignore sync setup, invalid available channel count */
 		return;
 	}
 
@@ -397,7 +389,13 @@ void ull_sync_setup(struct ll_scan_set *scan, struct ll_scan_aux_set *aux,
 	lll->event_counter = si->evt_cntr;
 	lll->phy = aux->lll.phy;
 
-	sca = si->sca_chm[4] >> 5;
+	/* Extract the SCA value from the sca_chm field of the sync_info
+	 * structure.
+	 */
+	sca = (si->sca_chm[PDU_SYNC_INFO_SCA_CHM_SCA_BYTE_OFFSET] &
+	       PDU_SYNC_INFO_SCA_CHM_SCA_BIT_MASK) >>
+	      PDU_SYNC_INFO_SCA_CHM_SCA_BIT_POS;
+
 	interval = sys_le16_to_cpu(si->interval);
 	interval_us = interval * CONN_INT_UNIT_US;
 
@@ -414,8 +412,25 @@ void ull_sync_setup(struct ll_scan_set *scan, struct ll_scan_aux_set *aux,
 		lll->window_size_event_us = OFFS_UNIT_30_US;
 	}
 
+	/* Reset the sync context allocated to scan contexts */
+	scan->per_scan.sync = NULL;
+	if (IS_ENABLED(CONFIG_BT_CTLR_PHY_CODED)) {
+		struct ll_scan_set *scan_1m;
+
+		scan_1m = ull_scan_set_get(SCAN_HANDLE_1M);
+		if (scan == scan_1m) {
+			struct ll_scan_set *scan_coded;
+
+			scan_coded = ull_scan_set_get(SCAN_HANDLE_PHY_CODED);
+			scan_coded->per_scan.sync = NULL;
+		} else {
+			scan_1m->per_scan.sync = NULL;
+		}
+	}
+
 	sync_handle = ull_sync_handle_get(sync);
 
+	/* Prepare and dispatch sync notification */
 	rx = (void *)scan->per_scan.node_rx_estab;
 	rx->hdr.type = NODE_RX_TYPE_SYNC;
 	rx->hdr.handle = sync_handle;
@@ -429,6 +444,7 @@ void ull_sync_setup(struct ll_scan_set *scan, struct ll_scan_aux_set *aux,
 	ll_rx_put(rx->hdr.link, rx);
 	ll_rx_sched();
 
+	/* Calculate offset and schedule sync radio events */
 	ftr = &node_rx->rx_ftr;
 	pdu = (void *)((struct node_rx_pdu *)node_rx)->pdu;
 

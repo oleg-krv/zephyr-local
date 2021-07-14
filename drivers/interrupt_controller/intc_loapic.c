@@ -414,8 +414,7 @@ int loapic_resume(const struct device *port)
 __pinned_func
 static int loapic_device_ctrl(const struct device *port,
 			      uint32_t ctrl_command,
-			      enum pm_device_state *state, pm_device_cb cb,
-			      void *arg)
+			      enum pm_device_state *state)
 {
 	int ret = 0;
 
@@ -427,10 +426,6 @@ static int loapic_device_ctrl(const struct device *port,
 		}
 	} else if (ctrl_command == PM_DEVICE_STATE_GET) {
 		*state = loapic_device_power_state;
-	}
-
-	if (cb) {
-		cb(port, ret, state, arg);
 	}
 
 	return ret;

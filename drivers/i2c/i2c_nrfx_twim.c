@@ -263,7 +263,7 @@ static int init_twim(const struct device *dev)
 #ifdef CONFIG_PM_DEVICE
 static int twim_nrfx_pm_control(const struct device *dev,
 				uint32_t ctrl_command,
-				enum pm_device_state *state, pm_device_cb cb, void *arg)
+				enum pm_device_state *state)
 {
 	int ret = 0;
 	enum pm_device_state pm_current_state = get_dev_data(dev)->pm_state;
@@ -301,10 +301,6 @@ static int twim_nrfx_pm_control(const struct device *dev,
 	} else {
 		__ASSERT_NO_MSG(ctrl_command == PM_DEVICE_STATE_GET);
 		*state = get_dev_data(dev)->pm_state;
-	}
-
-	if (cb) {
-		cb(dev, ret, state, arg);
 	}
 
 	return ret;
