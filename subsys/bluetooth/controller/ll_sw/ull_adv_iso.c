@@ -58,9 +58,7 @@ uint8_t ll_big_create(uint8_t big_handle, uint8_t adv_handle, uint8_t num_bis,
 		      uint8_t packing, uint8_t framing, uint8_t encryption,
 		      uint8_t *bcode)
 {
-	uint8_t field_data[1 + sizeof(uint8_t *)];
-	struct ull_adv_ext_hdr_data hdr_data;
-	void *extra_data_prev, *extra_data;
+	uint8_t hdr_data[1 + sizeof(uint8_t *)];
 	struct lll_adv_sync *lll_adv_sync;
 	struct lll_adv_iso *lll_adv_iso;
 	struct pdu_adv *pdu_prev, *pdu;
@@ -139,23 +137,21 @@ uint8_t ll_big_create(uint8_t big_handle, uint8_t adv_handle, uint8_t num_bis,
 	}
 
 	/* Allocate next PDU */
-	err = ull_adv_sync_pdu_alloc(adv, 0, 0, NULL, &pdu_prev, &pdu,
-				     &extra_data_prev, &extra_data, &ter_idx);
+	err = ull_adv_sync_pdu_alloc(adv, ULL_ADV_PDU_EXTRA_DATA_ALLOC_IF_EXIST, &pdu_prev, &pdu,
+				     NULL, NULL, &ter_idx);
 	if (err) {
 		return err;
 	}
 
 	/* Add ACAD to AUX_SYNC_IND */
-	hdr_data.field_data = field_data;
-	field_data[0] = sizeof(struct pdu_big_info) + 2;
-	err = ull_adv_sync_pdu_set_clear(lll_adv_sync, pdu_prev, pdu,
-					 ULL_ADV_PDU_HDR_FIELD_ACAD, 0U,
-					 &hdr_data);
+	hdr_data[0] = sizeof(struct pdu_big_info) + 2;
+	err = ull_adv_sync_pdu_set_clear(lll_adv_sync, pdu_prev, pdu, ULL_ADV_PDU_HDR_FIELD_ACAD,
+					 0U, hdr_data);
 	if (err) {
 		return err;
 	}
 
-	memcpy(&acad, &field_data[1], sizeof(acad));
+	memcpy(&acad, &hdr_data[1], sizeof(acad));
 	acad[0] = sizeof(struct pdu_big_info) + 1;
 	acad[1] = BT_DATA_BIG_INFO;
 
@@ -227,7 +223,6 @@ uint8_t ll_big_test_create(uint8_t big_handle, uint8_t adv_handle,
 
 uint8_t ll_big_terminate(uint8_t big_handle, uint8_t reason)
 {
-	void *extra_data_prev, *extra_data;
 	struct lll_adv_sync *lll_adv_sync;
 	struct lll_adv_iso *lll_adv_iso;
 	struct pdu_adv *pdu_prev, *pdu;
@@ -254,8 +249,8 @@ uint8_t ll_big_terminate(uint8_t big_handle, uint8_t reason)
 	adv = HDR_LLL2ULL(lll_adv);
 
 	/* Allocate next PDU */
-	err = ull_adv_sync_pdu_alloc(adv, 0, 0, NULL, &pdu_prev, &pdu,
-				     &extra_data_prev, &extra_data, &ter_idx);
+	err = ull_adv_sync_pdu_alloc(adv, ULL_ADV_PDU_EXTRA_DATA_ALLOC_IF_EXIST, &pdu_prev, &pdu,
+				     NULL, NULL, &ter_idx);
 	if (err) {
 		return err;
 	}

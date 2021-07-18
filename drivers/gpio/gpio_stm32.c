@@ -114,7 +114,7 @@ static inline uint32_t stm32_pinval_get(int pin)
 /**
  * @brief Configure the hardware.
  */
-int gpio_stm32_configure(const struct device *dev, int pin, int conf, int altf)
+void gpio_stm32_configure(const struct device *dev, int pin, int conf, int altf)
 {
 	const struct gpio_stm32_config *cfg = dev->config;
 	GPIO_TypeDef *gpio = (GPIO_TypeDef *)cfg->base;
@@ -221,7 +221,6 @@ int gpio_stm32_configure(const struct device *dev, int pin, int conf, int altf)
 	z_stm32_hsem_unlock(CFG_HW_GPIO_SEMID);
 #endif  /* CONFIG_SOC_SERIES_STM32F1X */
 
-	return 0;
 }
 
 /**
@@ -683,7 +682,7 @@ static int gpio_stm32_init(const struct device *dev)
 			    gpio_stm32_pm_device_ctrl,			       \
 			    &gpio_stm32_data_## __suffix,		       \
 			    &gpio_stm32_cfg_## __suffix,		       \
-			    POST_KERNEL,				       \
+			    PRE_KERNEL_1,				       \
 			    CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,	       \
 			    &gpio_stm32_driver)
 
