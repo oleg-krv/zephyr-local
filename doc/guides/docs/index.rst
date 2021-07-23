@@ -39,8 +39,30 @@ The project's documentation contains the following items:
 * Script-generated material for kernel configuration options based on Kconfig
   files found in the source code tree
 
-.. image:: images/doc-gen-flow.png
-   :align: center
+.. graphviz::
+   :caption: Schematic of the documentation build process
+
+   digraph {
+      rankdir=LR
+
+      images [shape="rectangle" label=".png, .jpg\nimages"]
+      rst [shape="rectangle" label="restructuredText\nfiles"]
+      conf [shape="rectangle" label="conf.py\nconfiguration"]
+      rtd [shape="rectangle" label="read-the-docs\ntheme"]
+      header [shape="rectangle" label="c header\ncomments"]
+      xml [shape="rectangle" label="XML"]
+      html [shape="rectangle" label="HTML\nweb site"]
+      sphinx[shape="ellipse" label="sphinx +\nbreathe,\ndocutils"]
+      images -> sphinx
+      rst -> sphinx
+      conf -> sphinx
+      header -> doxygen
+      doxygen -> xml
+      xml-> sphinx
+      rtd -> sphinx
+      sphinx -> html
+   }
+
 
 The reStructuredText files are processed by the Sphinx documentation system,
 and make use of the breathe extension for including the doxygen-generated API
@@ -55,6 +77,7 @@ Installing the documentation processors
 Our documentation processing has been tested to run with:
 
 * Doxygen version 1.8.13
+* Graphviz 2.43
 * Latexmk version 4.56
 * All Python dependencies listed in the repository file
   ``scripts/requirements-doc.txt``
@@ -74,27 +97,27 @@ as described below:
 
       .. code-block:: console
 
-         sudo apt-get install --no-install-recommends doxygen librsvg2-bin \
+         sudo apt-get install --no-install-recommends doxygen graphviz librsvg2-bin \
          texlive-latex-base texlive-latex-extra latexmk texlive-fonts-recommended
 
       On Fedora Linux:
 
       .. code-block:: console
 
-         sudo dnf install doxygen texlive-latex latexmk \
+         sudo dnf install doxygen graphviz texlive-latex latexmk \
          texlive-collection-fontsrecommended librsvg2-tools
 
       On Clear Linux:
 
       .. code-block:: console
 
-         sudo swupd bundle-add texlive
+         sudo swupd bundle-add texlive graphviz
 
       On Arch Linux:
 
       .. code-block:: console
 
-         sudo pacman -S doxygen librsvg texlive-core texlive-bin
+         sudo pacman -S graphviz doxygen librsvg texlive-core texlive-bin
 
    .. group-tab:: macOS
 
@@ -102,7 +125,7 @@ as described below:
 
       .. code-block:: console
 
-         brew install doxygen mactex librsvg
+         brew install doxygen graphviz mactex librsvg
          tlmgr install latexmk
          tlmgr install collection-fontsrecommended
 
@@ -112,7 +135,7 @@ as described below:
 
       .. code-block:: console
 
-         choco install doxygen.install strawberryperl miktex rsvg-convert
+         choco install doxygen.install graphviz strawberryperl miktex rsvg-convert
 
       .. note::
          On Windows, the Sphinx executable ``sphinx-build.exe`` is placed in

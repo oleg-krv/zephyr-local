@@ -28,13 +28,37 @@
 
 /* chip specific register defines */
 #include "reg/mec172x_defs.h"
+#include "reg/mec172x_ecia.h"
+#include "reg/mec172x_ecs.h"
+#include "reg/mec172x_espi_iom.h"
+#include "reg/mec172x_espi_saf.h"
+#include "reg/mec172x_espi_vw.h"
+#include "reg/mec172x_gpio.h"
+#include "reg/mec172x_i2c_smb.h"
+#include "reg/mec172x_p80bd.h"
 #include "reg/mec172x_pcr.h"
+#include "reg/mec172x_qspi.h"
+#include "reg/mec172x_vbat.h"
 
 /* common peripheral register defines */
 #include "../common/reg/mec_acpi_ec.h"
+#include "../common/reg/mec_adc.h"
+#include "../common/reg/mec_global_cfg.h"
+#include "../common/reg/mec_kbc.h"
+#include "../common/reg/mec_keyscan.h"
+#include "../common/reg/mec_peci.h"
+#include "../common/reg/mec_ps2.h"
+#include "../common/reg/mec_pwm.h"
+#include "../common/reg/mec_tach.h"
+#include "../common/reg/mec_tfdp.h"
+#include "../common/reg/mec_timers.h"
+#include "../common/reg/mec_uart.h"
+#include "../common/reg/mec_vci.h"
+#include "../common/reg/mec_wdt.h"
 
 /* common SoC API */
 #include "../common/soc_gpio.h"
+#include "../common/soc_pcr.h"
 #include "../common/soc_pins.h"
 #include "../common/soc_espi_channels.h"
 #include "../common/soc_espi_saf.h"

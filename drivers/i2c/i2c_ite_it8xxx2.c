@@ -771,8 +771,6 @@ static int i2c_it8xxx2_transfer(const struct device *dev, struct i2c_msg *msgs,
 		if (i2c_bus_not_available(dev)) {
 			/* Recovery I2C bus */
 			i2c_recover_bus(dev);
-			printk("I2C ch%d reset cause %d\n", config->port,
-			       I2C_RC_NO_IDLE_FOR_START);
 			/*
 			 * After resetting I2C bus, if I2C bus is not available
 			 * (No external pull-up), drop the transaction.
@@ -805,6 +803,13 @@ static int i2c_it8xxx2_transfer(const struct device *dev, struct i2c_msg *msgs,
 		/* Wait for the transfer to complete */
 		/* TODO: the timeout should be adjustable */
 		res = k_sem_take(&data->device_sync_sem, K_MSEC(100));
+		/*
+		 * The irq will be enabled at the condition of start or
+		 * repeat start of I2C. If timeout occurs without being
+		 * wake up during suspend(ex: interrupt is not fired),
+		 * the irq should be disabled immediately.
+		 */
+		irq_disable(config->i2c_irq_base);
 		/*
 		 * The transaction is dropped on any error(timeout, NACK, fail,
 		 * bus error, device error).
