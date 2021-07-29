@@ -62,7 +62,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: f525ee6f468c2c68119731e1453ad72d189a1277
+      revision: 7b19e8c4a66fa6fb05c5862175edb12e15659b72
       path: modules/hal/espressif
       groups:
         - hal
@@ -162,7 +162,7 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: 7a5196820ba48a6ad7e7d573c9048c021960677c
+      revision: 62b78ff2a2148490f91ee9a4b4d7a7ab8bbc4fd4
       path: bootloader/mcuboot
     - name: mcumgr
       revision: 5c5055f5a7565f8152d75fcecf07262928b4d56e
@@ -201,12 +201,6 @@ manifest:
       revision: dc70a45a7cc12c25726a32cd91b28be59e7bc596
       path: modules/lib/tensorflow
       repo-path: tensorflow
-    - name: tfm-mcuboot # This is used by the trusted-firmware-m module.
-      revision: v1.7.2
-      path: modules/tee/tfm-mcuboot
-      groups:
-        - tee
-      repo-path: mcuboot
     - name: tinycbor
       revision: 40daca97b478989884bffb5226e9ab73ca54b8c4
       path: modules/lib/tinycbor
@@ -222,7 +216,7 @@ manifest:
         - debug
     - name: trusted-firmware-m
       path: modules/tee/tfm
-      revision: e18b7a9b040b5b5324520388047c9e7d678447e6
+      revision: 1ab3b62d641070a6e8574634168c374645f382b8
       groups:
         - tee
 
