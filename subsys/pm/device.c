@@ -14,71 +14,41 @@
 #include <logging/log.h>
 LOG_MODULE_DECLARE(power);
 
-extern const struct device __device_start[];
-extern const struct device __device_end[];
-
 #if defined(CONFIG_PM)
 extern const struct device *__pm_device_slots_start[];
 
 /* Number of devices successfully suspended. */
 static size_t num_susp;
 
-static bool should_suspend(const struct device *dev, enum pm_device_state state)
+static int _pm_devices(enum pm_device_state state)
 {
-	int rc;
-	enum pm_device_state current_state;
+	const struct device *devs;
+	size_t devc;
 
-	if (pm_device_is_busy(dev) != 0) {
-		return false;
-	}
+	devc = z_device_get_all_static(&devs);
 
-	rc = pm_device_state_get(dev, &current_state);
-	if ((rc == -ENOSYS) || (rc != 0)) {
-		LOG_DBG("Was not possible to get device %s state: %d",
-			dev->name, rc);
-		return false;
-	}
-
-	/*
-	 * If the device is currently powered off or the request was
-	 * to go to the same state, just ignore it.
-	 */
-	if ((current_state == PM_DEVICE_STATE_OFF) ||
-			(current_state == state)) {
-		return false;
-	}
-
-	return true;
-}
-
-static int _pm_devices(uint32_t state)
-{
-	const struct device *dev;
 	num_susp = 0;
 
-	for (dev = (__device_end - 1); dev > __device_start; dev--) {
-		bool suspend;
-		int rc;
+	for (const struct device *dev = devs + devc - 1; dev >= devs; dev--) {
+		int ret;
 
-		suspend = should_suspend(dev, state);
-		if (suspend) {
-			/*
-			 * Don't bother the device if it is currently
-			 * in the right state.
-			 */
-			rc = pm_device_state_set(dev, state);
-			if (rc == -ENOTSUP) {
-				continue;
-			} else if ((rc != -ENOSYS) && (rc != 0)) {
-				LOG_DBG("%s did not enter %s state: %d",
-					dev->name, pm_device_state_str(state),
-					rc);
-				return rc;
-			}
-
-			__pm_device_slots_start[num_susp] = dev;
-			num_susp++;
+		/* ignore busy devices */
+		if (pm_device_is_busy(dev)) {
+			continue;
 		}
+
+		ret = pm_device_state_set(dev, state);
+		/* ignore devices not supporting or already at the given state */
+		if ((ret == -ENOSYS) || (ret == -ENOTSUP) || (ret == -EALREADY)) {
+			continue;
+		} else if (ret < 0) {
+			LOG_ERR("Device %s did not enter %s state (%d)",
+				dev->name, pm_device_state_str(state), ret);
+			return ret;
+		}
+
+		__pm_device_slots_start[num_susp] = dev;
+		num_susp++;
 	}
 
 	return 0;
@@ -145,6 +115,8 @@ int pm_device_state_set(const struct device *dev,
 		if ((dev->pm->state == PM_DEVICE_STATE_SUSPENDED) ||
 		    (dev->pm->state == PM_DEVICE_STATE_SUSPENDING)) {
 			return -EALREADY;
+		} else if (dev->pm->state == PM_DEVICE_STATE_OFF) {
+			return -ENOTSUP;
 		}
 
 		action = PM_DEVICE_ACTION_SUSPEND;
@@ -206,13 +178,15 @@ int pm_device_state_get(const struct device *dev,
 
 bool pm_device_is_any_busy(void)
 {
-	const struct device *dev = __device_start;
+	const struct device *devs;
+	size_t devc;
 
-	while (dev < __device_end) {
+	devc = z_device_get_all_static(&devs);
+
+	for (const struct device *dev = devs; dev < (devs + devc); dev++) {
 		if (atomic_test_bit(dev->pm->flags, PM_DEVICE_FLAG_BUSY)) {
 			return true;
 		}
-		++dev;
 	}
 
 	return false;

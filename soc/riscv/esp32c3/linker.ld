@@ -212,7 +212,6 @@ SECTIONS
     *(.noinit)
     *(".noinit.*")
     . = ALIGN (8);
-    _heap_start = ABSOLUTE(.);
   } GROUP_LINK_IN(RAMABLE_REGION)
 
   .flash.text : ALIGN(4)
