@@ -616,6 +616,12 @@ test_i2c_vcnl4040: vcnl4040@60 {
 	int-gpios = <&test_gpio 0 0>;
 };
 
+test_i2c_bmi160: bmi160@4a {
+	compatible = "bosch,bmi160";
+	label = "BMI160";
+	reg = <0x4a>;
+};
+
 test_i2c_bmi270: bmi270@4a {
 	compatible = "bosch,bmi270";
 	label = "BMI270";
@@ -668,4 +674,11 @@ test_i2c_ina23x: ina23x@4f {
 	mask = <0>;
 	alert_limit = <0>;
 	irq-gpios = <&test_gpio 0 0>;
+};
+
+test_i2c_lm77: lm77@50 {
+	compatible = "lm77";
+	label = "LM77";
+	reg = <0x50>;
+	int-gpios = <&test_gpio 0 0>;
 };
