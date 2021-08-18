@@ -370,8 +370,18 @@ static int common_prepare_cb(struct lll_prepare_param *p, bool is_resume)
 	radio_isr_set(isr_rx, lll);
 
 	/* setup tIFS switching */
-	radio_tmr_tifs_set(EVENT_IFS_US);
-	radio_switch_complete_and_tx(0, 0, 0, 0);
+	if (0) {
+	} else if (lll->type ||
+#if defined(CONFIG_BT_CENTRAL)
+		   lll->conn) {
+#else /* !CONFIG_BT_CENTRAL */
+		   0) {
+#endif /* !CONFIG_BT_CENTRAL */
+		radio_tmr_tifs_set(EVENT_IFS_US);
+		radio_switch_complete_and_tx(0, 0, 0, 0);
+	} else {
+		radio_switch_complete_and_disable();
+	}
 
 #if defined(CONFIG_BT_CTLR_PRIVACY)
 	if (ull_filter_lll_rl_enabled()) {
@@ -509,15 +519,15 @@ static int is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb)
 		}
 	}
 
+	if (0) {
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
-	if (unlikely(lll->duration_reload && !lll->duration_expire)) {
+	} else if (unlikely(lll->duration_reload && !lll->duration_expire)) {
 		radio_isr_set(isr_done_cleanup, lll);
 	} else if (lll->is_aux_sched) {
 		/* as a continuous scanner, let us not abort aux PDU scan */
 		return 0;
-	} else
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
-	{
+	} else {
 		radio_isr_set(isr_window, lll);
 	}
 
@@ -680,9 +690,8 @@ static void isr_tx(void *param)
 	/* Clear radio status and events */
 	lll_isr_tx_status_reset();
 
-	/* setup tIFS switching */
-	radio_tmr_tifs_set(EVENT_IFS_US);
-	radio_switch_complete_and_tx(0, 0, 0, 0);
+	/* Complete currently setup Rx and disable radio */
+	radio_switch_complete_and_disable();
 
 	node_rx = ull_pdu_rx_alloc_peek(1);
 	LL_ASSERT(node_rx);
@@ -740,8 +749,19 @@ static void isr_common_done(void *param)
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 
 	/* setup tIFS switching */
-	radio_tmr_tifs_set(EVENT_IFS_US);
-	radio_switch_complete_and_tx(0, 0, 0, 0);
+	if (0) {
+		/* TODO: Add Rx-Rx switch usecase improvement in the future */
+	} else if (lll->type ||
+#if defined(CONFIG_BT_CENTRAL)
+		   lll->conn) {
+#else /* !CONFIG_BT_CENTRAL */
+		   0) {
+#endif /* !CONFIG_BT_CENTRAL */
+		radio_tmr_tifs_set(EVENT_IFS_US);
+		radio_switch_complete_and_tx(0, 0, 0, 0);
+	} else {
+		radio_switch_complete_and_disable();
+	}
 
 	node_rx = ull_pdu_rx_alloc_peek(1);
 	LL_ASSERT(node_rx);
@@ -788,7 +808,6 @@ static void isr_done(void *param)
 
 static void isr_window(void *param)
 {
-	uint32_t ticks_at_start;
 	uint32_t remainder_us;
 	struct lll_scan *lll;
 
@@ -806,6 +825,7 @@ static void isr_window(void *param)
 	bool is_sched_advanced = IS_ENABLED(CONFIG_BT_CTLR_SCHED_ADVANCED) &&
 				 lll->conn && lll->conn_win_offset_us;
 	uint32_t ticks_anchor_prev;
+	uint32_t ticks_at_start;
 
 	if (is_sched_advanced) {
 		/* Get the ticks_anchor when the offset to free time space for
@@ -818,11 +838,14 @@ static void isr_window(void *param)
 	} else {
 		ticks_anchor_prev = 0U;
 	}
-#endif /* CONFIG_BT_CENTRAL */
 
 	ticks_at_start = ticker_ticks_now_get() +
 			 HAL_TICKER_CNTR_CMP_OFFSET_MIN;
 	remainder_us = radio_tmr_start_tick(0, ticks_at_start);
+#else /* !CONFIG_BT_CENTRAL */
+
+	remainder_us = radio_tmr_start_now(0);
+#endif /* !CONFIG_BT_CENTRAL */
 
 	/* capture end of Rx-ed PDU, for initiator to calculate first
 	 * master event.
@@ -889,6 +912,22 @@ static void isr_done_cleanup(void *param)
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 	struct event_done_extra *extra;
+	struct lll_scan *lll;
+
+	lll = param;
+	if (lll->is_aux_sched) {
+		struct node_rx_pdu *node_rx;
+
+		node_rx = ull_pdu_rx_alloc();
+		LL_ASSERT(node_rx);
+
+		node_rx->hdr.type = NODE_RX_TYPE_EXT_AUX_RELEASE;
+
+		node_rx->hdr.rx_ftr.param = lll;
+
+		ull_rx_put(node_rx->hdr.link, node_rx);
+		ull_rx_sched();
+	}
 
 	extra = ull_event_done_extra_get();
 	LL_ASSERT(extra);

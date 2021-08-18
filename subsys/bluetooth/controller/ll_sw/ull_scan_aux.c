@@ -101,26 +101,28 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	struct pdu_adv *pdu;
 	uint8_t aux_handle;
 	bool is_lll_sched;
+	bool is_scan_req;
 	bool is_lll_aux;
 	uint8_t *ptr;
 	uint8_t phy;
 
+	is_scan_req = false;
 	is_lll_aux = false;
 	ftr = &rx->rx_ftr;
 
 	switch (rx->type) {
 	case NODE_RX_TYPE_EXT_1M_REPORT:
-		lll = ftr->param;
 		lll_aux = NULL;
 		aux = NULL;
+		lll = ftr->param;
 		scan = HDR_LLL2ULL(lll);
 		sync = sync_create_get(scan);
 		phy = BT_HCI_LE_EXT_SCAN_PHY_1M;
 		break;
 	case NODE_RX_TYPE_EXT_CODED_REPORT:
-		lll = ftr->param;
 		lll_aux = NULL;
 		aux = NULL;
+		lll = ftr->param;
 		scan = HDR_LLL2ULL(lll);
 		sync = sync_create_get(scan);
 		phy = BT_HCI_LE_EXT_SCAN_PHY_CODED;
@@ -142,19 +144,15 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 			 * PDU was handled.
 			 */
 			lll = ftr->param;
-			LL_ASSERT(lll->lll_aux);
+
 			lll_aux = lll->lll_aux;
-			lll->lll_aux = NULL;
+			LL_ASSERT(lll_aux);
+
 			aux = HDR_LLL2ULL(lll_aux);
 			LL_ASSERT(lll == aux->rx_head->rx_ftr.param);
 
 			/* aux is retrieved from LLL Aux scheduling */
 			is_lll_aux = true;
-
-			/* Store retrieved aux context to node so it can be
-			 * processed as if scheduled from ULL.
-			 */
-			ftr->param = lll_aux;
 		}
 
 		scan = HDR_LLL2ULL(lll);
@@ -164,6 +162,8 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 		if (scan) {
 			/* Here we are scanner context */
 			sync = sync_create_get(scan);
+
+			/* Generate report based on PHY scanned */
 			switch (phy) {
 			case PHY_1M:
 				rx->type = NODE_RX_TYPE_EXT_1M_REPORT;
@@ -178,6 +178,12 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 				LL_ASSERT(0);
 				return;
 			}
+
+			/* Backup scan requested flag as it is in union with
+			 * `extra` struct member which will be set to NULL
+			 * in subsequent code.
+			 */
+			is_scan_req = !!ftr->scan_req;
 
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
 		} else {
@@ -238,6 +244,15 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 
 	h = (void *)p->ext_hdr_adv_data;
 	if (!h->aux_ptr && !sync) {
+		if (is_scan_req) {
+			LL_ASSERT(aux && aux->rx_last);
+
+			aux->rx_last->rx_ftr.extra = rx;
+			aux->rx_last = rx;
+
+			return;
+		}
+
 		goto ull_scan_aux_rx_flush;
 	}
 
@@ -318,9 +333,13 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	 */
 	if (is_lll_sched) {
 		lll->lll_aux = lll_aux;
+		lll_aux->state = 0U;
 
 		return;
 	}
+
+	/* Switching to ULL scheduling to receive auxiliary PDUs */
+	lll->lll_aux = NULL;
 
 	/* Determine the window size */
 	if (aux_ptr->offs_units) {
@@ -475,6 +494,26 @@ struct ll_scan_aux_set *ull_scan_aux_is_valid_get(struct ll_scan_aux_set *aux)
 	return aux;
 }
 
+void ull_scan_aux_release(memq_link_t *link, struct node_rx_hdr *rx)
+{
+	struct lll_scan_aux *lll_aux;
+	struct ll_scan_aux_set *aux;
+	struct lll_scan *lll;
+
+	lll = rx->rx_ftr.param;
+	lll_aux = lll->lll_aux;
+	if (lll_aux) {
+		aux = HDR_LLL2ULL(lll_aux);
+		flush(aux, NULL);
+	}
+
+	/* Mark for buffer for release */
+	rx->type = NODE_RX_TYPE_RELEASE;
+
+	ll_rx_put(link, rx);
+	ll_rx_sched();
+}
+
 static int init_reset(void)
 {
 	/* Initialize adv aux pool. */
@@ -532,10 +571,7 @@ static void flush(struct ll_scan_aux_set *aux, struct node_rx_hdr *rx)
 		struct lll_scan *lll;
 
 		if (rx) {
-			struct node_rx_ftr *ftr;
-
-			ftr = &aux->rx_last->rx_ftr;
-			ftr->extra = rx;
+			aux->rx_last->rx_ftr.extra = rx;
 		}
 
 		rx = aux->rx_head;

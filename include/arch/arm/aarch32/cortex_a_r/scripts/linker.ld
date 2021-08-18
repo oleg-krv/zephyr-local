@@ -108,7 +108,11 @@ SECTIONS
 
     GROUP_START(ROMABLE_REGION)
 
+#if defined(CONFIG_XIP)
     _image_rom_start = ROM_ADDR;
+#else
+    _image_rom_start = RAM_ADDR;
+#endif
 
     SECTION_PROLOGUE(rom_start,,)
     {
@@ -130,6 +134,9 @@ SECTIONS
     SECTION_PROLOGUE(_TEXT_SECTION_NAME,,)
     {
         _image_text_start = .;
+
+#include <linker/kobject-text.ld>
+
         *(.text)
         *(".text.*")
         *(.gnu.linkonce.t.*)
@@ -139,8 +146,6 @@ SECTIONS
          * after .gnu.linkonce.t.*
          */
         *(.glue_7t) *(.glue_7) *(.vfp11_veneer) *(.v4_bx)
-
-#include <linker/kobject-text.ld>
 
     } GROUP_LINK_IN(ROMABLE_REGION)
 
@@ -175,6 +180,7 @@ SECTIONS
 
 #include <linker/common-rom.ld>
 #include <linker/thread-local-storage.ld>
+#include <linker/cplusplus-rom.ld>
 
     SECTION_PROLOGUE(_RODATA_SECTION_NAME,,)
     {
@@ -200,13 +206,17 @@ SECTIONS
          * usually 4k aligned.
          */
         . = ALIGN(4);
+
+        /*
+         * RODATA must be the last section so that the size of the entire read
+         * only area will be filled to a power of 2.
+         */
+        MPU_ALIGN(ABSOLUTE(.) - _image_rom_start);
     } GROUP_LINK_IN(ROMABLE_REGION)
 
-#include <linker/cplusplus-rom.ld>
-
     _image_rodata_end = .;
-    MPU_ALIGN(_image_rodata_end -_image_rom_start);
     _image_rom_end = .;
+    _image_rom_end_order = (LOG2CEIL(_image_rom_end) - 1) << 1;
 
     GROUP_END(ROMABLE_REGION)
 

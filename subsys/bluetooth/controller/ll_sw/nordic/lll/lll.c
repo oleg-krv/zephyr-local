@@ -939,7 +939,8 @@ static void preempt(void *param)
 		iter = ull_prepare_dequeue_iter(&iter_idx);
 		while (iter) {
 			if (!iter->is_aborted &&
-			    event.curr.param == iter->prepare_param.param) {
+			    (event.curr.param == iter->prepare_param.param) &&
+			    iter->is_resume) {
 				iter->is_aborted = 1;
 				iter->abort_cb(&iter->prepare_param,
 					       iter->prepare_param.param);
@@ -949,7 +950,7 @@ static void preempt(void *param)
 				 *       the prepare pipeline hence re-iterate
 				 *       through the prepare pipeline.
 				 */
-				idx = UINT8_MAX;
+				iter_idx = UINT8_MAX;
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL_DONE */
 			}
 
