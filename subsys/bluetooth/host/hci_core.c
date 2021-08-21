@@ -739,7 +739,6 @@ static void hci_disconn_complete(struct net_buf *buf)
 	conn->err = evt->reason;
 
 	bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
-	conn->handle = 0U;
 
 	if (conn->type != BT_CONN_TYPE_LE) {
 #if defined(CONFIG_BT_BREDR)
@@ -3542,7 +3541,10 @@ int bt_enable(bt_ready_cb_t cb)
 			return err;
 		}
 	} else {
-		bt_set_name(CONFIG_BT_DEVICE_NAME);
+		err = bt_set_name(CONFIG_BT_DEVICE_NAME);
+		if (err) {
+			BT_WARN("Failed to set device name (%d)", err);
+		}
 	}
 
 	ready_cb = cb;
@@ -3584,6 +3586,13 @@ int bt_enable(bt_ready_cb_t cb)
 	k_work_submit(&bt_dev.init);
 	return 0;
 }
+
+#define DEVICE_NAME_LEN (sizeof(CONFIG_BT_DEVICE_NAME) - 1)
+#if defined(CONFIG_BT_DEVICE_NAME_DYNAMIC)
+BUILD_ASSERT(DEVICE_NAME_LEN < CONFIG_BT_DEVICE_NAME_MAX);
+#else
+BUILD_ASSERT(DEVICE_NAME_LEN < 248);
+#endif
 
 int bt_set_name(const char *name)
 {

@@ -23,8 +23,9 @@ set(EDT_PICKLE                  ${PROJECT_BINARY_DIR}/edt.pickle)
 set(DEVICETREE_UNFIXED_H        ${PROJECT_BINARY_DIR}/include/generated/devicetree_unfixed.h)
 set(DEVICE_EXTERN_H             ${PROJECT_BINARY_DIR}/include/generated/device_extern.h)
 set(DTS_POST_CPP                ${PROJECT_BINARY_DIR}/${BOARD}.dts.pre.tmp)
-# A list of generally accepted vendor prefixes.
-set_ifndef(VENDOR_PREFIXES      ${ZEPHYR_BASE}/dts/bindings/vendor-prefixes.txt)
+# The location of a list of known vendor prefixes.
+# This is relative to each element of DTS_ROOT.
+set(VENDOR_PREFIXES             dts/bindings/vendor-prefixes.txt)
 
 set_ifndef(DTS_SOURCE ${BOARD_DIR}/${BOARD}.dts)
 
@@ -90,6 +91,7 @@ if(SUPPORTS_DTS)
   endforeach()
 
   unset(DTS_ROOT_SYSTEM_INCLUDE_DIRS)
+  unset(DTS_ROOT_BINDINGS)
   foreach(dts_root ${DTS_ROOT})
     foreach(dts_root_path
         include
@@ -105,16 +107,18 @@ if(SUPPORTS_DTS)
           )
       endif()
     endforeach()
-  endforeach()
 
-  unset(DTS_ROOT_BINDINGS)
-  foreach(dts_root ${DTS_ROOT})
-    set(full_path ${dts_root}/dts/bindings)
-    if(EXISTS ${full_path})
+    set(bindings_path ${dts_root}/dts/bindings)
+    if(EXISTS ${bindings_path})
       list(APPEND
         DTS_ROOT_BINDINGS
-        ${full_path}
+        ${bindings_path}
         )
+    endif()
+
+    set(vendor_prefixes ${dts_root}/${VENDOR_PREFIXES})
+    if(EXISTS ${vendor_prefixes})
+      list(APPEND EXTRA_GEN_DEFINES_ARGS --vendor-prefixes ${vendor_prefixes})
     endif()
   endforeach()
 
@@ -230,7 +234,6 @@ if(SUPPORTS_DTS)
   --device-header-out ${DEVICE_EXTERN_H}
   --dts-out ${ZEPHYR_DTS} # As a debugging aid
   --edt-pickle-out ${EDT_PICKLE}
-  --vendor-prefixes ${VENDOR_PREFIXES}
   ${EXTRA_GEN_DEFINES_ARGS}
   )
 

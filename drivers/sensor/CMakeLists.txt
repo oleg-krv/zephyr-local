@@ -25,7 +25,7 @@ add_subdirectory_ifdef(CONFIG_ENS210		ens210)
 add_subdirectory_ifdef(CONFIG_FDC2X1X		fdc2x1x)
 add_subdirectory_ifdef(CONFIG_FXAS21002		fxas21002)
 add_subdirectory_ifdef(CONFIG_FXOS8700		fxos8700)
-add_subdirectory(grove)
+add_subdirectory_ifdef(CONFIG_GROVE_SENSORS	grove)
 add_subdirectory_ifdef(CONFIG_TI_HDC		ti_hdc)
 add_subdirectory_ifdef(CONFIG_TI_HDC20XX	ti_hdc20xx)
 add_subdirectory_ifdef(CONFIG_HMC5883L		hmc5883l)
@@ -97,7 +97,13 @@ add_subdirectory_ifdef(CONFIG_ITDS		wsen_itds)
 add_subdirectory_ifdef(CONFIG_MCUX_ACMP		mcux_acmp)
 add_subdirectory_ifdef(CONFIG_TACH_NPCX		nuvoton_tach_npcx)
 
+if(CONFIG_USERSPACE OR CONFIG_SENSOR_SHELL OR CONFIG_SENSOR_SHELL_BATTERY)
+# The above if() is needed or else CMake would complain about
+# empty library.
+
 zephyr_library()
 zephyr_library_sources_ifdef(CONFIG_USERSPACE sensor_handlers.c)
 zephyr_library_sources_ifdef(CONFIG_SENSOR_SHELL sensor_shell.c)
 zephyr_library_sources_ifdef(CONFIG_SENSOR_SHELL_BATTERY shell_battery.c)
+
+endif()

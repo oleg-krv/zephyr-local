@@ -188,8 +188,6 @@ SECTIONS
 #include <linker/cplusplus-rom.ld>
 	_image_rodata_end = .;
 	MPU_ALIGN(_image_rodata_end - _image_rom_start);
-	_image_rom_end = .;
-	_image_rom_size = _image_rom_end - _image_rom_start;
     GROUP_END(ROMABLE_REGION)
 
     GROUP_START(RAMABLE_REGION)
@@ -239,6 +237,22 @@ SECTIONS
 
 		 *(.data)
 		 *(".data.*")
+
+#ifdef CONFIG_RISCV_GP
+		/*
+		 * RISC-V architecture has 12-bit signed immediate offsets in the
+		 * instructions. If we can put the most commonly accessed globals
+		 * in a special 4K span of memory addressed by the GP register, then
+		 * we can access those values in a single instruction, saving both
+		 * codespace and runtime.
+		 *
+		 * Since these immediate offsets are signed, place gp 0x800 past the
+		 * beginning of .sdata so that we can use both positive and negative
+		 * offsets.
+		 */
+		 . = ALIGN(8);
+		 PROVIDE (__global_pointer$ = . + 0x800);
+#endif
 
 		 *(.sdata .sdata.* .gnu.linkonce.s.*)
 
@@ -342,5 +356,15 @@ GROUP_END(DTCM)
 	KEEP(*(.riscv.attributes))
 	KEEP(*(.gnu.attributes))
 	}
+
+/* Must be last in romable region */
+SECTION_PROLOGUE(.last_section,(NOLOAD),)
+{
+} GROUP_LINK_IN(ROMABLE_REGION)
+
+/* To provide the image size as a const expression,
+ * calculate this value here. */
+_image_rom_end = LOADADDR(.last_section);
+_image_rom_size = _image_rom_end - _image_rom_start;
 
 }
