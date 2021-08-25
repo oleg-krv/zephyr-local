@@ -319,7 +319,7 @@ device.
      - Flash partition that the Zephyr image's text section should be linked
        into
    * - zephyr,console
-     - Sets default :kconfig:`CONFIG_UART_CONSOLE_ON_DEV_NAME`
+     - Sets UART device used by console driver
    * - zephyr,dtcm
      - Data Tightly Coupled Memory node on some Arm SoCs
    * - zephyr,entropy
@@ -339,8 +339,10 @@ device.
        interprocess-communication (IPC)
    * - zephyr,itcm
      - Instruction Tightly Coupled Memory node on some Arm SoCs
+   * - zephyr,ot-uart
+     - Used by the OpenThread to specify UART device for Spinel protocol
    * - zephyr,shell-uart
-     - Sets default :kconfig:`CONFIG_UART_SHELL_ON_DEV_NAME`
+     - Sets UART device used by serial shell backend
    * - zephyr,sram
      - A node whose ``reg`` sets the base address and size of SRAM memory
        available to the Zephyr image, used during linking

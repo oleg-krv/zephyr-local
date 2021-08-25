@@ -152,7 +152,8 @@ uint8_t lll_scan_aux_setup(struct lll_scan *lll, struct pdu_adv *pdu,
 
 	/* No need to scan further if no aux_ptr filled */
 	aux_ptr = (void *)pri_dptr;
-	if (unlikely(!pri_hdr->aux_ptr || !aux_ptr->offs)) {
+	if (unlikely(!pri_hdr->aux_ptr || !aux_ptr->offs ||
+		     (aux_ptr->phy > EXT_ADV_AUX_PHY_LE_CODED))) {
 		return 0;
 	}
 
@@ -723,7 +724,14 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		}
 
 		if (!lll_aux_to_use) {
-			return -ENOBUFS;
+			/* Return -ECHILD, as ULL execution has not yet assigned
+			 * an aux context. This can happen only under LLL
+			 * scheduling where in LLL auxiliary channel PDU
+			 * reception is spawn from LLL primary channel scanning
+			 * and on completion will join back to resume primary
+			 * channel PDU scanning.
+			 */
+			return -ECHILD;
 		}
 
 		/* Always use CSA#2 on secondary channel, we need 2 nodes for conn
@@ -1013,7 +1021,14 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 			ftr->param = lll;
 			ftr->scan_rsp = lll->lll_aux->state;
 		} else {
-			return -ECANCELED;
+			/* Return -ECHILD, as ULL execution has not yet assigned
+			 * an aux context. This can happen only under LLL
+			 * scheduling where in LLL auxiliary channel PDU
+			 * reception is spawn from LLL primary channel scanning
+			 * and on completion will join back to resume primary
+			 * channel PDU scanning.
+			 */
+			return -ECHILD;
 		}
 
 		/* Allocate before `lll_scan_aux_setup` call, so that a new

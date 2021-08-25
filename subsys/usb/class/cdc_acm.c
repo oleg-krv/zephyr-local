@@ -1088,16 +1088,17 @@ static const struct uart_driver_api cdc_acm_driver_api = {
 		.tx_ringbuf = &tx_ringbuf_##x,				\
 	};
 
-#define CDC_ACM_DEVICE_DEFINE(idx, _)					\
+#define DT_DRV_COMPAT zephyr_cdc_acm_uart
+
+#define CDC_ACM_DT_DEVICE_DEFINE(idx)					\
+	BUILD_ASSERT(DT_INST_ON_BUS(idx, usb),				\
+		     "node " DT_NODE_PATH(DT_DRV_INST(idx))		\
+		     " is not assigned to a USB device controller");	\
 	CDC_ACM_CFG_AND_DATA_DEFINE(idx)				\
 									\
-	DEVICE_DEFINE(cdc_acm_##idx,					\
-		CONFIG_USB_CDC_ACM_DEVICE_NAME "_" #idx,		\
-		cdc_acm_init, NULL,					\
-		&cdc_acm_dev_data_##idx,				\
-		&cdc_acm_config_##idx,					\
-		POST_KERNEL,						\
-		CONFIG_KERNEL_INIT_PRIORITY_DEVICE,			\
+	DEVICE_DT_INST_DEFINE(idx, cdc_acm_init, NULL,			\
+		&cdc_acm_dev_data_##idx, &cdc_acm_config_##idx,		\
+		POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,	\
 		&cdc_acm_driver_api);
 
-UTIL_LISTIFY(CONFIG_USB_CDC_ACM_DEVICE_COUNT, CDC_ACM_DEVICE_DEFINE, _)
+DT_INST_FOREACH_STATUS_OKAY(CDC_ACM_DT_DEVICE_DEFINE);

@@ -47,6 +47,16 @@ Removed APIs in this release
 * Removed support for the Kconfig ``USB`` option. Option ``USB_DEVICE_STACK``
   is sufficient to enable USB device support.
 
+* Removed ``CONFIG_OPENTHREAD_COPROCESSOR_SPINEL_ON_UART_ACM`` and
+  ``CONFIG_OPENTHREAD_COPROCESSOR_SPINEL_ON_UART_DEV_NAME`` Kconfig options
+  in favor of chosen node ``zephyr,ot-uart``.
+* Removed ``CONFIG_UART_MCUMGR_ON_DEV_NAME`` Kconfig option
+  in favor of direct use of chosen node ``zephyr,uart-mcumgr``.
+* Removed ``CONFIG_UART_CONSOLE_ON_DEV_NAME`` Kconfig option
+  in favor of direct use of chosen node ``zephyr,console``.
+* Removed ``CONFIG_UART_SHELL_ON_DEV_NAME`` Kconfig option
+  in favor of direct use of chosen node ``zephyr,shell-uart``.
+
 ============================
 
 Stable API changes in this release
