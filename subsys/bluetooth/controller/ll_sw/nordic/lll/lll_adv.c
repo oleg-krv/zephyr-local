@@ -45,8 +45,6 @@
 #include "lll_prof_internal.h"
 #include "lll_df_internal.h"
 
-#include "ull_internal.h"
-
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
 #define LOG_MODULE_NAME bt_ctlr_lll_adv
 #include "common/log.h"
@@ -673,8 +671,6 @@ int lll_adv_scan_req_report(struct lll_adv *lll, struct pdu_adv *pdu_adv_rx,
 			    uint8_t rl_idx, uint8_t rssi_ready)
 {
 	struct node_rx_pdu *node_rx;
-	struct pdu_adv *pdu_adv;
-	uint8_t pdu_len;
 
 	node_rx = ull_pdu_rx_alloc_peek(3);
 	if (!node_rx) {
@@ -685,13 +681,6 @@ int lll_adv_scan_req_report(struct lll_adv *lll, struct pdu_adv *pdu_adv_rx,
 	/* Prepare the report (scan req) */
 	node_rx->hdr.type = NODE_RX_TYPE_SCAN_REQ;
 	node_rx->hdr.handle = ull_adv_lll_handle_get(lll);
-
-	/* Make a copy of PDU into Rx node (as the received PDU is in the
-	 * scratch buffer), and save the RSSI value.
-	 */
-	pdu_adv = (void *)node_rx->pdu;
-	pdu_len = offsetof(struct pdu_adv, payload) + pdu_adv_rx->len;
-	memcpy(pdu_adv, pdu_adv_rx, pdu_len);
 
 	node_rx->hdr.rx_ftr.rssi = (rssi_ready) ? radio_rssi_get() :
 						  BT_HCI_LE_RSSI_NOT_AVAILABLE;
@@ -885,7 +874,7 @@ static int prepare_cb(struct lll_prepare_param *p)
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 	/* TODO: if coded we use S8? */
-	radio_phy_set(lll->phy_p, 1);
+	radio_phy_set(lll->phy_p, lll->phy_flags);
 	radio_pkt_configure(8, PDU_AC_LEG_PAYLOAD_SIZE_MAX, (lll->phy_p << 1));
 #else /* !CONFIG_BT_CTLR_ADV_EXT */
 	radio_phy_set(0, 0);
@@ -1048,16 +1037,21 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 
 static void isr_tx(void *param)
 {
-	uint32_t hcto;
+	struct node_rx_pdu *node_rx_prof;
+	struct node_rx_pdu *node_rx;
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 	struct lll_adv *lll = param;
 	uint8_t phy_p = lll->phy_p;
+	uint8_t phy_flags = lll->phy_flags;
 #else
-	uint8_t phy_p = 0;
+	const uint8_t phy_p = 0U;
+	const uint8_t phy_flags = 0U;
 #endif
+	uint32_t hcto;
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 		lll_prof_latency_capture();
+		node_rx_prof = lll_prof_reserve();
 	}
 
 	/* Clear radio tx status and events */
@@ -1065,9 +1059,13 @@ static void isr_tx(void *param)
 
 	/* setup tIFS switching */
 	radio_tmr_tifs_set(EVENT_IFS_US);
-	radio_switch_complete_and_tx(phy_p, 0, phy_p, 0);
+	radio_switch_complete_and_tx(phy_p, 0, phy_p, phy_flags);
 
-	radio_pkt_rx_set(radio_pkt_scratch_get());
+	/* setup Rx buffer */
+	node_rx = ull_pdu_rx_alloc_peek(1);
+	LL_ASSERT(node_rx);
+	radio_pkt_rx_set(node_rx->pdu);
+
 	/* assert if radio packet ptr is not set and radio started rx */
 	LL_ASSERT(!radio_is_ready());
 
@@ -1120,7 +1118,7 @@ static void isr_tx(void *param)
 		/* NOTE: as scratch packet is used to receive, it is safe to
 		 * generate profile event using rx nodes.
 		 */
-		lll_prof_send();
+		lll_prof_reserve_send(node_rx_prof);
 	}
 }
 
@@ -1357,6 +1355,7 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 			     uint8_t irkmatch_ok, uint8_t irkmatch_id,
 			     uint8_t rssi_ready)
 {
+	struct node_rx_pdu *node_rx;
 	struct pdu_adv *pdu_adv;
 	struct pdu_adv *pdu_rx;
 	uint8_t tx_addr;
@@ -1372,7 +1371,10 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 	uint8_t rl_idx = FILTER_IDX_NONE;
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
-	pdu_rx = (void *)radio_pkt_scratch_get();
+	node_rx = ull_pdu_rx_alloc_peek(1);
+	LL_ASSERT(node_rx);
+
+	pdu_rx = (void *)node_rx->pdu;
 	pdu_adv = lll_adv_data_curr_get(lll);
 
 	addr = pdu_adv->adv_ind.addr;
@@ -1485,9 +1487,6 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 
 		rx->hdr.type = NODE_RX_TYPE_CONNECTION;
 		rx->hdr.handle = 0xffff;
-
-		memcpy(rx->pdu, pdu_rx, (offsetof(struct pdu_adv, connect_ind) +
-					 sizeof(struct pdu_adv_connect_ind)));
 
 		ftr = &(rx->hdr.rx_ftr);
 		ftr->param = lll;

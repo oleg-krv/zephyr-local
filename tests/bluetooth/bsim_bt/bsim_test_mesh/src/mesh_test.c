@@ -103,8 +103,14 @@ int __weak test_model_settings_set(struct bt_mesh_model *model,
 	return -1;
 }
 
+void __weak test_model_reset(struct bt_mesh_model *model)
+{
+	/* No-op. */
+}
+
 static const struct bt_mesh_model_cb test_model_cb = {
 	.settings_set = test_model_settings_set,
+	.reset = test_model_reset,
 };
 
 static struct bt_mesh_model_pub pub = {
@@ -128,8 +134,14 @@ int __weak test_vnd_model_settings_set(struct bt_mesh_model *model,
 	return -1;
 }
 
+void __weak test_vnd_model_reset(struct bt_mesh_model *model)
+{
+	/* No-op. */
+}
+
 static const struct bt_mesh_model_cb test_vnd_model_cb = {
 	.settings_set = test_vnd_model_settings_set,
+	.reset = test_vnd_model_reset,
 };
 
 static struct bt_mesh_model_pub vnd_pub = {
@@ -167,25 +179,10 @@ const uint8_t test_net_key[16] = { 1, 2, 3 };
 const uint8_t test_app_key[16] = { 4, 5, 6 };
 const uint8_t test_va_uuid[16] = "Mesh Label UUID";
 
-static void bt_enabled(void)
+static void bt_mesh_device_provision_and_configure(void)
 {
-	static struct bt_mesh_prov prov;
 	uint8_t status;
 	int err;
-
-	net_buf_simple_init(pub.msg, 0);
-	net_buf_simple_init(vnd_pub.msg, 0);
-
-	err = bt_mesh_init(&prov, &comp);
-	if (err) {
-		FAIL("Initializing mesh failed (err %d)", err);
-		return;
-	}
-
-	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-		LOG_INF("Loading stored settings");
-		settings_load();
-	}
 
 	err = bt_mesh_provision(test_net_key, 0, 0, 0, cfg->addr, cfg->dev_key);
 	if (err == -EALREADY) {
@@ -195,8 +192,6 @@ static void bt_enabled(void)
 		FAIL("Provisioning failed (err %d)", err);
 		return;
 	}
-
-	LOG_INF("Mesh initialized");
 
 	/* Self configure */
 
@@ -223,7 +218,7 @@ static void bt_enabled(void)
 	}
 }
 
-void bt_mesh_test_setup(void)
+void bt_mesh_device_setup(const struct bt_mesh_prov *prov, const struct bt_mesh_comp *comp)
 {
 	int err;
 
@@ -235,7 +230,29 @@ void bt_mesh_test_setup(void)
 
 	LOG_INF("Bluetooth initialized");
 
-	bt_enabled();
+	err = bt_mesh_init(prov, comp);
+	if (err) {
+		FAIL("Initializing mesh failed (err %d)", err);
+		return;
+	}
+
+	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+		LOG_INF("Loading stored settings");
+		settings_load();
+	}
+
+	LOG_INF("Mesh initialized");
+}
+
+void bt_mesh_test_setup(void)
+{
+	static struct bt_mesh_prov prov;
+
+	net_buf_simple_init(pub.msg, 0);
+	net_buf_simple_init(vnd_pub.msg, 0);
+
+	bt_mesh_device_setup(&prov, &comp);
+	bt_mesh_device_provision_and_configure();
 }
 
 void bt_mesh_test_timeout(bs_time_t HW_device_time)

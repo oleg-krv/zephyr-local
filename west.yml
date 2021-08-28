@@ -32,7 +32,7 @@ manifest:
       revision: 094aeb41bb93e9199d24d665ee43e9e05d6d7b1c
       path: modules/lib/civetweb
     - name: cmsis
-      revision: c3bd2094f92d574377f7af2aec147ae181aa5f8e
+      revision: 2c143ffc1fcc044c7f45f2d8ba259228ad5ffa06
       path: modules/hal/cmsis
       groups:
         - hal
@@ -62,7 +62,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: 56a84e45eeaf3b6dea88b198c5c252c06f8ac774
+      revision: 22d8246a520d2cf1ca6ba2e690471913cc00482a
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -88,7 +88,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: 6287a073922a42685cc0b63b97d35b49b66b7a8f
+      revision: c7bb88ec3240f1f44b1aafd2831b1472ca99b1d8
       path: modules/hal/nxp
       groups:
         - hal
@@ -161,7 +161,7 @@ manifest:
       revision: ca01db4216c63678768ea78fe04f27cd80b83246
       path: bootloader/mcuboot
     - name: mcumgr
-      revision: a15a953e35b0d3100893fd86a127c3e8b7e3257c
+      revision: 31a2aa9cea58d3ceecbf0d5b91361bff7c94aeca
       path: modules/lib/mcumgr
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
@@ -191,7 +191,7 @@ manifest:
       groups:
         - debug
     - name: sof
-      revision: 779f28ed465c03899c8a7d4aaf399856f4e51158
+      revision: 23c7e4739c301cc0dbc625aaf3f8e86042891565
       path: modules/audio/sof
     - name: tflite-micro
       revision: 9156d050927012da87079064db59d07f03b8baf6

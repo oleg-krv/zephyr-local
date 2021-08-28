@@ -102,11 +102,23 @@ static int init_reset(void)
 	return 0;
 }
 
+static bool is_instant_or_past(uint16_t event_counter, uint16_t instant)
+{
+	uint16_t instant_latency;
+
+	instant_latency = (event_counter - instant) &
+			  EVENT_INSTANT_MAX;
+
+	return instant_latency <= EVENT_INSTANT_LATENCY_MAX;
+}
+
 static int prepare_cb(struct lll_prepare_param *p)
 {
 	struct lll_adv_sync *lll;
 	uint32_t ticks_at_event;
 	uint32_t ticks_at_start;
+	uint8_t data_chan_count;
+	uint8_t *data_chan_map;
 	uint16_t event_counter;
 	uint8_t data_chan_use;
 	struct pdu_adv *pdu;
@@ -133,10 +145,18 @@ static int prepare_cb(struct lll_prepare_param *p)
 	/* Reset accumulated latencies */
 	lll->latency_prepare = 0;
 
+	/* Process channel map update, if any */
+	if ((lll->chm_first != lll->chm_last) &&
+	    is_instant_or_past(event_counter, lll->chm_instant)) {
+		/* At or past the instant, use channelMapNew */
+		lll->chm_first = lll->chm_last;
+	}
+
 	/* Calculate the radio channel to use */
+	data_chan_map = lll->chm[lll->chm_first].data_chan_map;
+	data_chan_count = lll->chm[lll->chm_first].data_chan_count;
 	data_chan_use = lll_chan_sel_2(event_counter, lll->data_chan_id,
-				       &lll->data_chan_map[0],
-				       lll->data_chan_count);
+				       data_chan_map, data_chan_count);
 
 	/* Start setting up of Radio h/w */
 	radio_reset();
@@ -149,7 +169,7 @@ static int prepare_cb(struct lll_prepare_param *p)
 	phy_s = lll->adv->phy_s;
 
 	/* TODO: if coded we use S8? */
-	radio_phy_set(phy_s, 1);
+	radio_phy_set(phy_s, lll->adv->phy_flags);
 	radio_pkt_configure(8, PDU_AC_PAYLOAD_SIZE_MAX, (phy_s << 1));
 	radio_aa_set(lll->access_addr);
 	radio_crc_configure(((0x5bUL) | ((0x06UL) << 8) | ((0x00UL) << 16)),
@@ -264,14 +284,35 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 
 static void isr_done(void *param)
 {
-	struct lll_adv_sync *lll;
+	struct lll_adv_sync *lll = param;
 
-	lll = param;
 #if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
 	if (lll->cte_started) {
 		lll_df_conf_cte_tx_disable();
 	}
 #endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
+
+	/* Signal thread mode to remove Channel Map Update Indication in the
+	 * ACAD.
+	 */
+	if ((lll->chm_first != lll->chm_last) &&
+	    is_instant_or_past(lll->event_counter, lll->chm_instant)) {
+		struct node_rx_hdr *rx;
+
+		/* Allocate, prepare and dispatch Channel Map Update
+		 * complete message towards ULL, then subsequently to
+		 * the thread context.
+		 */
+		rx = ull_pdu_rx_alloc();
+		LL_ASSERT(rx);
+
+		rx->type = NODE_RX_TYPE_SYNC_CHM_COMPLETE;
+		rx->rx_ftr.param = lll;
+
+		ull_rx_put(rx->link, rx);
+		ull_rx_sched();
+	}
+
 	lll_isr_done(lll);
 }
 
@@ -352,8 +393,8 @@ static void isr_tx(void *param)
 static void pdu_b2b_update(struct lll_adv_sync *lll, struct pdu_adv *pdu, uint32_t cte_len_us)
 {
 	while (pdu) {
-		pdu_b2b_aux_ptr_update(pdu, lll->adv->phy_s, 0, 0, ADV_SYNC_PDU_B2B_AFS,
-				       cte_len_us);
+		pdu_b2b_aux_ptr_update(pdu, lll->adv->phy_s, lll->adv->phy_flags, 0,
+				       ADV_SYNC_PDU_B2B_AFS, cte_len_us);
 		pdu = lll_adv_pdu_linked_next_get(pdu);
 	}
 }
@@ -386,7 +427,7 @@ static void pdu_b2b_aux_ptr_update(struct pdu_adv *pdu, uint8_t phy, uint8_t fla
 
 	/* Update AuxPtr */
 	aux = (void *)dptr;
-	offset_us += PKT_AC_US(pdu->len, phy);
+	offset_us += PDU_AC_US(pdu->len, phy, flags);
 	/* Add CTE length to PDUs that have CTE attached.
 	 * Periodic advertising chain may include PDUs without CTE.
 	 */

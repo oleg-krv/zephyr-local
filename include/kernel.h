@@ -3045,12 +3045,25 @@ int k_work_cancel(struct k_work *work);
  */
 bool k_work_cancel_sync(struct k_work *work, struct k_work_sync *sync);
 
+/** @brief Initialize a work queue structure.
+ *
+ * This must be invoked before starting a work queue structure for the first time.
+ * It need not be invoked again on the same work queue structure.
+ *
+ * @funcprops \isr_ok
+ *
+ * @param queue the queue structure to be initialized.
+ */
+void k_work_queue_init(struct k_work_q *queue);
+
 /** @brief Initialize a work queue.
  *
  * This configures the work queue thread and starts it running.  The function
  * should not be re-invoked on a queue.
  *
- * @param queue pointer to the queue structure.
+ * @param queue pointer to the queue structure. It must be initialized
+ *        in zeroed/bss memory or with @ref k_work_queue_init before
+ *        use.
  *
  * @param stack pointer to the work thread stack area.
  *
@@ -4799,7 +4812,8 @@ struct k_mem_slab {
  * @param slab_align Alignment of the memory slab's buffer (power of 2).
  */
 #define K_MEM_SLAB_DEFINE(name, slab_block_size, slab_num_blocks, slab_align) \
-	char __noinit __aligned(WB_UP(slab_align)) \
+	char __noinit_named(k_mem_slab_buf_##name) \
+	   __aligned(WB_UP(slab_align)) \
 	   _k_mem_slab_buf_##name[(slab_num_blocks) * WB_UP(slab_block_size)]; \
 	STRUCT_SECTION_ITERABLE(k_mem_slab, name) = \
 		Z_MEM_SLAB_INITIALIZER(name, _k_mem_slab_buf_##name, \
@@ -5024,7 +5038,8 @@ void k_heap_free(struct k_heap *h, void *mem);
  * @param bytes Size of memory region, in bytes
  */
 #define K_HEAP_DEFINE(name, bytes)				\
-	char __aligned(8) /* CHUNK_UNIT */			\
+	char __noinit_named(kheap_buf_##name)			\
+	     __aligned(8) /* CHUNK_UNIT */			\
 	     kheap_##name[MAX(bytes, Z_HEAP_MIN_SIZE)];		\
 	STRUCT_SECTION_ITERABLE(k_heap, name) = {		\
 		.heap = {					\

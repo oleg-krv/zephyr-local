@@ -303,6 +303,30 @@ i2s1: &flexcomm3 {
 	pwr-gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
 };
 
+&lpadc0 {
+	status = "okay";
+};
+
 zephyr_udc0: &usbhs {
+	status = "okay";
+};
+
+&ctimer0 {
+	status = "okay";
+};
+
+&ctimer1 {
+	status = "okay";
+};
+
+&ctimer2 {
+	status = "okay";
+};
+
+&ctimer3 {
+	status = "okay";
+};
+
+&ctimer4 {
 	status = "okay";
 };

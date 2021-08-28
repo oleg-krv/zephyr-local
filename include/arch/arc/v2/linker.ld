@@ -30,7 +30,7 @@
 #ifdef CONFIG_ARC_MPU_ENABLE
 	#if CONFIG_ARC_MPU_VER == 2
 		#define MPU_MIN_SIZE 2048
-	#elif CONFIG_ARC_MPU_VER == 4
+	#elif (CONFIG_ARC_MPU_VER == 3) ||  (CONFIG_ARC_MPU_VER == 4) || (CONFIG_ARC_MPU_VER == 6)
 		#define MPU_MIN_SIZE 32
 	#endif
 	#define MPU_MIN_SIZE_ALIGN . = ALIGN(MPU_MIN_SIZE);
@@ -45,12 +45,6 @@
 #else
 	#define MPU_MIN_SIZE_ALIGN
 	#define MPU_ALIGN(region_size) . = ALIGN(4)
-#endif
-
-#if defined(CONFIG_XIP)
-	#define _DATA_IN_ROM __data_rom_start
-#else
-	#define _DATA_IN_ROM
 #endif
 
 OUTPUT_ARCH(arc)
@@ -80,8 +74,8 @@ SECTIONS {
 	GROUP_START(ROMABLE_REGION)
 
 	SECTION_PROLOGUE(_TEXT_SECTION_NAME,,ALIGN(1024)) {
-		_image_rom_start = .;
-		_image_text_start = .;
+		__rom_region_start = .;
+		__text_region_start = .;
 
 /* Located in generated directory. This file is populated by the
  * zephyr_linker_sources() Cmake function.
@@ -101,8 +95,8 @@ SECTIONS {
 	} GROUP_LINK_IN(ROMABLE_REGION)
 #endif /* CONFIG_CPLUSPLUS && !CONFIG_CPP_STATIC_INIT_GNU && __MWDT_LINKER_CMD__ */
 
-	_image_text_end = .;
-	_image_rodata_start = .;
+	__text_region_end = .;
+	__rodata_region_start = .;
 
 #include <linker/common-rom.ld>
 #include <linker/thread-local-storage.ld>
@@ -133,10 +127,10 @@ SECTIONS {
 #include <linker/cplusplus-rom.ld>
 #endif /* __MWDT_LINKER_CMD__ */
 
-	_image_rodata_end = .;
-	MPU_ALIGN(_image_rodata_end - _image_rom_start);
-	_image_rom_end = .;
-	_image_rom_size = _image_rom_end - _image_rom_start;
+	__rodata_region_end = .;
+	MPU_ALIGN(__rodata_region_end - __rom_region_start);
+	__rom_region_end = .;
+	__rom_region_size = __rom_region_end - __rom_region_start;
 
 	GROUP_END(ROMABLE_REGION)
 
@@ -184,10 +178,14 @@ SECTIONS {
 
 #include <linker/common-noinit.ld>
 
+	GROUP_START(DATA_REGION)
+
+	__data_region_start = .;
+
 	SECTION_DATA_PROLOGUE(_DATA_SECTION_NAME,,) {
 
 /* when XIP, .text is in ROM, but vector table must be at start of .data */
-		__data_ram_start = .;
+		__data_start = .;
 		*(".data")
 		*(".data.*")
 		*(".kernel.*")
@@ -197,9 +195,14 @@ SECTIONS {
  */
 #include <snippets-rwdata.ld>
 
+		__data_end = .;
+
 	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
 
-	__data_rom_start = LOADADDR(_DATA_SECTION_NAME);
+	__data_size = __data_end - __data_start;
+	__data_load_start = LOADADDR(_DATA_SECTION_NAME);
+
+	__data_region_load_start = LOADADDR(_DATA_SECTION_NAME);
 
 #include <linker/common-ram.ld>
 #include <linker/kobject-data.ld>
@@ -215,7 +218,8 @@ SECTIONS {
  */
 #include <snippets-data-sections.ld>
 
-	__data_ram_end = .;
+	__data_region_end = .;
+
 	MPU_MIN_SIZE_ALIGN
 	/* Define linker symbols */
 	_image_ram_end = .;

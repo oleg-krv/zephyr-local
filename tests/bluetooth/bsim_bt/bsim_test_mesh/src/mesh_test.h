@@ -63,6 +63,15 @@
 		}                                                              \
 	} while (0)
 
+#define ASSERT_FALSE(cond, ...)                                                \
+	do {                                                                   \
+		if (cond) {                                                    \
+			bst_result = Failed;                                   \
+			bs_trace_error_time_line(                              \
+				#cond " is true.", ##__VA_ARGS__);             \
+		}                                                              \
+	} while (0)
+
 #define ASSERT_EQUAL(expected, got)                                            \
 	do {                                                                   \
 		if ((expected) != (got)) {                                     \
@@ -110,6 +119,8 @@ extern struct bt_mesh_msg_ctx test_send_ctx;
 void bt_mesh_test_cfg_set(const struct bt_mesh_test_cfg *cfg, int wait_time);
 void bt_mesh_test_setup(void);
 void bt_mesh_test_timeout(bs_time_t HW_device_time);
+
+void bt_mesh_device_setup(const struct bt_mesh_prov *prov, const struct bt_mesh_comp *comp);
 
 int bt_mesh_test_recv(uint16_t len, uint16_t dst, k_timeout_t timeout);
 int bt_mesh_test_recv_msg(struct bt_mesh_test_msg *msg, k_timeout_t timeout);

@@ -227,6 +227,7 @@ enum node_rx_type {
 	NODE_RX_TYPE_SYNC,
 	NODE_RX_TYPE_SYNC_REPORT,
 	NODE_RX_TYPE_SYNC_LOST,
+	NODE_RX_TYPE_SYNC_CHM_COMPLETE,
 	NODE_RX_TYPE_SYNC_ISO,
 	NODE_RX_TYPE_SYNC_ISO_LOST,
 	NODE_RX_TYPE_EXT_ADV_TERMINATE,
@@ -275,12 +276,15 @@ struct node_rx_ftr {
 				*/
 		void *aux_ptr;
 		uint8_t aux_phy;
-		uint8_t aux_sched;
 	};
 	uint32_t ticks_anchor;
 	uint32_t radio_end_us;
 	uint8_t  rssi;
 #if defined(CONFIG_BT_CTLR_ADV_EXT) && defined(CONFIG_BT_OBSERVER)
+	uint8_t  aux_lll_sched:1;
+	uint8_t  aux_w4next:1;
+
+	uint8_t  phy_flags:1;
 	uint8_t  scan_req:1;
 	uint8_t  scan_rsp:1;
 #endif /* CONFIG_BT_CTLR_ADV_EXT && CONFIG_BT_OBSERVER */
@@ -302,6 +306,12 @@ struct node_rx_iso_meta {
 	uint32_t timestamp;           /* Time of reception */
 	uint8_t  status;              /* Status of reception (OK/not OK) */
 };
+
+/* Define invalid/unassigned Controller state/role instance handle */
+#define NODE_RX_HANDLE_INVALID 0xFFFF
+
+/* Define invalid/unassigned Controller LLL context handle */
+#define LLL_HANDLE_INVALID     0xFFFF
 
 /* Header of node_rx_pdu */
 struct node_rx_hdr {
