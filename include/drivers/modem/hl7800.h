@@ -57,6 +57,13 @@ struct mdm_hl7800_apn {
 #define MDM_HL7800_LTE_BAND_STR_SIZE 21
 #define MDM_HL7800_LTE_BAND_STRLEN (MDM_HL7800_LTE_BAND_STR_SIZE - 1)
 
+#define MDM_HL7800_OPERATOR_INDEX_SIZE 3
+#define MDM_HL7800_OPERATOR_INDEX_STRLEN (MDM_HL7800_OPERATOR_INDEX_SIZE - 1)
+
+#define MDM_HL7800_IMSI_MIN_STR_SIZE 15
+#define MDM_HL7800_IMSI_MAX_STR_SIZE 16
+#define MDM_HL7800_IMSI_MAX_STRLEN (MDM_HL7800_IMSI_MAX_STR_SIZE - 1)
+
 enum mdm_hl7800_radio_mode { MDM_RAT_CAT_M1 = 0, MDM_RAT_CAT_NB1 };
 
 enum mdm_hl7800_event {
@@ -206,6 +213,12 @@ char *mdm_hl7800_get_imei(void);
 char *mdm_hl7800_get_fw_version(void);
 
 /**
+ * @brief Get the IMSI
+ *
+ */
+char *mdm_hl7800_get_imsi(void);
+
+/**
  * @brief Update the Access Point Name in the modem.
  *
  * @retval 0 on success, negative on failure.
@@ -262,6 +275,13 @@ int32_t mdm_hl7800_get_local_time(struct tm *tm, int32_t *offset);
  */
 int32_t mdm_hl7800_update_fw(char *file_path);
 #endif
+
+/**
+ * @brief Read the operator index from the modem.
+ *
+ * @retval negative error code, 0 on success
+ */
+int32_t mdm_hl7800_get_operator_index(void);
 
 #ifdef __cplusplus
 }

@@ -501,10 +501,11 @@ struct hl7800_iface_ctx {
 	char mdm_sn[MDM_HL7800_SERIAL_NUMBER_SIZE];
 	char mdm_network_status[MDM_NETWORK_STATUS_LENGTH];
 	char mdm_iccid[MDM_HL7800_ICCID_SIZE];
-	uint8_t mdm_startup_state;
+	enum mdm_hl7800_startup_state mdm_startup_state;
 	enum mdm_hl7800_radio_mode mdm_rat;
 	char mdm_active_bands_string[MDM_HL7800_LTE_BAND_STR_SIZE];
 	char mdm_bands_string[MDM_HL7800_LTE_BAND_STR_SIZE];
+	char mdm_imsi[MDM_HL7800_IMSI_MAX_STR_SIZE];
 	uint16_t mdm_bands_top;
 	uint32_t mdm_bands_middle;
 	uint32_t mdm_bands_bottom;
@@ -514,6 +515,7 @@ struct hl7800_iface_ctx {
 	bool mdm_startup_reporting_on;
 	int device_services_ind;
 	bool new_rat_cmd_support;
+	uint8_t operator_index;
 
 	/* modem state */
 	bool allow_sleep;
@@ -552,6 +554,9 @@ static int modem_boot_handler(char *reason);
 static void mdm_vgpio_work_cb(struct k_work *item);
 static void mdm_reset_work_callback(struct k_work *item);
 static int write_apn(char *access_point_name);
+#ifdef CONFIG_MODEM_HL7800_LOW_POWER_MODE
+static void mark_sockets_for_reconfig(void);
+#endif
 
 #ifdef CONFIG_MODEM_HL7800_FW_UPDATE
 static char *get_fota_state_string(enum mdm_hl7800_fota_state state);
@@ -1051,6 +1056,24 @@ int32_t mdm_hl7800_get_local_time(struct tm *tm, int32_t *offset)
 }
 #endif
 
+int32_t mdm_hl7800_get_operator_index(void)
+{
+	int ret;
+
+	hl7800_lock();
+	wakeup_hl7800();
+	ictx.last_socket_id = 0;
+	ret = send_at_cmd(NULL, "AT+KCARRIERCFG?", MDM_CMD_SEND_TIMEOUT, 0,
+			  false);
+	allow_sleep(true);
+	hl7800_unlock();
+	if (ret < 0) {
+		return ret;
+	} else {
+		return ictx.operator_index;
+	}
+}
+
 void mdm_hl7800_generate_status_events(void)
 {
 	hl7800_lock();
@@ -1498,6 +1521,42 @@ done:
 	return true;
 }
 
+static bool on_cmd_atcmdinfo_imsi(struct net_buf **buf, uint16_t len)
+{
+	struct net_buf *frag = NULL;
+	size_t out_len;
+
+	/* The handler for the IMSI is based on the command.
+	 *  waiting for: <IMSI>\r\n
+	 */
+	wait_for_modem_data_and_newline(buf, net_buf_frags_len(*buf),
+					MDM_HL7800_IMSI_MIN_STR_SIZE);
+
+	frag = NULL;
+	len = net_buf_findcrlf(*buf, &frag);
+	if (!frag) {
+		LOG_ERR("Unable to find IMSI end");
+		goto done;
+	}
+	if (len > MDM_HL7800_IMSI_MAX_STRLEN) {
+		LOG_WRN("IMSI too long (len:%d)", len);
+		len = MDM_HL7800_IMSI_MAX_STRLEN;
+	}
+
+	out_len = net_buf_linearize(ictx.mdm_imsi, MDM_HL7800_IMSI_MAX_STR_SIZE,
+				    *buf, 0, len);
+	ictx.mdm_imsi[out_len] = 0;
+
+	if (strstr(ictx.mdm_imsi, "ERROR") != NULL) {
+		LOG_ERR("Unable to read IMSI");
+		memset(ictx.mdm_imsi, 0, sizeof(ictx.mdm_imsi));
+	}
+
+	LOG_INF("IMSI: %s", log_strdup(ictx.mdm_imsi));
+done:
+	return true;
+}
+
 static void dns_work_cb(struct k_work *work)
 {
 #if defined(CONFIG_DNS_RESOLVER) && !defined(CONFIG_DNS_SERVER_IP_ADDRESSES)
@@ -1535,6 +1594,11 @@ char *mdm_hl7800_get_imei(void)
 char *mdm_hl7800_get_fw_version(void)
 {
 	return ictx.mdm_revision;
+}
+
+char *mdm_hl7800_get_imsi(void)
+{
+	return ictx.mdm_imsi;
 }
 
 /* Handler: +CGCONTRDP: <cid>,<bearer_id>,<apn>,<local_addr and subnet_mask>,
@@ -1988,6 +2052,10 @@ static bool on_cmd_startup_report(struct net_buf **buf, uint16_t len)
 		PRINT_AWAKE_MSG;
 		ictx.wait_for_KSUP = false;
 		ictx.mdm_startup_reporting_on = true;
+		ictx.reconfig_IP_connection = true;
+#ifdef CONFIG_MODEM_HL7800_LOW_POWER_MODE
+		mark_sockets_for_reconfig();
+#endif
 		set_sleep_state(HL7800_SLEEP_STATE_AWAKE);
 		k_sem_give(&ictx.mdm_awake);
 	}
@@ -2301,7 +2369,8 @@ static void iface_status_work_cb(struct k_work *work)
 	} else if (ictx.iface && net_if_is_up(ictx.iface)) {
 		hl7800_start_rssi_work();
 		/* get IP address info */
-		SEND_AT_CMD_IGNORE_ERROR("AT+CGCONTRDP=1");
+		(void)send_at_cmd(NULL, "AT+CGCONTRDP=1", MDM_CMD_SEND_TIMEOUT,
+				  CONFIG_MODEM_HL7800_GET_IP_ADDR_INFO_ATTEMPTS, false);
 		/* get active bands */
 		SEND_AT_CMD_IGNORE_ERROR("AT+KBND?");
 	}
@@ -2368,6 +2437,32 @@ static bool on_cmd_network_report_query(struct net_buf **buf, uint16_t len)
 					    IFACE_WORK_DELAY);
 	}
 
+	return true;
+}
+
+static bool on_cmd_operator_index_query(struct net_buf **buf, uint16_t len)
+{
+	struct net_buf *frag = NULL;
+	char carrier[MDM_HL7800_OPERATOR_INDEX_SIZE];
+	size_t out_len;
+
+	wait_for_modem_data_and_newline(buf, net_buf_frags_len(*buf),
+					MDM_HL7800_OPERATOR_INDEX_SIZE);
+
+	frag = NULL;
+	len = net_buf_findcrlf(*buf, &frag);
+	if (!frag) {
+		LOG_ERR("Unable to find end of operator index response");
+		goto done;
+	}
+
+	out_len = net_buf_linearize(carrier, MDM_HL7800_OPERATOR_INDEX_STRLEN,
+				    *buf, 0, len);
+	carrier[out_len] = 0;
+	ictx.operator_index = (uint8_t)strtol(carrier, NULL, 10);
+
+	LOG_INF("Operator Index: %u", ictx.operator_index);
+done:
 	return true;
 }
 
@@ -3335,6 +3430,8 @@ static void hl7800_rx(void)
 		CMD_HANDLER("+WPPP: 1,1,", atcmdinfo_pdp_authentication_cfg),
 		CMD_HANDLER("+CGDCONT: 1", atcmdinfo_pdp_context),
 		CMD_HANDLER("AT+CEREG?", network_report_query),
+		CMD_HANDLER("+KCARRIERCFG: ", operator_index_query),
+		CMD_HANDLER("AT+CIMI", atcmdinfo_imsi),
 #ifdef CONFIG_NEWLIB_LIBC
 		CMD_HANDLER("+CCLK: ", rtc_query),
 #endif
@@ -3669,7 +3766,11 @@ static void modem_reset(void)
 	set_network_state(HL7800_NOT_REGISTERED);
 	set_startup_state(HL7800_STARTUP_STATE_UNKNOWN);
 #ifdef CONFIG_MODEM_HL7800_FW_UPDATE
-	set_fota_state(HL7800_FOTA_IDLE);
+	if (ictx.fw_update_state == HL7800_FOTA_REBOOT_AND_RECONFIGURE) {
+		set_fota_state(HL7800_FOTA_COMPLETE);
+	} else {
+		set_fota_state(HL7800_FOTA_IDLE);
+	}
 #endif
 	k_sem_reset(&ictx.mdm_awake);
 }
@@ -3692,8 +3793,6 @@ static int modem_boot_handler(char *reason)
 	if (ret) {
 		LOG_ERR("Err waiting for boot: %d, DSR: %u", ret,
 			ictx.dsr_state);
-		return -1;
-	} else if (ictx.mdm_startup_state != HL7800_STARTUP_STATE_READY) {
 		return -1;
 	} else {
 		LOG_INF("Modem booted!");
@@ -4028,7 +4127,11 @@ reboot:
 	SEND_COMPLEX_AT_CMD("AT+KGSN=3");
 
 	/* query SIM ICCID */
-	SEND_AT_CMD_EXPECT_OK("AT+CCID?");
+	SEND_AT_CMD_IGNORE_ERROR("AT+CCID?");
+
+	/* query SIM IMSI */
+	(void)send_at_cmd(NULL, "AT+CIMI", MDM_CMD_SEND_TIMEOUT,
+			  MDM_DEFAULT_AT_CMD_RETRIES, true);
 
 	/* An empty string is used here so that it doesn't conflict
 	 * with the APN used in the +CGDCONT command.
@@ -4079,7 +4182,6 @@ error:
 	LOG_ERR("Unable to configure modem");
 	ictx.configured = false;
 	set_network_state(HL7800_UNABLE_TO_CONFIGURE);
-	modem_reset();
 	/* Kernel will fault with non-zero return value.
 	 * Allow other parts of application to run when modem cannot be configured.
 	 */
@@ -4113,12 +4215,6 @@ int32_t mdm_hl7800_reset(void)
 	hl7800_lock();
 
 	ret = modem_reset_and_configure();
-
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
-	if (ictx.fw_update_state == HL7800_FOTA_REBOOT_AND_RECONFIGURE) {
-		set_fota_state(HL7800_FOTA_COMPLETE);
-	}
-#endif
 
 	hl7800_unlock();
 
