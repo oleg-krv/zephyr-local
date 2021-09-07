@@ -214,7 +214,15 @@ extern void k_thread_foreach_unlocked(
 /* x86 Bitmask definitions for threads user options */
 
 #if defined(CONFIG_FPU_SHARING) && defined(CONFIG_X86_SSE)
-/* thread uses SSEx (and also FP) registers */
+/**
+ * @brief FP and SSE registers are managed by context switch on x86
+ *
+ * @details
+ * This option indicates that the thread uses the x86 CPU's floating point
+ * and SSE registers. This instructs the kernel to take additional steps to
+ * save and restore the contents of these registers when scheduling
+ * the thread. No effect if @kconfig{CONFIG_X86_SSE} is not enabled.
+ */
 #define K_SSE_REGS (BIT(7))
 #endif
 #endif
@@ -4772,8 +4780,8 @@ struct k_mem_slab {
 #define Z_MEM_SLAB_INITIALIZER(obj, slab_buffer, slab_block_size, \
 			       slab_num_blocks) \
 	{ \
-	.lock = {}, \
 	.wait_q = Z_WAIT_Q_INIT(&obj.wait_q), \
+	.lock = {}, \
 	.num_blocks = slab_num_blocks, \
 	.block_size = slab_block_size, \
 	.buffer = slab_buffer, \
