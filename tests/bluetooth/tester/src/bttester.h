@@ -746,6 +746,7 @@ struct l2cap_connect_cmd {
 	uint16_t psm;
 	uint16_t mtu;
 	uint8_t num;
+	uint8_t ecfc;
 } __packed;
 struct l2cap_connect_rp {
 	uint8_t num;
@@ -784,6 +785,13 @@ struct l2cap_listen_cmd {
 struct l2cap_accept_connection_cmd {
 	uint8_t chan_id;
 	uint16_t result;
+} __packed;
+
+#define L2CAP_DISCONNECT_EATT_CHANS		0x09
+struct l2cap_disconnect_eatt_chans_cmd {
+	uint8_t address_type;
+	uint8_t address[6];
+	uint8_t count;
 } __packed;
 
 /* events */
