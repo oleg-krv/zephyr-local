@@ -646,6 +646,8 @@ static int uart_stm32_irq_is_pending(const struct device *dev)
 
 	return ((LL_USART_IsActiveFlag_RXNE(UartInstance) &&
 		 LL_USART_IsEnabledIT_RXNE(UartInstance)) ||
+		(LL_USART_IsActiveFlag_TXE(UartInstance) &&
+		 LL_USART_IsEnabledIT_TXE(UartInstance)) ||
 		(LL_USART_IsActiveFlag_TC(UartInstance) &&
 		 LL_USART_IsEnabledIT_TC(UartInstance)));
 }
@@ -802,15 +804,14 @@ static void uart_stm32_isr(const struct device *dev)
 	USART_TypeDef *UartInstance = UART_STRUCT(dev);
 
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
+	if (data->user_cb) {
+		data->user_cb(dev, data->user_data);
+	}
 	if (LL_USART_IsActiveFlag_TC(UartInstance)) {
-		LL_USART_ClearFlag_TC(UartInstance);
+		//LL_USART_ClearFlag_TC(UartInstance);
 
 		/* allow system to suspend, UART has now finished */
 		pm_constraint_release(PM_STATE_SUSPEND_TO_IDLE);
-	}
-
-	if (data->user_cb) {
-		data->user_cb(dev, data->user_data);
 	}
 #endif /* CONFIG_UART_INTERRUPT_DRIVEN */
 
@@ -1448,10 +1449,10 @@ static int uart_stm32_init(const struct device *dev)
 
 #if defined(CONFIG_UART_INTERRUPT_DRIVEN) || defined(CONFIG_PM)
 	/* Clear TC flag */
-	LL_USART_ClearFlag_TC(UartInstance);
+	//LL_USART_ClearFlag_TC(UartInstance);
 
 	/* Enable TC interrupt so we can release suspend constraint when done */
-	LL_USART_EnableIT_TC(UartInstance);
+	//LL_USART_EnableIT_TC(UartInstance);
 #endif /* defined(CONFIG_UART_INTERRUPT_DRIVEN) || defined(CONFIG_PM) */
 
 #ifdef CONFIG_UART_ASYNC_API
