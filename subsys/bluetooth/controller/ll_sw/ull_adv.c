@@ -66,13 +66,15 @@ static uint16_t adv_time_get(struct pdu_adv *pdu, struct pdu_adv *pdu_scan,
 			     uint8_t adv_chn_cnt, uint8_t phy,
 			     uint8_t phy_flags);
 
-static void ticker_cb(uint32_t ticks_at_expire, uint32_t remainder,
-		      uint16_t lazy, uint8_t force, void *param);
+static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
+		      uint32_t remainder, uint16_t lazy, uint8_t force,
+		      void *param);
 static void ticker_update_op_cb(uint32_t status, void *param);
 
 #if defined(CONFIG_BT_PERIPHERAL)
-static void ticker_stop_cb(uint32_t ticks_at_expire, uint32_t remainder,
-			   uint16_t lazy, uint8_t force, void *param);
+static void ticker_stop_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
+			   uint32_t remainder, uint16_t lazy, uint8_t force,
+			   void *param);
 static void ticker_stop_op_cb(uint32_t status, void *param);
 static void adv_disable(void *param);
 static void disabled_cb(void *param);
@@ -2093,8 +2095,9 @@ static uint16_t adv_time_get(struct pdu_adv *pdu, struct pdu_adv *pdu_scan,
 	return time_us;
 }
 
-static void ticker_cb(uint32_t ticks_at_expire, uint32_t remainder, uint16_t lazy,
-		      uint8_t force, void *param)
+static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
+		      uint32_t remainder, uint16_t lazy, uint8_t force,
+		      void *param)
 {
 	static memq_link_t link;
 	static struct mayfly mfy = {0, 0, &link, NULL, lll_adv_prepare};
@@ -2154,15 +2157,11 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t remainder, uint16_t laz
 			uint32_t ticks_interval =
 				HAL_TICKER_US_TO_TICKS((uint64_t)adv->interval *
 						       ADV_INT_UNIT_US);
-			uint32_t ticks_elapsed = ticks_interval * (lazy + 1);
+			uint32_t ticks_elapsed = ticks_interval * (lazy + 1) +
+						 ticks_drift;
 
 			if (adv->ticks_remain_duration > ticks_elapsed) {
 				adv->ticks_remain_duration -= ticks_elapsed;
-
-				if (adv->ticks_remain_duration > random_delay) {
-					adv->ticks_remain_duration -=
-						random_delay;
-				}
 			} else {
 				adv->ticks_remain_duration = ticks_interval;
 			}
@@ -2180,8 +2179,9 @@ static void ticker_update_op_cb(uint32_t status, void *param)
 }
 
 #if defined(CONFIG_BT_PERIPHERAL)
-static void ticker_stop_cb(uint32_t ticks_at_expire, uint32_t remainder,
-			   uint16_t lazy, uint8_t force, void *param)
+static void ticker_stop_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
+			   uint32_t remainder, uint16_t lazy, uint8_t force,
+			   void *param)
 {
 	struct ll_adv_set *adv = param;
 	uint8_t handle;
@@ -2772,7 +2772,7 @@ static void init_set(struct ll_adv_set *adv)
 	adv->own_addr_type = BT_ADDR_LE_PUBLIC;
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 	adv->lll.chan_map = BT_LE_ADV_CHAN_MAP_ALL;
-	adv->lll.filter_policy = BT_LE_ADV_FP_NO_WHITELIST;
+	adv->lll.filter_policy = BT_LE_ADV_FP_NO_FILTER;
 #if defined(CONFIG_BT_CTLR_JIT_SCHEDULING)
 	adv->delay_remain = ULL_ADV_RANDOM_DELAY;
 #endif /* ONFIG_BT_CTLR_JIT_SCHEDULING */
