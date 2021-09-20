@@ -563,6 +563,7 @@ static void uart_stm32_irq_tx_enable(const struct device *dev)
 	USART_TypeDef *UartInstance = UART_STRUCT(dev);
 
 	LL_USART_EnableIT_TC(UartInstance);
+	LL_USART_EnableIT_TXE(UartInstance);
 }
 
 static void uart_stm32_irq_tx_disable(const struct device *dev)
@@ -570,6 +571,7 @@ static void uart_stm32_irq_tx_disable(const struct device *dev)
 	USART_TypeDef *UartInstance = UART_STRUCT(dev);
 
 	LL_USART_DisableIT_TC(UartInstance);
+	LL_USART_DisableIT_TXE(UartInstance);
 }
 
 static int uart_stm32_irq_tx_ready(const struct device *dev)
