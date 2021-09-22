@@ -130,6 +130,12 @@ enum socket_state {
 	SOCK_CONNECTED,
 };
 
+enum hl7800_lpm {
+	HL7800_LPM_NONE,
+	HL7800_LPM_EDRX,
+	HL7800_LPM_PSM,
+};
+
 struct mdm_control_pinconfig {
 	char *dev_name;
 	gpio_pin_t pin;
@@ -147,7 +153,6 @@ enum mdm_control_pins {
 	MDM_WAKE,
 	MDM_PWR_ON,
 	MDM_FAST_SHUTD,
-	MDM_UART_DTR,
 	MDM_VGPIO,
 	MDM_UART_DSR,
 	MDM_UART_CTS,
@@ -207,10 +212,6 @@ static const struct mdm_control_pinconfig pinconfig[] = {
 		  DT_INST_GPIO_PIN(0, mdm_fast_shutd_gpios),
 		  (GPIO_OUTPUT | GPIO_OPEN_DRAIN)),
 
-	/* MDM_UART_DTR */
-	PINCONFIG(DT_INST_GPIO_LABEL(0, mdm_uart_dtr_gpios),
-		  DT_INST_GPIO_PIN(0, mdm_uart_dtr_gpios), GPIO_OUTPUT),
-
 	/* MDM_VGPIO */
 	PINCONFIG(DT_INST_GPIO_LABEL(0, mdm_vgpio_gpios),
 		  DT_INST_GPIO_PIN(0, mdm_vgpio_gpios),
@@ -242,8 +243,6 @@ static const struct mdm_control_pinconfig pinconfig[] = {
 #define MDM_PWR_ON_NOT_ASSERTED 1
 #define MDM_FAST_SHUTD_ASSERTED 0
 #define MDM_FAST_SHUTD_NOT_ASSERTED 1
-#define MDM_UART_DTR_ASSERTED 0 /* Asserted keeps the module awake */
-#define MDM_UART_DTR_NOT_ASSERTED 1
 
 #define MDM_SEND_OK_ENABLED 0
 #define MDM_SEND_OK_DISABLED 1
@@ -522,6 +521,7 @@ struct hl7800_iface_ctx {
 	bool allow_sleep;
 	bool uart_on;
 	enum mdm_hl7800_sleep_state sleep_state;
+	enum hl7800_lpm low_power_mode;
 	enum mdm_hl7800_network_state network_state;
 	enum net_operator_status operator_status;
 	void (*event_callback)(enum mdm_hl7800_event event, void *event_data);
@@ -812,28 +812,12 @@ static void modem_assert_fast_shutd(bool assert)
 	}
 }
 
-static void modem_assert_uart_dtr(bool assert)
-{
-	if (assert) {
-		HL7800_IO_DBG_LOG("MDM_UART_DTR -> ASSERTED");
-		gpio_pin_set(ictx.gpio_port_dev[MDM_UART_DTR],
-			     pinconfig[MDM_UART_DTR].pin,
-			     MDM_UART_DTR_ASSERTED);
-	} else {
-		HL7800_IO_DBG_LOG("MDM_UART_DTR -> NOT_ASSERTED");
-		gpio_pin_set(ictx.gpio_port_dev[MDM_UART_DTR],
-			     pinconfig[MDM_UART_DTR].pin,
-			     MDM_UART_DTR_NOT_ASSERTED);
-	}
-}
-
 static void allow_sleep_work_callback(struct k_work *item)
 {
 	ARG_UNUSED(item);
 	LOG_DBG("Allow sleep");
 	ictx.allow_sleep = true;
 	modem_assert_wake(false);
-	modem_assert_uart_dtr(false);
 }
 
 static void allow_sleep(bool allow)
@@ -848,7 +832,6 @@ static void allow_sleep(bool allow)
 		k_work_cancel_delayable(&ictx.allow_sleep_work);
 		ictx.allow_sleep = false;
 		modem_assert_wake(true);
-		modem_assert_uart_dtr(true);
 	}
 #endif
 }
@@ -2925,14 +2908,17 @@ static void iface_status_work_cb(struct k_work *work)
 		break;
 	case HL7800_OUT_OF_COVERAGE:
 	default:
-		if (ictx.iface && net_if_is_up(ictx.iface)) {
+		if (ictx.iface && net_if_is_up(ictx.iface) &&
+		    (ictx.low_power_mode != HL7800_LPM_PSM)) {
 			LOG_DBG("HL7800 iface DOWN");
 			net_if_down(ictx.iface);
 		}
 		break;
 	}
 
-	if (ictx.iface && !net_if_is_up(ictx.iface)) {
+	if ((ictx.iface && !net_if_is_up(ictx.iface)) ||
+	    (ictx.low_power_mode == HL7800_LPM_PSM &&
+	     ictx.network_state == HL7800_OUT_OF_COVERAGE)) {
 		hl7800_stop_rssi_work();
 		notify_all_tcp_sockets_closed();
 	} else if (ictx.iface && net_if_is_up(ictx.iface)) {
@@ -3540,7 +3526,8 @@ static void sockreadrecv_cb_work(struct k_work *work)
 
 	sock = CONTAINER_OF(work, struct hl7800_socket, recv_cb_work);
 
-	LOG_DBG("Sock %d RX CB", sock->socket_id);
+	LOG_DBG("Sock %d RX CB (size: %zd)", sock->socket_id,
+		(sock->recv_pkt != NULL) ? net_pkt_get_len(sock->recv_pkt) : 0);
 	/* return data */
 	pkt = sock->recv_pkt;
 	sock->recv_pkt = NULL;
@@ -4319,7 +4306,6 @@ static void prepare_io_for_reset(void)
 {
 	HL7800_IO_DBG_LOG("Preparing IO for reset/sleep");
 	shutdown_uart();
-	modem_assert_uart_dtr(true);
 	modem_assert_wake(false);
 	modem_assert_pwr_on(false);
 	modem_assert_fast_shutd(false);
@@ -4336,8 +4322,8 @@ static void mdm_vgpio_work_cb(struct k_work *item)
 		if (ictx.sleep_state != HL7800_SLEEP_STATE_ASLEEP) {
 			set_sleep_state(HL7800_SLEEP_STATE_ASLEEP);
 		}
-		if (ictx.iface && ictx.initialized &&
-		    net_if_is_up(ictx.iface)) {
+		if (ictx.iface && ictx.initialized && net_if_is_up(ictx.iface) &&
+		    ictx.low_power_mode != HL7800_LPM_PSM) {
 			net_if_down(ictx.iface);
 		}
 	}
@@ -4761,20 +4747,22 @@ reboot:
 	}
 #endif
 
+	ictx.low_power_mode = HL7800_LPM_NONE;
 #ifdef CONFIG_MODEM_HL7800_LOW_POWER_MODE
-
 	/* enable GPIO6 low power monitoring */
 	SEND_AT_CMD_EXPECT_OK("AT+KHWIOCFG=3,1,6");
 
 	/* Turn on sleep mode */
-	SEND_AT_CMD_EXPECT_OK("AT+KSLEEP=0,2,10");
+	SEND_AT_CMD_EXPECT_OK("AT+KSLEEP=1,2,10");
 
 #if CONFIG_MODEM_HL7800_PSM
+	ictx.low_power_mode = HL7800_LPM_PSM;
 	/* Turn off eDRX */
 	SEND_AT_CMD_EXPECT_OK("AT+CEDRXS=0");
 
 	SEND_AT_CMD_EXPECT_OK(TURN_ON_PSM);
 #elif CONFIG_MODEM_HL7800_EDRX
+	ictx.low_power_mode = HL7800_LPM_EDRX;
 	/* Turn off PSM */
 	SEND_AT_CMD_EXPECT_OK("AT+CPSMS=0");
 
@@ -5647,7 +5635,6 @@ static int hl7800_init(const struct device *dev)
 	ictx.uart_on = true;
 
 	modem_assert_wake(false);
-	modem_assert_uart_dtr(false);
 	modem_assert_pwr_on(false);
 	modem_assert_fast_shutd(false);
 

@@ -79,6 +79,13 @@ Modified in this release
   * ``m_*`` structure members are now ``c_*``
   * ``s_*`` structure members are now ``p_*``
 
+* The ``CONFIG_BT_PERIPHERAL_PREF_SLAVE_LATENCY`` Kconfig option is now
+  :kconfig:`CONFIG_BT_PERIPHERAL_PREF_LATENCY`
+* The ``CONFIG_BT_CTLR_SLAVE_FEAT_REQ_SUPPORT`` Kconfig option is now
+  :kconfig:`CONFIG_BT_CTLR_PER_INIT_FEAT_XCHG_SUPPORT`
+* The ``CONFIG_BT_CTLR_SLAVE_FEAT_REQ`` Kconfig option is now
+  :kconfig:`CONFIG_BT_CTLR_PER_INIT_FEAT_XCHG`
+
 Changes in this release
 ==========================
 

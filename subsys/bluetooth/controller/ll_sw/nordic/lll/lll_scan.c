@@ -141,7 +141,7 @@ bool lll_scan_adva_check(struct lll_scan *lll, uint8_t addr_type, uint8_t *addr,
 			 uint8_t rl_idx)
 {
 #if defined(CONFIG_BT_CTLR_PRIVACY)
-	/* Only applies to initiator with no whitelist */
+	/* Only applies to initiator with no filter accept list */
 	if (rl_idx != FILTER_IDX_NONE) {
 		return (rl_idx == lll->rl_idx);
 	} else if (!ull_filter_lll_rl_addr_allowed(addr_type, addr, &rl_idx)) {
@@ -328,8 +328,8 @@ static int common_prepare_cb(struct lll_prepare_param *p, bool is_resume)
 	 */
 	if (unlikely(lll->is_stop ||
 		     (lll->conn &&
-		      (lll->conn->master.initiated ||
-		       lll->conn->master.cancelled)))) {
+		      (lll->conn->central.initiated ||
+		       lll->conn->central.cancelled)))) {
 		radio_isr_set(lll_isr_early_abort, lll);
 		radio_disable();
 
@@ -406,13 +406,13 @@ static int common_prepare_cb(struct lll_prepare_param *p, bool is_resume)
 	} else
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
-	if (IS_ENABLED(CONFIG_BT_CTLR_FILTER) && lll->filter_policy) {
+	if (IS_ENABLED(CONFIG_BT_CTLR_FILTER_ACCEPT_LIST) && lll->filter_policy) {
 		/* Setup Radio Filter */
-		struct lll_filter *wl = ull_filter_lll_get(true);
+		struct lll_filter *fal = ull_filter_lll_get(true);
 
-		radio_filter_configure(wl->enable_bitmask,
-				       wl->addr_type_bitmask,
-				       (uint8_t *)wl->bdaddr);
+		radio_filter_configure(fal->enable_bitmask,
+				       fal->addr_type_bitmask,
+				       (uint8_t *)fal->bdaddr);
 	}
 
 	ticks_at_event = p->ticks_at_expire;
@@ -426,7 +426,7 @@ static int common_prepare_cb(struct lll_prepare_param *p, bool is_resume)
 	remainder_us = radio_tmr_start(0, ticks_at_start, remainder);
 
 	/* capture end of Rx-ed PDU, for initiator to calculate first
-	 * master event or extended scan to schedule auxiliary channel
+	 * central event or extended scan to schedule auxiliary channel
 	 * reception.
 	 */
 	radio_tmr_end_capture();
@@ -573,7 +573,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 		if (0) {
 #if defined(CONFIG_BT_CENTRAL)
 		} else if (IS_ENABLED(CONFIG_BT_CTLR_LOW_LAT) &&
-			   lll->conn && lll->conn->master.initiated) {
+			   lll->conn && lll->conn->central.initiated) {
 			while (!radio_has_disabled()) {
 				cpu_sleep();
 			}
@@ -826,7 +826,7 @@ static void isr_done(void *param)
 #endif /* !CONFIG_BT_CTLR_GPIO_LNA_PIN */
 
 	/* capture end of Rx-ed PDU, for initiator to calculate first
-	 * master event.
+	 * central event.
 	 */
 	radio_tmr_end_capture();
 }
@@ -873,7 +873,7 @@ static void isr_window(void *param)
 #endif /* !CONFIG_BT_CENTRAL */
 
 	/* capture end of Rx-ed PDU, for initiator to calculate first
-	 * master event.
+	 * central event.
 	 */
 	radio_tmr_end_capture();
 
@@ -1006,7 +1006,7 @@ static inline bool isr_rx_scan_check(struct lll_scan *lll, uint8_t irkmatch_ok,
 		 (!devmatch_ok || ull_filter_lll_rl_idx_allowed(irkmatch_ok,
 								rl_idx))) ||
 		(((lll->filter_policy & 0x01) != 0) &&
-		 (devmatch_ok || ull_filter_lll_irk_whitelisted(rl_idx)));
+		 (devmatch_ok || ull_filter_lll_irk_in_fal(rl_idx)));
 #else
 	return ((lll->filter_policy & 0x01) == 0U) ||
 		devmatch_ok;
@@ -1027,7 +1027,7 @@ static inline int isr_rx_pdu(struct lll_scan *lll, struct pdu_adv *pdu_adv_rx,
 	/* Note: connectable ADV_EXT_IND is handled as any other ADV_EXT_IND
 	 *       because we need to receive AUX_ADV_IND anyway.
 	 */
-	} else if (lll->conn && !lll->conn->master.cancelled &&
+	} else if (lll->conn && !lll->conn->central.cancelled &&
 		   (pdu_adv_rx->type != PDU_ADV_TYPE_EXT_IND) &&
 		   isr_scan_init_check(lll, pdu_adv_rx, rl_idx)) {
 		struct lll_conn *lll_conn;
@@ -1137,7 +1137,7 @@ static inline int isr_rx_pdu(struct lll_scan *lll, struct pdu_adv *pdu_adv_rx,
 		/* FIXME: for extended connection initiation, handle reset on
 		 *        event aborted before connect_rsp is received.
 		 */
-		lll->conn->master.initiated = 1U;
+		lll->conn->central.initiated = 1U;
 
 		/* Stop further initiating events */
 		lll->is_stop = 1U;
