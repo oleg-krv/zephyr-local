@@ -126,6 +126,12 @@ Stable API changes in this release
     structure contains two members: ``handles``, which was moved from
     :c:struct:`bt_gatt_read_params`, and ``variable``.
 
+* Networking
+
+  * Added IPv4 address support to the multicast group join/leave monitor. The
+    address parameter passed to the callback function was therefore changed from
+    ``in6_addr`` to ``net_addr`` type.
+
 Kernel
 ******
 
@@ -177,6 +183,7 @@ Boards & SoC Support
 
 * Added support for these SoC series:
 
+  * Added STM32U5 basic SoC support
 
 * Removed support for these SoC series:
 
@@ -192,13 +199,26 @@ Boards & SoC Support
   * Enabled Atmel SAM ``clock-frequency`` support from devicetree
   * Free Atmel SAM TRACESWO pin when unused
   * Enabled Cypress PSoC-6 Cortex-M4 support
+  * Added low power support to STM32L0, STM32G0 and STM32WL series
+  * STM32: Enabled ART Flash accelerator by default when available (F2, F4, F7, H7, L5)
+  * STM32: Added Kconfig option to enable STM32Cube asserts (CONFIG_USE_STM32_ASSERT)
 
 
 * Changes for ARC boards:
 
 
+* Changes for ARM boards:
+
+  * Added SPI support on Arduino standard SPI when possible
+
 * Added support for these ARM boards:
 
+  * Dragino NBSN95 NB-IoT Sensor Node
+  * Seeedstudio LoRa-E5 Dev Board
+  * ST B_U585I_IOT02A Discovery kit
+  * ST Nucleo F446ZE
+  * ST Nucleo U575ZI Q
+  * ST STM32H735G Discovery
 
 * Added support for these ARM64 boards:
 
@@ -229,12 +249,16 @@ Boards & SoC Support
 
 * Added support for these following shields:
 
+  * 4.2inch epaper display (GDEW042T2)
+  * X-NUCLEO-EEPRMA2 EEPROM memory expansion board
 
 Drivers and Sensors
 *******************
 
 * ADC
 
+  * Added STM32WL ADC driver
+  * STM32: Added support for oversampling
 
 * Bluetooth
 
@@ -251,13 +275,17 @@ Drivers and Sensors
 * Counter
 
   * Add Atmel SAM counter (TC) Driver
+  * Added STM32WL RTC counter driver
 
+* Crypto
+
+  * STM23: Add support for SOCs with AES hardware block (STM32G0, STM32L5 and STM32WL)
 
 * DAC
 
   * Added Atmel SAM DAC (DACC) driver
   * Added support for Microchip MCP4725
-
+  * Added support for STM32F3 series
 
 * Disk
 
@@ -269,16 +297,22 @@ Drivers and Sensors
 
 * Disk
 
+  * STM32 SDMMC now supports SDIO enabled devices
 
 * DMA
 
   * Added Atmel SAM XDMAC reload support
-  * Added support on STM32G0 and STM32H7
+  * Added support on STM32F3, STM32G0, STM32H7 and STM32L5
+  * STM32: Reviewed bindings definitions, "st,stm32-dma-v2bis" introduced.
 
 
 * EEPROM
 
   * Added support for EEPROM emulated in flash.
+
+* Entropy
+
+  * Added support for STM32F2, STM32G0, STM32WB and STM32WL
 
 * ESPI
 
@@ -294,6 +328,9 @@ Drivers and Sensors
 
 * Flash
 
+  * Added STM32F2, STM32L5 and STM32WL Flash driver support
+  * STM32: Max erase time parameter was moved to device tree
+  * Added quad SPI support for STM32F4
 
 * GPIO
 
@@ -311,9 +348,16 @@ Drivers and Sensors
 
 * IEEE 802.15.4
 
+* IPM
+
+  * Added STM32 HSEM IPM driver.
 
 * Interrupt Controller
 
+
+* IPM
+
+  * STM32: Add HSEM based IPM driver for STM32H7 series
 
 * LED
 
@@ -322,18 +366,33 @@ Drivers and Sensors
 
   * lora_send now blocks until the transmission is complete. lora_send_async
     can be used for the previous, non-blocking behaviour.
+  * Enabled support for STM32WL series
+
+* MEMC
+
+  * Added STM32F4 support
+
 
 * Modem
 
   * Added gsm_ppp devicetree support
 
+* PCI/PCIe
+
+  * Fixed an issue that MSI-X was used even though it is not available.
+  * Improved MBAR retrieval for MSI-X.
+  * Added ability to retrieve extended PCI/PCIe capabilities.
 
 * Pinmux
 
   * Added Atmel SAM0 pinctrl support
+  * STM32: Deprecated definitions like 'STM32F2_PINMUX_FUNC_PA0_UART4_TX'
+    are now removed.
 
 
 * PWM
+
+  * Property "st,prescaler" of binding "st,stm32-pwm" now defaults to "0".
 
 
 * Sensor
@@ -341,6 +400,11 @@ Drivers and Sensors
 
 * Serial
 
+  * Added kconfig to disable runtime re-configuration of UART
+    to reduce footprint if so desired.
+  * Added ESP32-C3 polling only UART driver.
+  * Added ESP32-S2 polling only UART driver.
+  * Added Microchip XEC UART driver.
 
 * SPI
 
@@ -355,6 +419,8 @@ Drivers and Sensors
 
 * Watchdog
 
+  * Added STM32L5 watchdog support
+
 
 * WiFi
 
@@ -362,38 +428,131 @@ Drivers and Sensors
 Networking
 **********
 
+* 802.15.4 L2:
+
+  * Fixed a bug, where the net_pkt structure contained invalid LL address
+    pointers after being processed by 802.15.4 L2.
+  * Added an optional destination address filtering in the 802.15.4 L2.
+
 * CoAP:
 
+  * Added ``user_data`` field to the :c:struct:`coap_packet` structure.
+  * Fixed processing of out-of-order notifications.
+  * Fixed :c:func:`coap_packet_get_payload` function.
+  * Converted CoAP test suite to ztest API.
+  * Improved :c:func:`coap_packet_get_payload` function to minimize number
+    of RNG calls.
+  * Fixed retransmissions in the ``coap_server`` sample.
+  * Fixed observer removal in the ``coap_server`` sample (on notification
+    timeout).
 
 * DHCPv4:
 
+  * Fixed a bug, where DHPCv4 library removed statically configured gateway
+    before obtaining a new one from the server.
 
 * DNS:
 
+  * Fixed a bug, where the same IP address was used to populate the result
+    address info entries, when multiple IP addresses were obtained from the
+    server.
 
 * HTTP:
 
+  * Switched the library to use ``zsock_*`` API, to improve compatibility with
+    various POSIX configurations.
+  * Fixed a bug, where ``HTTP_DATA_FINAL`` notification was triggered even for
+    intermediate response fragments.
 
-* IPv4:
+* IPv6:
 
+  * Multiple IPv6 fixes, addressing failures in IPv6Ready compliance tests.
 
 * LwM2M:
 
+  * Added support for notification timeout reporting to the application.
+  * Fixed a bug, where a multi instance resource with only one active instance
+    was incorrectly encoded on reads.
+  * Fixed a bug, where notifications were generated on changes to non-readable
+    resources.
+  * Added mutex protection  for the state variable of the ``lwm2m_rd_client``
+    module.
+  * Removed LWM2M_RES_TYPE_U64 type, as it's not possible to encode it properly
+    for large values.
+  * Fixed a bug, where large unsigned integers were incorrectly encoded in TLV.
+  * Multiple fixes for FLOAT type processing in the LwM2M engine and encoders.
+  * Fix a bug, where IPSO Push Button counter resource was not triggering
+    notification on incrementation.
+  * Fixed a bug, where Register failures were reported as success to the
+    application.
 
 * Misc:
 
+  * Added RX/TX timeout on a socket in ``big_http_download`` sample.
+  * Introduced :c:func:`net_pkt_remove_tail` function.
+    Added IEEE 802.15.4 security-related flags to the :c:struct:`net_pkt`
+    structure.
+  * Added bridging support to the Ethernet L2.
+  * Fixed a bug in mDNS, where an incorrect address type could be set as a
+    response destination.
+  * Added an option to suppress ICMP destination unreachable errors.
+  * Fixed possible assertion in ``net nbr`` shell command.
+  * Major refactoring of the TFTP library.
+
+* MQTT:
+
+  * Added an option to register a custom transport type.
+  * Fixed a bug in :c:func:`mqtt_abort`, where the function could return without
+    releasing a lock.
 
 * OpenThread:
 
+  * Update OpenThread module up to commit ``9ea34d1e2053b6b2a80e1d46b65a6aee99fc504a``.
+    Added several new Kconfig options to align with new OpenThread
+    configurations.
+  * Added OpenThread API mutex protection during initialization.
+  * Converted OpenThread thread to a dedicated work queue.
+  * Implemented missing :c:func:`otPlatAssertFail` platform function.
+  * Fixed a bug, where NONE level OpenThread logs were not processed.
+  * Added possibility to disable CSL sampling, when used.
+  * Fixed a potential bug, where invalid error code could be returned by the
+    platform radio layer to OpenThread.
+  * Reworked UART configuration in the OpenThread Coprocessor sample.
 
 * Socket:
 
+  * Added microsecond accuracy in :c:func:`zsock_select` function.
+  * Reworked :c:func:`zsock_select` into a syscall.
+  * Fixed a bug, where :c:func:`poll` events were not signalled correctly
+    for socketpair sockets.
+  * Fixed a bug, where socket mutex could be used after being initialized by a
+    new owner after being deallocated in :c:func:`zsock_close`.
+  * Fixed a possible assert after enabling CAN sockets.
+  * Fixed IPPROTO_RAW usage in packet socket implementation.
 
 * TCP:
 
+  * Fixed a bug, where ``unacked_len`` could be set to a negative value.
+  * Fixed possible assertion failure in :c:func:`tcp_send_data`.
+  * Fixed a bug, where [FIN, PSH, ACK] was not handled properly in
+    TCP_FIN_WAIT_2 state.
 
 * TLS:
 
+  * Reworked TLS sockets to use secure random generator from Zephyr.
+  * Fixed busy looping during DTLS handshake with offloaded sockets.
+  * Fixed busy looping during TLS/DTLS handshake on non blocking sockets.
+  * Reset mbed TLS session on timed out DTLS handshake, to allow a retry without
+    closing a socket.
+  * Fixed TLS/DTLS :c:func:`sendmsg` implementation for larger payloads.
+  * Fixed TLS/DTLS sockets ``POLLHUP`` notification.
+
+* WebSocket:
+
+  * Fixed :c:func:`poll` implementation for WebSocket, which did not work
+    correctly with offloaded sockets.
+  * Fixed :c:func:`ioctl` implementation for WebSocket, which did not work
+    correctly with offloaded sockets.
 
 USB
 ***
@@ -462,6 +621,17 @@ Libraries / Subsystems
     * ``device_busy_clear`` -> ``pm_device_busy_clear``
     * ``device_busy_check`` -> ``pm_device_is_busy``
     * ``device_any_busy_check`` -> ``pm_device_is_any_busy``
+
+  * The device power management callback (``pm_device_control_callback_t``) has
+    been largely simplified to work based on *actions*, resulting in simpler and
+    more natural implementations. This principle is also used by other OSes like
+    the Linux Kernel. As a result, the callback argument list has been reduced
+    to the device instance and an action (e.g. ``PM_DEVICE_ACTION_RESUME``).
+    Other improvements include specification of error codes, removal of some
+    unused/unclear states, or guarantees such as avoid calling a device for
+    suspend/resume if it is already at the right state. All these changes
+    together have allowed simplifying multiple device power management callback
+    implementations.
 
 * Logging
 

@@ -8,7 +8,6 @@
 #ifndef ZEPHYR_INCLUDE_ARCH_ARM64_CORTEX_R_MPU_ARM_MPU_H_
 #define ZEPHYR_INCLUDE_ARCH_ARM64_CORTEX_R_MPU_ARM_MPU_H_
 
-#ifndef _ASMLANGUAGE
 /*
  * Convenience macros to represent the ARMv8-R64-specific configuration
  * for memory access permission and cache-ability attribution.
@@ -152,7 +151,7 @@
 #define REGION_RAM_TEXT_ATTR				   \
 	{						   \
 		/* AP, XN, SH */			   \
-		.rbar = P_RO_U_NA_Msk | NON_SHAREABLE_Msk, \
+		.rbar = P_RO_U_RO_Msk | NON_SHAREABLE_Msk, \
 		/* Cache-ability */			   \
 		.mair_idx = MPU_MAIR_INDEX_SRAM,	   \
 	}
@@ -160,7 +159,7 @@
 #define REGION_RAM_RO_ATTR					      \
 	{							      \
 		/* AP, XN, SH */				      \
-		.rbar = NOT_EXEC | P_RO_U_NA_Msk | NON_SHAREABLE_Msk, \
+		.rbar = NOT_EXEC | P_RO_U_RO_Msk | NON_SHAREABLE_Msk, \
 		/* Cache-ability */				      \
 		.mair_idx = MPU_MAIR_INDEX_SRAM,		      \
 	}
@@ -182,6 +181,8 @@
 		.mair_idx = MPU_MAIR_INDEX_FLASH,			    \
 	}
 #endif /* CONFIG_MPU_ALLOW_FLASH_WRITE */
+
+#ifndef _ASMLANGUAGE
 
 struct arm_mpu_region_attr {
 	/* Attributes belonging to PRBAR */
@@ -217,6 +218,17 @@ struct arm_mpu_config {
 		.limit = _limit,		      \
 		.attr = _attr,			      \
 	}
+
+#define K_MEM_PARTITION_P_RW_U_RW ((k_mem_partition_attr_t) \
+	{(P_RW_U_RW_Msk), MPU_MAIR_INDEX_SRAM})
+#define K_MEM_PARTITION_P_RW_U_NA ((k_mem_partition_attr_t) \
+	{(P_RW_U_NA_Msk), MPU_MAIR_INDEX_SRAM})
+#define K_MEM_PARTITION_P_RO_U_RO ((k_mem_partition_attr_t) \
+	{(P_RO_U_RO_Msk), MPU_MAIR_INDEX_SRAM})
+#define K_MEM_PARTITION_P_RO_U_NA ((k_mem_partition_attr_t) \
+	{(P_RO_U_NA_Msk), MPU_MAIR_INDEX_SRAM})
+
+typedef struct arm_mpu_region_attr k_mem_partition_attr_t;
 
 /* Reference to the MPU configuration.
  *
