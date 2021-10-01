@@ -595,7 +595,7 @@ static void uart_stm32_irq_tx_enable(const struct device *dev)
 	USART_TypeDef *UartInstance = UART_STRUCT(dev);
 
 	LL_USART_EnableIT_TC(UartInstance);
-	LL_USART_EnableIT_TXE(UartInstance);
+	//LL_USART_EnableIT_TXE(UartInstance);
 
 #ifdef CONFIG_PM
 	uart_stm32_pm_constraint_set(dev);
@@ -607,7 +607,7 @@ static void uart_stm32_irq_tx_disable(const struct device *dev)
 	USART_TypeDef *UartInstance = UART_STRUCT(dev);
 
 	LL_USART_DisableIT_TC(UartInstance);
-	LL_USART_DisableIT_TXE(UartInstance);
+	//LL_USART_DisableIT_TXE(UartInstance);
 
 #ifdef CONFIG_PM
 	uart_stm32_pm_constraint_release(dev);
@@ -688,8 +688,8 @@ static int uart_stm32_irq_is_pending(const struct device *dev)
 
 	return ((LL_USART_IsActiveFlag_RXNE(UartInstance) &&
 		 LL_USART_IsEnabledIT_RXNE(UartInstance)) ||
-		(LL_USART_IsActiveFlag_TXE(UartInstance) &&
-		 LL_USART_IsEnabledIT_TXE(UartInstance)) ||
+		/*(LL_USART_IsActiveFlag_TXE(UartInstance) &&
+		 LL_USART_IsEnabledIT_TXE(UartInstance)) ||*/
 		(LL_USART_IsActiveFlag_TC(UartInstance) &&
 		 LL_USART_IsEnabledIT_TC(UartInstance)));
 }
