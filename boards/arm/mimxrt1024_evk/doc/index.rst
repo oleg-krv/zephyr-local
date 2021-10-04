@@ -91,6 +91,10 @@ features:
 +-----------+------------+-------------------------------------+
 | WATCHDOG  | on-chip    | watchdog                            |
 +-----------+------------+-------------------------------------+
+| HWINFO    | on-chip    | reset cause                         |
++-----------+------------+-------------------------------------+
+| DMA       | on-chip    | dma                                 |
++-----------+------------+-------------------------------------+
 
 The default configuration can be found in the defconfig file:
 ``boards/arm/mimxrt1024_evk/mimxrt1024_evk_defconfig``
