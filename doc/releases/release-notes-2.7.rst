@@ -16,6 +16,12 @@ Security Vulnerability Related
 
 The following CVEs are addressed by this release:
 
+More detailed information can be found in:
+https://docs.zephyrproject.org/latest/security/vulnerabilities.html
+
+* CVE-2021-3510: `Zephyr project bug tracker GHSA-289f-7mw3-2qf4
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-289f-7mw3-2qf4>`_.
+
 
 Known issues
 ************
@@ -141,6 +147,13 @@ Architectures
 
 * ARC
 
+  * Add SMP support to ARCv3 HS6x
+  * Add MWDT C library support
+  * Add basic C++ support with MWDT toolchain
+  * Add MPUv3 and MPUv6 support
+  * Remove dead PM code from ARC core interrupt controller driver
+  * Add updating arc connect debug mask dynamically
+
 
 * ARM
 
@@ -246,6 +259,10 @@ Boards & SoC Support
 
 * Changes for ARC boards:
 
+  * Implement 'run' command for SMP nSIM simulation board
+  * Enable upstream verification on QEMU ARCv3 HS6x board (qemu_arc_hs6x)
+  * Implement creg GPIO driver and add it to hsdk and em_starterkit boards
+
 
 * Changes for ARM boards:
 
@@ -330,14 +347,12 @@ Drivers and Sensors
 * Disk
 
   * Added SDMMC support on STM32L4+
+  * STM32 SDMMC now supports SDIO enabled devices
+  * Added USDHC support for i.MX RT685
 
 * Display
 
   * Added support for ST7735R
-
-* Disk
-
-  * STM32 SDMMC now supports SDIO enabled devices
 
 * DMA
 
@@ -437,6 +452,25 @@ Drivers and Sensors
 
 * Sensor
 
+  * Refactored various drivers to use ``_dt_spec``.
+  * Refactored various drivers to support multiple instances.
+  * Enhanced TI HDC20XX driver to support DRDY/INT pin.
+  * Updated temperature conversion formula in TI HDC20XX driver.
+  * Enhanced MS5607 pressure sensor driver to support I2C.
+  * Fixed temperature compensation in MS5607 pressure sensor driver.
+  * Refactored ST LIS2DW12 driver to move range, power, and trigger
+    configuration from Kconfig to dts.
+  * Enhanced TI BQ274XX fuel gauge driver to support power management.
+  * Aligned ST sensor drivers to use STMEMC HAL I/F v2.00.
+  * Added Sensirion SGP40 multipixel gas sensor driver.
+  * Added Sensirion SHTCX humidity sensor driver.
+  * Added Sensirion SHT4X temperature and humidity sensor driver.
+  * Added SiLabs SI7270 hall effect magnetic position and temperature sensor
+    driver.
+  * Added ST I3G4250D gyroscope driver.
+  * Added TI INA219 and INA23X current/power monitor drivers.
+  * Added TI LM75 and LM77 temperature sensor drivers.
+  * Added TI HDC20XX humidity and temperature sensor driver.
 
 * Serial
 
@@ -454,8 +488,9 @@ Drivers and Sensors
 
 * USB
 
-  * Add Atmel SAM4L USBC device controller
-
+  * Added Atmel SAM4L USBC device controller driver
+  * Added support for NXP LPC USB controller
+  * Adapted drivers use new USB framework header
 
 * Watchdog
 
@@ -597,6 +632,20 @@ Networking
 USB
 ***
 
+* Added new header file where all defines and structures from Chapter 9
+  (USB Device Framework) should be included.
+* Revised configuraiton of USB device support.
+  Removed Kconfig option ``CONFIG_USB`` and introduced Kconfig option
+  ``CONFIG_USB_DEVICE_DRIVER`` to enable USB device controller drivers,
+  which is selected when option ``CONFIG_USB_DEVICE_STACK`` is enabled.
+* Enhanced verification of the control request in device stack, classes, and samples.
+* Added support to store alternate interface setting.
+* Added ``zephyr_udc0`` nodelabel to all boards with USB support to allow
+  generic USB device support samples to be build.
+* Reworked descriptors, config, and data definitions macros in CDC ACM class.
+* Changed CDC ACM UART implementation to get configuration from devicetree.
+  With this change, many ``CONFIG_*_ON_DEV_NAME`` options were removed and
+  applications revised. See :ref:`usb_device_cdc_acm` for more information.
 
 Build and Infrastructure
 ************************
@@ -788,8 +837,38 @@ Libraries / Subsystems
     together have allowed simplifying multiple device power management callback
     implementations.
 
+  * Introduced a new API to allow devices capable of wake up the system
+    register themselves was wake up sources. This permits applications to
+    select the most appropriate way to wake up the system when it is
+    suspended. Devices marked as wake up source are not suspended by the kernel
+    when the system is idle. It is possible to declare a device wake up capable
+    direct in devicetree like this example::
+
+        &gpio0 {
+                compatible = "zephyr,gpio-emul";
+                gpio-controller;
+                wakeup-source;
+        };
+
+    * Removed  ``PM_DEVICE_STATE_FORCE_SUSPEND`` device power state.because it
+      is an action and not a state.
+
+    * Removed ``PM_DEVICE_STATE_RESUMING`` and ``PM_DEVICE_STATE_SUSPENDING``.
+      They were transitional states and only used in device runtime. Now the
+      subsystem is using device flag to keep track of a transition.
+
+    * Implement constraint API as weak symbols so applications or platform
+      can override them. Platforms can have their own way to
+      set/release constraints in their drivers that are not part of
+      Zephyr code base.
+
+
 * Logging
 
+* MODBUS
+
+  * Changed server handler to copy Transaction and Protocol Identifiers
+    to response header.
 
 * Random
 
