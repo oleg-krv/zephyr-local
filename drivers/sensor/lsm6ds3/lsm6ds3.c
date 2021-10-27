@@ -906,9 +906,8 @@ static int lsm6ds3_init(const struct device *dev)
 			.handle =					\
 			   (void *)&lsm6ds3_config_##inst.stmemsc_cfg,	\
 		},							\
-		.stmemsc_cfg.i2c = {					\
-			.bus = DEVICE_DT_GET(DT_INST_BUS(inst)),	\
-			.i2c_slv_addr = DT_INST_REG_ADDR(inst),		\
+		.stmemsc_cfg = {					\
+			.i2c = I2C_DT_SPEC_INST_GET(inst),		\
 		},							\
 		COND_CODE_1(DT_INST_NODE_HAS_PROP(inst, irq_gpios),	\
 			(LSM6DS3_CFG_IRQ(inst)), ())			\
