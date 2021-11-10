@@ -228,12 +228,15 @@ struct gap_passkey_confirm_cmd {
 	uint8_t match;
 } __packed;
 
+#define GAP_START_DIRECTED_ADV_HD	BIT(0)
+#define GAP_START_DIRECTED_ADV_OWN_ID	BIT(1)
+#define GAP_START_DIRECTED_ADV_PEER_RPA	BIT(2)
+
 #define GAP_START_DIRECTED_ADV		0x15
 struct gap_start_directed_adv_cmd {
 	uint8_t address_type;
 	uint8_t address[6];
-	uint8_t high_duty;
-	uint8_t own_id_addr;
+	uint16_t options;
 } __packed;
 struct gap_start_directed_adv_rp {
 	uint32_t current_settings;
