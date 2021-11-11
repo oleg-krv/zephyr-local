@@ -633,7 +633,9 @@ static bool tcp_options_check(struct tcp_options *recv_options,
 			}
 			opt_len = options[1];
 		}
-		NET_DBG("opt: %hu, opt_len: %hu", (uint16_t)opt, (uint16_t)opt_len);
+
+		NET_DBG("opt: %hu, opt_len: %hu",
+			(uint16_t)opt, (uint16_t)opt_len);
 
 		if (opt_len < 2 || opt_len > len) {
 			result = false;
@@ -806,14 +808,11 @@ static int ip_header_add(struct tcp *conn, struct net_pkt *pkt)
 
 static int net_tcp_set_mss_opt(struct tcp *conn, struct net_pkt *pkt)
 {
-	struct mss_option {
-		uint32_t option;
-	};
-	NET_PKT_DATA_ACCESS_DEFINE(mss_option, struct mss_option);
-	struct mss_option *mss;
+	NET_PKT_DATA_ACCESS_DEFINE(mss_opt_access, struct tcp_mss_option);
+	struct tcp_mss_option *mss;
 	uint32_t recv_mss;
 
-	mss = net_pkt_get_data(pkt, &mss_option);
+	mss = net_pkt_get_data(pkt, &mss_opt_access);
 	if (!mss) {
 		return -ENOBUFS;
 	}
@@ -823,7 +822,7 @@ static int net_tcp_set_mss_opt(struct tcp *conn, struct net_pkt *pkt)
 
 	UNALIGNED_PUT(htonl(recv_mss), (uint32_t *)mss);
 
-	return net_pkt_set_data(pkt, &mss_option);
+	return net_pkt_set_data(pkt, &mss_opt_access);
 }
 
 static bool is_destination_local(struct net_pkt *pkt)
@@ -1048,7 +1047,6 @@ static int tcp_send_queued_data(struct tcp *conn)
 	}
 
 	while (tcp_unsent_len(conn) > 0) {
-
 		if (tcp_window_full(conn)) {
 			subscribe = true;
 			break;
@@ -1128,13 +1126,14 @@ static void tcp_resend_data(struct k_work *work)
 			NET_DBG("TCP connection in active close, "
 				"not disposing yet (waiting %dms)",
 				FIN_TIMEOUT_MS);
-			k_work_reschedule_for_queue(
-				&tcp_work_q, &conn->fin_timer, FIN_TIMEOUT);
+			k_work_reschedule_for_queue(&tcp_work_q,
+						    &conn->fin_timer,
+						    FIN_TIMEOUT);
 
 			conn_state(conn, TCP_FIN_WAIT_1);
 
 			ret = tcp_out_ext(conn, FIN | ACK, NULL,
-				    conn->seq + conn->unacked_len);
+					  conn->seq + conn->unacked_len);
 			if (ret == 0) {
 				conn_seq(conn, + 1);
 			}
@@ -1312,7 +1311,6 @@ static struct tcp *tcp_conn_search(struct net_pkt *pkt)
 	struct tcp *tmp;
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&tcp_conns, conn, tmp, next) {
-
 		found = tcp_conn_cmp(conn, pkt);
 		if (found) {
 			break;
@@ -1997,7 +1995,8 @@ next_state:
 	case TCP_FIN_WAIT_2:
 		if (th && (FL(&fl, ==, FIN, th_seq(th) == conn->ack) ||
 			   FL(&fl, ==, FIN | ACK, th_seq(th) == conn->ack) ||
-			   FL(&fl, ==, FIN | PSH | ACK, th_seq(th) == conn->ack))) {
+			   FL(&fl, ==, FIN | PSH | ACK,
+			      th_seq(th) == conn->ack))) {
 			/* Received FIN on FIN_WAIT_2, so cancel the timer */
 			k_work_cancel_delayable(&conn->fin_timer);
 
@@ -2104,11 +2103,12 @@ int net_tcp_put(struct net_context *context)
 
 			NET_DBG("TCP connection in active close, not "
 				"disposing yet (waiting %dms)", FIN_TIMEOUT_MS);
-			k_work_reschedule_for_queue(
-				&tcp_work_q, &conn->fin_timer, FIN_TIMEOUT);
+			k_work_reschedule_for_queue(&tcp_work_q,
+						    &conn->fin_timer,
+						    FIN_TIMEOUT);
 
 			ret = tcp_out_ext(conn, FIN | ACK, NULL,
-				    conn->seq + conn->unacked_len);
+					  conn->seq + conn->unacked_len);
 			if (ret == 0) {
 				conn_seq(conn, + 1);
 			}
@@ -2183,9 +2183,9 @@ int net_tcp_queue_data(struct net_context *context, struct net_pkt *pkt)
 		 * conn is embedded, and calling that function directly here
 		 * and in the work handler.
 		 */
-		(void)k_work_schedule_for_queue(
-			&tcp_work_q, &conn->send_data_timer, K_NO_WAIT);
-
+		(void)k_work_schedule_for_queue(&tcp_work_q,
+						&conn->send_data_timer,
+						K_NO_WAIT);
 		ret = -EAGAIN;
 		goto out;
 	}
@@ -2479,8 +2479,8 @@ struct net_tcp_hdr *net_tcp_input(struct net_pkt *pkt,
 	struct net_tcp_hdr *tcp_hdr;
 
 	if (IS_ENABLED(CONFIG_NET_TCP_CHECKSUM) &&
-			net_if_need_calc_rx_checksum(net_pkt_iface(pkt)) &&
-			net_calc_chksum_tcp(pkt) != 0U) {
+	    net_if_need_calc_rx_checksum(net_pkt_iface(pkt)) &&
+	    net_calc_chksum_tcp(pkt) != 0U) {
 		NET_DBG("DROP: checksum mismatch");
 		goto drop;
 	}
@@ -2813,7 +2813,7 @@ const char *net_tcp_state_str(enum tcp_state state)
 void net_tcp_init(void)
 {
 #if defined(CONFIG_NET_TEST_PROTOCOL)
-	/* Register inputs for TTCN-3 based TCP2 sanity check */
+	/* Register inputs for TTCN-3 based TCP sanity check */
 	test_cb_register(AF_INET,  IPPROTO_TCP, 4242, 4242, tcp_input);
 	test_cb_register(AF_INET6, IPPROTO_TCP, 4242, 4242, tcp_input);
 	test_cb_register(AF_INET,  IPPROTO_UDP, 4242, 4242, tp_input);
