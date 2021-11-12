@@ -260,13 +260,13 @@ static int prepare_cb(struct lll_prepare_param *p)
 	/* capture end of Tx-ed PDU, used to calculate HCTO. */
 	radio_tmr_end_capture();
 
-#if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
 	radio_gpio_pa_setup();
 	radio_gpio_pa_lna_enable(start_us + radio_tx_ready_delay_get(phy_s, 1) -
-				 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
-#else /* !CONFIG_BT_CTLR_GPIO_PA_PIN */
+				 HAL_RADIO_GPIO_PA_OFFSET);
+#else /* !HAL_RADIO_GPIO_HAVE_PA_PIN */
 	ARG_UNUSED(start_us);
-#endif /* !CONFIG_BT_CTLR_GPIO_PA_PIN */
+#endif /* !HAL_RADIO_GPIO_HAVE_PA_PIN */
 
 #if defined(CONFIG_BT_CTLR_XTAL_ADVANCED) && \
 	(EVENT_OVERHEAD_PREEMPT_US <= EVENT_OVERHEAD_PREEMPT_MIN_US)
@@ -354,7 +354,7 @@ static void isr_tx_chain(void *param)
 	 */
 	radio_tmr_end_capture();
 
-#if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 		/* PA/LNA enable is overwriting packet end used in ISR
 		 * profiling, hence back it up for later use.
@@ -366,8 +366,8 @@ static void isr_tx_chain(void *param)
 	radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() + EVENT_B2B_MAFS_US -
 				 4 - radio_tx_chain_delay_get(lll->phy_s,
 							      lll->phy_flags) -
-				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_LNA_PIN */
+				 HAL_RADIO_GPIO_LNA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_LNA_PIN */
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 		lll_prof_send();
@@ -437,7 +437,7 @@ static void isr_tx_rx(void *param)
 		radio_rssi_measure();
 	}
 
-#if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 		/* PA/LNA enable is overwriting packet end used in ISR
 		 * profiling, hence back it up for later use.
@@ -448,8 +448,8 @@ static void isr_tx_rx(void *param)
 	radio_gpio_lna_setup();
 	radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() + EVENT_IFS_US - 4 -
 				 radio_tx_chain_delay_get(lll->phy_s, 1) -
-				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_LNA_PIN */
+				 HAL_RADIO_GPIO_LNA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_LNA_PIN */
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 		lll_prof_reserve_send(node_rx_prof);
@@ -609,7 +609,7 @@ static inline int isr_rx_pdu(struct lll_adv_aux *lll_aux,
 		}
 #endif /* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY */
 
-#if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
 		if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 			/* PA/LNA enable is overwriting packet end used in ISR
 			 * profiling, hence back it up for later use.
@@ -622,8 +622,8 @@ static inline int isr_rx_pdu(struct lll_adv_aux *lll_aux,
 					 EVENT_IFS_US -
 					 radio_rx_chain_delay_get(lll->phy_s,
 								  1) -
-					 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_PA_PIN */
+					 HAL_RADIO_GPIO_PA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_PA_PIN */
 		return 0;
 
 #if defined(CONFIG_BT_PERIPHERAL)
@@ -661,7 +661,7 @@ static inline int isr_rx_pdu(struct lll_adv_aux *lll_aux,
 			lll_prof_cputime_capture();
 		}
 
-#if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
 		if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 			/* PA/LNA enable is overwriting packet end used in ISR
 			 * profiling, hence back it up for later use.
@@ -674,8 +674,8 @@ static inline int isr_rx_pdu(struct lll_adv_aux *lll_aux,
 					 EVENT_IFS_US -
 					 radio_rx_chain_delay_get(lll->phy_s,
 								  1) -
-					 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_PA_PIN */
+					 HAL_RADIO_GPIO_PA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_PA_PIN */
 
 		/* Note: this is the same as previous result from alloc_peek */
 		rx = ull_pdu_rx_alloc();
