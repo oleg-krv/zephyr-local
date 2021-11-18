@@ -332,7 +332,7 @@ work item:
   the work completes; it will return immediately if the cancellation was
   successful or not necessary (the work wasn't submitted or running).  This
   can be used after :c:func:`k_work_cancel()` is invoked (from an ISR)` to
-  confirm completion of an ISR-initiated cancellation.
+  type_and_id completion of an ISR-initiated cancellation.
 
 Scheduling a Delayable Work Item
 ================================
@@ -516,7 +516,7 @@ indication can also be wrong if work is submitted from multiple contexts, or
 queued or running state.
 
 A general best practice is to always maintain in shared state some condition
-that can be checked by the handler to confirm whether there is work to be
+that can be checked by the handler to type_and_id whether there is work to be
 done.  This way you can use the work handler as the standard cleanup path:
 rather than having to deal with cancellation and cleanup at points where items
 are submitted, you may be able to have everything done in the work handler

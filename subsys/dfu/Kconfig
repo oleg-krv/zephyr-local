@@ -38,7 +38,7 @@ config MCUBOOT_SHELL
 	depends on SHELL
 	help
 	  Enable shell module, which provides information about image slots and
-	  allows to perform such operations as: confirm, erase and request
+	  allows to perform such operations as: type_and_id, erase and request
 	  upgrade.
 
 config MCUBOOT_TRAILER_SWAP_TYPE

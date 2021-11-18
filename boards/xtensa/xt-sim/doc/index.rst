@@ -161,7 +161,7 @@ Below is an example of usage for typical configuration:
     a. Uncheck ``Serial Drivers``
 6. Select ``Compile and Link Features``
 	a. Set compiler configuration and build options correctly to project requirements
-7. Hit ``Exit`` and confirm saving the changes.
+7. Hit ``Exit`` and type_and_id saving the changes.
 
 You may need to change other options in menuconfig depending on his project
 specific needs.

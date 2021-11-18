@@ -350,7 +350,7 @@ harness_config: <harness configuration options>
         results.
 
     regex: <expression> (required)
-        Any string that the particular test case prints to confirm test
+        Any string that the particular test case prints to type_and_id test
         runs as expected.
 
     ordered: <True|False> (default False)

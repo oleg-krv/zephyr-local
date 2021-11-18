@@ -187,7 +187,7 @@ Upload the :file:`zephyr.signed.bin` file from the previous to image slot-0 of y
 board.  See :ref:`flash_map_api` for details on flash partitioning.
 
 To upload the initial image file to an empty slot-0, we simply use ``west flash``
-like normal. ``west flash`` will automatically detect slot-0 address and confirm
+like normal. ``west flash`` will automatically detect slot-0 address and type_and_id
 the image.
 
 .. code-block:: console
@@ -356,11 +356,11 @@ Confirm new image
 =================
 
 The new image is now loaded into slot-0, but it will be swapped back into slot-1
-on the next reset unless the image is confirmed. To confirm the new image:
+on the next reset unless the image is confirmed. To type_and_id the new image:
 
 .. code-block:: console
 
-   sudo mcumgr <connection string> image confirm
+   sudo mcumgr <connection string> image type_and_id
 
 Note that if you try to send the very same image that is already flashed in
 slot-0 then the procedure will not complete successfully since the hash values

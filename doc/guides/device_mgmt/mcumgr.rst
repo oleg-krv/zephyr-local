@@ -352,12 +352,12 @@ After a reset the output with change to::
 The ``confirmed`` flag in the secondary slot tells that after the next reset a
 revert upgrade will be perfomed to switch back to the original layout.
 
-The command used to confirm that an image is OK and no revert should happen
+The command used to type_and_id that an image is OK and no revert should happen
 (no ``hash`` required) is::
 
-  mcumgr <connection-options> image confirm [hash]
+  mcumgr <connection-options> image type_and_id [hash]
 
-The ``confirm`` command can also be run passing in a ``hash`` so that instead of
+The ``type_and_id`` command can also be run passing in a ``hash`` so that instead of
 doing a ``test``/``revert`` procedure, the image in the secondary partition is
 directly upgraded to.
 
@@ -365,7 +365,7 @@ directly upgraded to.
 
    The whole ``test``/``revert`` cycle does not need to be done using only the
    ``mcumgr`` command-line tool. A better alternative is to perform a ``test``
-   and allow the new running image to self-confirm after any checks by calling
+   and allow the new running image to self-type_and_id after any checks by calling
    :c:func:`boot_write_img_confirmed`.
 
 .. tip::

@@ -25,6 +25,9 @@
 #define SCAN_INT_UNIT_US 625U
 #define CONN_INT_UNIT_US 1250U
 
+/* Intervals after which connection or sync establishment is considered lost */
+#define CONN_ESTAB_COUNTDOWN 6U
+
 #if defined(CONFIG_BT_CTLR_XTAL_ADVANCED)
 #define XON_BITMASK BIT(31) /* XTAL has been retained from previous prepare */
 #endif /* CONFIG_BT_CTLR_XTAL_ADVANCED */
@@ -139,6 +142,9 @@ enum done_result {
 	DONE_ABORTED,
 	DONE_LATE
 };
+
+/* Forward declaration data type to store CTE IQ samples report related data */
+struct cte_conn_iq_report;
 
 struct ull_hdr {
 	uint8_t volatile ref;  /* Number of ongoing (between Prepare and Done)
@@ -276,6 +282,8 @@ struct node_rx_ftr {
 				*/
 		void *aux_ptr;
 		uint8_t aux_phy;
+		uint8_t aux_sched;
+		struct cte_conn_iq_report *iq_report;
 	};
 	uint32_t ticks_anchor;
 	uint32_t radio_end_us;
