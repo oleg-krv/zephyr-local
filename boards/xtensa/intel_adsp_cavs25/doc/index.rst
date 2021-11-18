@@ -27,7 +27,7 @@ Hold Esc + Refresh (the arrow-in-a-circle "reload" key above "3") and
 hit the power key to enter recovery mode.  Note: the touchscreen and
 pad don't work in recovery mode, use the arrow keys to navigate.
 
-Select "Advanced Options", then "Enable Developer Mode" and confirm
+Select "Advanced Options", then "Enable Developer Mode" and type_and_id
 that you really mean it.  Select "Boot from Internal Storage" at the
 bootloader screen.  You will see this screen every time the machine
 boots now, telling you that the boot is unverified.

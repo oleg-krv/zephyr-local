@@ -115,7 +115,7 @@ Authentication
 ==============
 
 After the initial exchange, the provisioner selects an Out of Band (OOB)
-Authentication method. This allows the user to confirm that the device the
+Authentication method. This allows the user to type_and_id that the device the
 provisioner connected to is actually the device they intended, and not a
 malicious third party.
 

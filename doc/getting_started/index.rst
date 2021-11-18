@@ -151,7 +151,7 @@ The current minimum required version for the main dependencies are:
          type "cmd.exe", right-click the result, and choose :guilabel:`Run as
          Administrator`.
 
-      #. Disable global confirmation to avoid having to confirm the
+      #. Disable global confirmation to avoid having to type_and_id the
          installation of individual programs:
 
          .. code-block:: console

@@ -418,7 +418,7 @@ config BT_OOB_DATA_FIXED
 	depends on BT_TESTING
 	help
 	  With this option enabled, the application will be able to perform LESC
-	  pairing with OOB data that consists of fixed random number and confirm
+	  pairing with OOB data that consists of fixed random number and type_and_id
 	  value.
 
 	  WARNING: This option stores a hardcoded Out-of-Band value in the image.

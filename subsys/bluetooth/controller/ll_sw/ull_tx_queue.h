@@ -7,7 +7,7 @@
 #include <sys/slist.h>
 
 struct ull_tx_q {
-	u8_t pause_data; /* Data pause state of the tx queue */
+	uint8_t pause_data; /* Data pause state of the tx queue */
 
 	sys_slist_t tx_list; /* Data and control node_tx list */
 	sys_slist_t data_list; /* Data node_tx wait list */
@@ -52,6 +52,15 @@ void ull_tx_q_enqueue_data(struct ull_tx_q *queue, struct node_tx *tx);
  * @param tx Address of tx node to enqueue.
  */
 void ull_tx_q_enqueue_ctrl(struct ull_tx_q *queue, struct node_tx *tx);
+
+/**
+ * @brief Peek head tx node of tx queue.
+ *
+ * @param ull_tx_q Address of tx queue.
+ *
+ * @return Head tx node of the tx queue.
+ */
+struct node_tx *ull_tx_q_peek(struct ull_tx_q *queue);
 
 /**
  * @brief Dequeue a tx node from a tx queue.

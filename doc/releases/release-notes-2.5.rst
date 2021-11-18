@@ -926,8 +926,8 @@ MCUBoot
 * imgtool
 
   * Print image digest during verify.
-  * Add possibility to set confirm flag for hex files as well.
-  * Usage of --confirm implies --pad.
+  * Add possibility to set type_and_id flag for hex files as well.
+  * Usage of --type_and_id implies --pad.
   * Fixed 'custom_tlvs' argument handling.
   * Add support for setting fixed ROM address into image header.
   * Fixed verification with protected TLVs.
@@ -1835,7 +1835,7 @@ release:
 * :github:`25173` - k_sem_give(struct k_sem \*sem) should report failure when the semaphore is full
 * :github:`25164` - Remove ``default:`` functionality from devicetree bindings
 * :github:`25015` - Bluetooth Isochronous Channels Support
-* :github:`25010` - disco_l475_iot1 don't confirm MCUBoot slot-1 image
+* :github:`25010` - disco_l475_iot1 don't type_and_id MCUBoot slot-1 image
 * :github:`24803` - ADC driver test hangs on atsame54_xpro
 * :github:`24652` - sanitycheck doesn't keep my cores busy
 * :github:`24453` - docs: Allow to use the exact current zephyr version number in place of /latest/ in documentation URLs

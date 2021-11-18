@@ -1324,7 +1324,7 @@ release:
 * :github:`34696` - Unable to select LOG_DICTIONARY_SUPPORT when TEST_LOGGING_DEFAULTS=y
 * :github:`34690` - net: process_rx_packet() work handler violates requirements of Workqueue Threads implementation
 * :github:`34687` - intel_adsp_cavs15: run tests/kernel/semaphore/semaphore/ failed on ADSP
-* :github:`34683` - MCUboot not confirm image when using 'west flash'
+* :github:`34683` - MCUboot not type_and_id image when using 'west flash'
 * :github:`34672` - stm32h7: issue with CONFIG_UART_ASYNC_API=y
 * :github:`34670` - smp_svr sample configured for serial port with shell management enabled does not work
 * :github:`34669` - uart_read_fifo() reads only 2 chars on nucleo STM32L43KC and nRF52840-DK

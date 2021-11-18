@@ -85,7 +85,7 @@ Step 4: Build Hawkbit
 
 .. _hawkbit_sample_sign:
 
-Step 5: Sign and confirm the first image
+Step 5: Sign and type_and_id the first image
 ========================================
 
 From this section onwards you use a binary (``.bin``) image format.
@@ -93,14 +93,14 @@ From this section onwards you use a binary (``.bin``) image format.
 .. code-block:: console
 
    west sign -t imgtool -- --key \
-   ~/zephyrproject/bootloader/mcuboot/root-rsa-2048.pem --confirm \
+   ~/zephyrproject/bootloader/mcuboot/root-rsa-2048.pem --type_and_id \
    --version 1.0.0
 
 The command above creates a signed and confirmed image file called
 :file:`zephyr.signed.confirmed.bin` in the build directory. It's important for
-the first image to be confirmed as MCUboot isn't able to confirm an image that
+the first image to be confirmed as MCUboot isn't able to type_and_id an image that
 is flashed using a hardware tool, and Hawkbit will reboot to trigger a firmware
-swap if it isn't able to confirm the running image on init.
+swap if it isn't able to type_and_id the running image on init.
 
 Step 6: Flash the first image
 =============================

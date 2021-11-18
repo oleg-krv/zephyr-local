@@ -907,7 +907,7 @@ release:
 * :github:`25016` - BT_LE_ADV_NCONN_NAME doesn't actually advertise name
 * :github:`25015` - Bluetooth Isochronous Channels Support
 * :github:`25012` - checkpatch.pl doesn't match the vendor string properly
-* :github:`25010` - disco_l475_iot1 don't confirm MCUBoot slot-1 image
+* :github:`25010` - disco_l475_iot1 don't type_and_id MCUBoot slot-1 image
 * :github:`24978` - RFC: use compatible name for prefix for device-specific API
 * :github:`24970` - ieee802154 l2: no length check in frame validation
 * :github:`24965` - RF2XX radio driver does automatic retransmission and OpenThread as well

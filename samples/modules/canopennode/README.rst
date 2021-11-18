@@ -377,7 +377,7 @@ for the FRDM-K64F as follows:
 
    .. code-block:: console
 
-      west flash --skip-rebuild --runner canopen --confirm-only
+      west flash --skip-rebuild --runner canopen --type_and_id-only
 
 #. Finally, resign the CANopen sample binary with a new version number
    and perform a program download over CANopen:

@@ -55,7 +55,7 @@ For example, to set LED0 on use FC01 command (write_coil).
    > client.connect
    > client.write_coil address=0 value=1 unit=1
 
-Client should confirm successful communication and LED0 should light.
+Client should type_and_id successful communication and LED0 should light.
 
 .. code-block:: console
 

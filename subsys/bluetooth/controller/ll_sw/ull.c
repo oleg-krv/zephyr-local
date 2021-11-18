@@ -45,6 +45,9 @@
 #include "ull_adv_types.h"
 #include "ull_scan_types.h"
 #include "ull_sync_types.h"
+#if !defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
+#include "ull_tx_queue.h"
+#endif
 #include "ull_conn_types.h"
 #include "ull_filter.h"
 #include "ull_df_types.h"
@@ -1379,11 +1382,41 @@ void ll_rx_mem_release(void **node_rx)
 		{
 			struct node_rx_sync *se =
 				(void *)((struct node_rx_pdu *)rx_free)->pdu;
+			uint8_t status = se->status;
 
-			if (!se->status) {
+			/* Below status codes use node_rx_sync_estab, hence
+			 * release the node_rx memory and release sync context
+			 * if sync establishment failed.
+			 */
+			if ((status == BT_HCI_ERR_SUCCESS) ||
+			    (status == BT_HCI_ERR_UNSUPP_REMOTE_FEATURE) ||
+			    (status == BT_HCI_ERR_CONN_FAIL_TO_ESTAB)) {
+				struct ll_sync_set *sync;
+				struct ll_scan_set *scan;
+
+				/* pick the scan context before node_rx
+				 * release.
+				 */
+				scan = (void *)rx_free->rx_ftr.param;
+
 				mem_release(rx_free, &mem_pdu_rx.free);
 
+				/* pick the sync context before scan context
+				 * is cleanup of sync context association.
+				 */
+				sync = scan->per_scan.sync;
+
+				ull_sync_setup_complete(scan);
+
+				if (status != BT_HCI_ERR_SUCCESS) {
+					ull_sync_release(sync);
+				}
+
 				break;
+			} else {
+				LL_ASSERT(status == BT_HCI_ERR_OP_CANCELLED_BY_HOST);
+
+				/* Fall through and release sync context */
 			}
 		}
 		/* Pass through */
@@ -1396,6 +1429,7 @@ void ll_rx_mem_release(void **node_rx)
 			ull_sync_release(sync);
 		}
 		break;
+
 #if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX)
 		case NODE_RX_TYPE_IQ_SAMPLE_REPORT:
 		{

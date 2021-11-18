@@ -550,7 +550,7 @@ This commands reads the controller specific static addresses.
 This command shall return the static addresses programmed by the vendor at
 manufacturing time.
 
-Each returned static address shall confirm to the Static Device Address
+Each returned static address shall type_and_id to the Static Device Address
 definition. The two most significant bits of the address shall be equal to 1.
 At least one bit of the random part of the address shall be 0. At least one bit
 of the random part of the address shall be 1.
