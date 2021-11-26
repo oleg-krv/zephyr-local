@@ -866,7 +866,7 @@ static int sock_get_pkt_src_addr(struct net_pkt *pkt,
 			goto error;
 		}
 
-		net_ipaddr_copy(&addr4->sin_addr, &ipv4_hdr->src);
+		net_ipv4_addr_copy_raw((uint8_t *)&addr4->sin_addr, ipv4_hdr->src);
 		port = &addr4->sin_port;
 	} else if (IS_ENABLED(CONFIG_NET_IPV6) &&
 		   net_pkt_family(pkt) == AF_INET6) {
@@ -889,7 +889,7 @@ static int sock_get_pkt_src_addr(struct net_pkt *pkt,
 			goto error;
 		}
 
-		net_ipaddr_copy(&addr6->sin6_addr, &ipv6_hdr->src);
+		net_ipv6_addr_copy_raw((uint8_t *)&addr6->sin6_addr, ipv6_hdr->src);
 		port = &addr6->sin6_port;
 	} else {
 		ret = -ENOTSUP;
