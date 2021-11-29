@@ -5,7 +5,6 @@
 # A script to generate twister options based on modified files.
 
 import re, os
-import sh
 import argparse
 import glob
 import yaml
@@ -14,7 +13,7 @@ import fnmatch
 import subprocess
 import csv
 import logging
-from git import Git, Repo
+from git import Repo
 
 if "ZEPHYR_BASE" not in os.environ:
     exit("$ZEPHYR_BASE environment variable undefined.")
@@ -100,16 +99,16 @@ class Filters:
         self.find_archs()
         self.find_boards()
 
-    def get_plan(self, options):
+    def get_plan(self, options, integration=False):
         fname = "_test_plan_partial.csv"
         cmd = ["scripts/twister", "-c"] + options + ["--save-tests", fname ]
-        if self.pull_request:
+        if integration:
             cmd.append("--integration")
 
-        p = subprocess.call(cmd)
+        _ = subprocess.call(cmd)
         with open(fname, newline='') as csvfile:
             csv_reader = csv.reader(csvfile, delimiter=',')
-            header = next(csv_reader)
+            _ = next(csv_reader)
             for e in csv_reader:
                 self.all_tests.append(e)
         if os.path.exists(fname):
@@ -139,7 +138,7 @@ class Filters:
 
         if _options:
             logging.info(f'Potential architecture filters...')
-            self.get_plan(_options)
+            self.get_plan(_options, True)
 
     def find_boards(self):
         boards = set()
@@ -191,7 +190,7 @@ class Filters:
                 for platform in self.platforms:
                     _options.extend(["-p", platform])
             else:
-                 _options.append("--all")
+                _options.append("--all")
             self.get_plan(_options)
 
     def find_tags(self):
@@ -257,7 +256,7 @@ class Filters:
                     _options.extend(["-p", platform])
 
             _options.extend(self.tag_options)
-            self.get_plan(_options)
+            self.get_plan(_options, True)
         else:
             logging.info(f'No twister needed or partial twister run only...')
 
