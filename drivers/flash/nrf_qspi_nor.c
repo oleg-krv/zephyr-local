@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <drivers/flash.h>
 #include <init.h>
+#include <pm/device.h>
 #include <string.h>
 #include <logging/log.h>
 LOG_MODULE_REGISTER(qspi_nor, CONFIG_FLASH_LOG_LEVEL);
@@ -608,11 +609,13 @@ static int qspi_sfdp_read(const struct device *dev, off_t offset,
 		.io3_level = true,
 	};
 
-	int res = ANOMALY_122_INIT(dev);
+	int ret = ANOMALY_122_INIT(dev);
+	nrfx_err_t res = NRFX_SUCCESS;
 
-	if (res != NRFX_SUCCESS) {
-		LOG_DBG("ANOMALY_122_INIT: %x", res);
-		goto out;
+	if (ret != 0) {
+		LOG_DBG("ANOMALY_122_INIT: %d", ret);
+		ANOMALY_122_UNINIT(dev);
+		return ret;
 	}
 
 	qspi_lock(dev);
