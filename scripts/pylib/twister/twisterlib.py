@@ -740,7 +740,7 @@ class DeviceHandler(Handler):
         else:
             serial_device = hardware.serial
 
-        logger.debug("Using serial device {} @ {} baud".format(serial_device, hardware.serial_baud))
+        logger.debug(f"Using serial device {serial_device} @ {hardware.baud} baud")
 
         if (self.suite.west_flash is not None) or runner:
             command = ["west", "flash", "--skip-rebuild", "-d", self.build_dir]
@@ -767,7 +767,7 @@ class DeviceHandler(Handler):
                         command_extra_args.append("--board-id")
                         command_extra_args.append(board_id)
                     elif runner == "nrfjprog":
-                        command_extra_args.append("--snr")
+                        command_extra_args.append("--dev-id")
                         command_extra_args.append(board_id)
                     elif runner == "openocd" and product == "STM32 STLink":
                         command_extra_args.append("--cmd-pre-init")
@@ -799,7 +799,7 @@ class DeviceHandler(Handler):
         try:
             ser = serial.Serial(
                 serial_device,
-                baudrate=hardware.serial_baud,
+                baudrate=hardware.baud,
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE,
                 bytesize=serial.EIGHTBITS,
@@ -4089,9 +4089,7 @@ class DUT(object):
                  runner=None):
 
         self.serial = serial
-        self.serial_baud = 115200
-        if serial_baud:
-            self.serial_baud = serial_baud
+        self.baud = serial_baud or 115200
         self.platform = platform
         self.serial_pty = serial_pty
         self._counter = Value("i", 0)
@@ -4273,6 +4271,7 @@ class HardwareMap:
                             s_dev.runner = runner
 
                 s_dev.connected = True
+                s_dev.lock = None
                 self.detected.append(s_dev)
             else:
                 logger.warning("Unsupported device (%s): %s" % (d.manufacturer, d))
