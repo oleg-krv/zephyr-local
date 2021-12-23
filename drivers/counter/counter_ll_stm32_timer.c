@@ -561,7 +561,7 @@ void counter_stm32_irq_handler(const struct device *dev)
 	}
 }
 
-#define TIMER(idx)              DT_PARENT(DT_DRV_INST(idx))
+#define TIMER(idx)              DT_INST_PARENT(idx)
 
 /** TIMx instance from DT */
 #define TIM(idx) ((TIM_TypeDef *)DT_REG_ADDR(TIMER(idx)))
@@ -580,7 +580,7 @@ void counter_stm32_irq_handler(const struct device *dev)
 		IRQ_CONNECT(DT_IRQN(TIMER(idx)),				  \
 			    DT_IRQ(TIMER(idx), priority),			  \
 			    counter_stm32_irq_handler,				  \
-			    DEVICE_DT_GET(DT_DRV_INST(idx)),			  \
+			    DEVICE_DT_INST_GET(idx),				  \
 			    0);							  \
 		irq_enable(DT_IRQN(TIMER(idx)));				  \
 	}									  \

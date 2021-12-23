@@ -37,7 +37,7 @@ manifest:
       groups:
         - hal
     - name: edtt
-      revision: 31badfbbd04f2948e3df6ebf329f930317550961
+      revision: c94f63865a803b18a2ab9eca70d2a9ab881130f6
       path: tools/edtt
       groups:
         - tools
@@ -73,7 +73,7 @@ manifest:
       groups:
         - hal
     - name: hal_gigadevice
-      revision: 749fdd4b9dc9dfc57daac1229a5a669109e14624
+      revision: 05de2b5229cf0267c73595c2454284059f48b27e
       path: modules/hal/gigadevice
       groups:
         - hal
@@ -88,7 +88,7 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: 077031bf6eaac5352e304ad0f1a0c5b16b4dd115
+      revision: a42b016d7c7610489f5f8c79773fedc05ba352ee
       path: modules/hal/nordic
       groups:
         - hal
@@ -124,7 +124,7 @@ manifest:
       groups:
         - hal
     - name: hal_stm32
-      revision: 6fc9b5f7e0229ef64a882e37213266d346ebfadb
+      revision: 5ca535df5874d1f9ab931265a2b1f691b76df9ce
       path: modules/hal/stm32
       groups:
         - hal
@@ -152,7 +152,7 @@ manifest:
       path: modules/fs/littlefs
       groups:
         - fs
-      revision: 9e4498d1c73009acd84bb36036ee5e2869112a6c
+      revision: 33509ed9c3d369cdb9d909cd40c5eea8f64a902c
     - name: loramac-node
       revision: 12019623bbad9eb54fe51066847a7cbd4b4eac57
       path: modules/lib/loramac-node
@@ -168,7 +168,7 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: 225b02468bf77806bdd5f503725256cb345970d2
+      revision: 399720d1cabd26c4356445d351f263b31e942961
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t

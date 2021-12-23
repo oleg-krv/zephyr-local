@@ -549,7 +549,7 @@ enum log_strdup_action {
 static inline uint32_t log_const_source_id(
 				const struct log_source_const_data *data)
 {
-	return ((uint8_t *)data - (uint8_t *)__log_const_start)/
+	return ((const uint8_t *)data - (uint8_t *)__log_const_start)/
 			sizeof(struct log_source_const_data);
 }
 
@@ -563,7 +563,7 @@ extern struct log_source_dynamic_data __log_dynamic_end[];
 #define LOG_ITEM_DYNAMIC_DATA(_name) UTIL_CAT(log_dynamic_, _name)
 
 #define LOG_INSTANCE_DYNAMIC_DATA(_module_name, _inst) \
-	LOG_ITEM_DYNAMIC_DATA(LOG_INSTANCE_FULL_NAME(_module_name, _inst))
+	LOG_ITEM_DYNAMIC_DATA(Z_LOG_INSTANCE_FULL_NAME(_module_name, _inst))
 
 /** @brief Get index of the log source based on the address of the dynamic data
  *         associated with the source.

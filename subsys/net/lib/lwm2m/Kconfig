@@ -23,6 +23,21 @@ config LWM2M_DTLS_SUPPORT
 	select NET_SOCKETS_SOCKOPT_TLS
 	select NET_SOCKETS_ENABLE_DTLS
 
+choice
+	prompt "LwM2M Server object version"
+	default LWM2M_SERVER_OBJECT_VERSION_1_0
+	help
+	  Select which version of the Server object should be used.
+
+config LWM2M_SERVER_OBJECT_VERSION_1_0
+	bool "Server object version 1.0"
+
+config LWM2M_SERVER_OBJECT_VERSION_1_1
+	bool "Server object version 1.1 [EXPERIMENTAL]"
+	select EXPERIMENTAL
+
+endchoice
+
 config LWM2M_DNS_SUPPORT
 	bool "Enable DNS support in the LWM2M client"
 	default y if DNS_RESOLVER
@@ -263,6 +278,31 @@ config LWM2M_FIRMWARE_UPDATE_PULL_SUPPORT
 	  Include support for pulling a file from a remote server via
 	  block transfer and "FIRMWARE PACKAGE URI" resource.  This option
 	  adds another UDP context and packet handling.
+
+config LWM2M_SWMGMT_OBJ_SUPPORT
+	bool "Software management object support"
+	help
+	  Include support for LWM2M Software Management Object (ID 9)
+
+config LWM2M_SWMGMT_MAX_INSTANCE_COUNT
+	int "Maximum # of object instances"
+	depends on LWM2M_SWMGMT_OBJ_SUPPORT
+	default 1
+
+config LWM2M_SWMGMT_PACKAGE_NAME_LEN
+	int "Maximum size of the software management object's name string"
+	depends on LWM2M_SWMGMT_OBJ_SUPPORT
+	default 64
+
+config LWM2M_SWMGMT_PACKAGE_VERSION_LEN
+	int "Maximum size of the software management object's version string"
+	depends on LWM2M_SWMGMT_OBJ_SUPPORT
+	default 64
+
+config LWM2M_SWMGMT_PACKAGE_URI_LEN
+	int "Maximum size of the software management object's download URI string"
+	depends on (LWM2M_SWMGMT_OBJ_SUPPORT || LWM2M_FIRMWARE_UPDATE_PULL_SUPPORT)
+	default 128
 
 config LWM2M_NUM_BLOCK1_CONTEXT
 	int "Maximum # of LWM2M block1 contexts"
