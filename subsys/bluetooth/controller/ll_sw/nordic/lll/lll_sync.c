@@ -145,12 +145,6 @@ void lll_sync_aux_prepare_cb(struct lll_sync *lll,
 	/* Start setting up Radio h/w */
 	radio_reset();
 
-#if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL)
-	radio_tx_power_set(lll_aux->tx_pwr_lvl);
-#else
-	radio_tx_power_set(RADIO_TXP_DEFAULT);
-#endif
-
 	radio_phy_set(lll_aux->phy, 1);
 	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, LL_EXT_OCTETS_RX_MAX,
 			    RADIO_PKT_CONF_PHY(lll_aux->phy));
@@ -396,12 +390,6 @@ static int prepare_cb_common(struct lll_prepare_param *p, uint8_t chan_idx)
 	/* Start setting up Radio h/w */
 	radio_reset();
 
-#if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL)
-	radio_tx_power_set(lll->tx_pwr_lvl);
-#else
-	radio_tx_power_set(RADIO_TXP_DEFAULT);
-#endif /* CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL */
-
 	radio_phy_set(lll->phy, 1);
 	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, LL_EXT_OCTETS_RX_MAX,
 			    RADIO_PKT_CONF_PHY(lll->phy));
@@ -619,6 +607,7 @@ static void isr_aux_setup(void *param)
 static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok, uint8_t rssi_ready,
 		  enum sync_status status)
 {
+	bool sched = false;
 	int err;
 
 	/* Check CRC and generate Periodic Advertising Report */
@@ -644,6 +633,7 @@ static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok, uint8
 					    radio_rx_chain_delay_get(lll->phy,
 								     1);
 			ftr->sync_status = status;
+			ftr->sync_rx_enabled = lll->is_rx_enabled;
 
 			pdu = (void *)node_rx->pdu;
 
@@ -660,23 +650,29 @@ static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok, uint8
 
 			ull_rx_put(node_rx->hdr.link, node_rx);
 
-#if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX)
-			(void)create_iq_report(lll, rssi_ready,
-					       BT_HCI_LE_CTE_CRC_OK);
-#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX */
-
-			ull_rx_sched();
+			sched = true;
 		} else {
 			err = 0;
 		}
+
+#if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX)
+		(void)create_iq_report(lll, rssi_ready, BT_HCI_LE_CTE_CRC_OK);
+		sched = true;
+#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX */
+
 	} else {
 #if defined(CONFIG_BT_CTLR_DF_SAMPLE_CTE_FOR_PDU_WITH_BAD_CRC)
 		err = create_iq_report(lll, rssi_ready, BT_HCI_LE_CTE_CRC_ERR_CTE_BASED_TIME);
 		if (!err) {
-			ull_rx_sched();
+			sched = true;
 		}
 #endif /* CONFIG_BT_CTLR_DF_SAMPLE_CTE_FOR_PDU_WITH_BAD_CRC */
+
 		err = 0;
+	}
+
+	if (sched) {
+		ull_rx_sched();
 	}
 
 	return err;
