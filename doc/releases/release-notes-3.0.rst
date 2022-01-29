@@ -28,6 +28,7 @@ API Changes
 ***********
 
 Changes in this release
+=======================
 
 * Following functions in UART Asynchronous API are using microseconds to represent
   timeout instead of milliseconds:
@@ -41,10 +42,8 @@ Changes in this release
 * Added ``ranges`` and ``dma-ranges`` as invalid property to be used with DT_PROP_LEN()
   along ``reg`` and ``interrupts``.
 
-Changes in this release
-=======================
-
-Removed APIs in this release:
+Removed APIs in this release
+============================
 
 * The following Kconfig options related to radio front-end modules (FEMs) were
   removed:
@@ -78,13 +77,42 @@ Removed APIs in this release:
 * Removed Kconfig option ``CONFIG_OPENOCD_SUPPORT`` in favor of
   ``CONFIG_DEBUG_THREAD_INFO``.
 
-Deprecated in this release:
+Deprecated in this release
+==========================
 
 * :c:macro:`USBD_CFG_DATA_DEFINE` is deprecated in favor of utilizing
   :c:macro:`USBD_DEFINE_CFG_DATA`
 
 Stable API changes in this release
 ==================================
+
+New APIs in this release
+========================
+
+* Serial
+
+  * Added new APIs to support datum wider than 8-bit.
+
+    * :kconfig:`CONFIG_UART_WIDE_DATA` is added to enable this new APIs.
+
+    * Following functions, mirroring similar functions for 8-bit datum,
+      are added:
+
+      * :c:func:`uart_tx_u16` to send a given number of datum from buffer.
+
+      * :c:func:`uart_rx_enable_u16` to start receiving data.
+
+      * :c:func:`uart_rx_buf_rsp_u16` to set buffer for receiving data
+        in response to ``UART_RX_BUF_REQUEST`` event.
+
+      * :c:func:`uart_poll_in_u16` to poll for input.
+
+      * :c:func:`uart_poll_out_u16` to output datum in polling mode.
+
+      * :c:func:`uart_fifo_fill_u16` to fill FIFO with data.
+
+      * :c:func:`uart_fifo_read_u16` to read data from FIFO.
+
 
 Kernel
 ******
@@ -106,6 +134,16 @@ Architectures
 
 * x86
 
+* Xtensa
+
+  * Introduced a mechanism to automatically figure out which scratch registers
+    are used for internal code, instead of hard-coding. This is to accommodate
+    the configurability of the architecture where some registers may exist in
+    one SoC but not on another one.
+
+  * Added coredump support for Xtensa.
+
+  * Added GDB stub support for Xtensa.
 
 Bluetooth
 *********
@@ -134,12 +172,18 @@ Boards & SoC Support
 
 * Made these changes in other SoC series:
 
+  * stm32h7: Added SMPS support
+  * stm32u5: Enabled TF-M
 
 * Changes for ARC boards:
 
 
 * Added support for these ARM boards:
 
+  * OLIMEX-STM32-H405
+  * ST Nucleo G031K8
+  * ST Nucleo H7A3ZI Q
+  * ST STM32G081B Evaluation
 
 * Added support for these ARM64 boards:
 
@@ -161,6 +205,8 @@ Drivers and Sensors
 
 * ADC
 
+  * Added support for stm32u5 series
+  * stm32: Added shared IRQ support
 
 * Bluetooth
 
@@ -176,12 +222,16 @@ Drivers and Sensors
 
 * Counter
 
+  * stm32: Added timer based counter driver (stm32f4 only for now).
 
 * DAC
 
+  * Added support for stm32u5 series
 
 * Disk
 
+  * stm32 sdmmc: Converted from polling to IT driven mode and added Hardware
+    Flow Control option
 
 * Display
 
@@ -195,14 +245,26 @@ Drivers and Sensors
 * EEPROM
 
 
+* Entropy
+
+  * Added support for stm32u5 series
+
 * ESPI
 
 
 * Ethernet
 
+  * Added support for Synopsys DesignWare MAC driver with implementation
+    on stm32h7 series.
+  * stm32 (hal based): Added promiscuous mode support
+  * stm32 (hal based): Added PTP L2 timestamping support
 
 * Flash
 
+  * stm32g0: Added Dual Bank support
+  * stm32_qspi: General enhancement (Generation of the reset pulse for SPI-NOR memory,
+    Usage of 4IO for read / write (4READ/4PP), Support for different QSPI banks,
+    Support for 4B addressing on spi-nor)
 
 * GPIO
 
@@ -228,29 +290,46 @@ Drivers and Sensors
 * LoRa
 
 
+* MEMC
+
+  *  Added support for stm32f7 series
+
 * Modem
 
 
+* Pinctrl
+
+  * Added support for STM32
+
 * PWM
 
+  * stm32: DT bindings: `st,prescaler` property was moved from pwm
+    to parent timer node.
+  * stm32: Implemented PWM capture API
 
 * Sensor
 
+  * Added L5 die temperature sensor
 
 * Serial
 
+  * stm32: Implemented half-duplex option.
 
 * SPI
 
+  * stm32: Implemented Frame format option (TI vs Motorola).
 
 * Timer
 
+  * stm32 lptim: Added support for stm32h7
 
 * USB
 
+  * Added support for stm32u5 series (OTG full speed)
 
 * Watchdog
 
+  * Added support for stm32u5 series (Independent and Window)
 
 * WiFi
 
@@ -362,6 +441,12 @@ Libraries / Subsystems
 HALs
 ****
 
+* STM32
+
+  * stm32cube/stm32wb and its lib: Upgraded to version V1.12.1
+  * stm32cube/stm32mp1: Upgraded to version V1.5.0
+  * stm32cube/stm32u5: Upgraded to version V1.0.2
+
 MCUboot
 *******
 
@@ -389,6 +474,7 @@ Documentation
 Tests and Samples
 *****************
 
+* Drivers: clock_control: Added test suite for stm32 (u5, h7).
 
 Issue Related Items
 *******************
