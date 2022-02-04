@@ -149,6 +149,14 @@ static int chan_send(struct bt_att_chan *chan, struct net_buf *buf,
 
 	BT_DBG("code 0x%02x", hdr->code);
 
+	if (IS_ENABLED(CONFIG_BT_EATT) && hdr->code == BT_ATT_OP_MTU_REQ &&
+	    chan->chan.tx.cid != BT_L2CAP_CID_ATT) {
+		/* The Exchange MTU sub-procedure shall only be supported on
+		 * the LE Fixed Channel Unenhanced ATT bearer
+		 */
+		return -ENOTSUP;
+	}
+
 	if (IS_ENABLED(CONFIG_BT_EATT) &&
 	    atomic_test_bit(chan->flags, ATT_ENHANCED)) {
 		/* Check if sent is pending already, if it does it cannot be
@@ -2665,7 +2673,8 @@ static void att_chan_detach(struct bt_att_chan *chan)
 
 static void att_timeout(struct k_work *work)
 {
-	struct bt_att_chan *chan = CONTAINER_OF(work, struct bt_att_chan,
+	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct bt_att_chan *chan = CONTAINER_OF(dwork, struct bt_att_chan,
 						timeout_work);
 
 	BT_ERR("ATT Timeout");
