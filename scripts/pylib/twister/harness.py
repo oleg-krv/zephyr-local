@@ -32,6 +32,7 @@ class Harness:
         self.fieldnames = []
         self.ztest = False
         self.is_pytest = False
+        self.detected_suite_names = []
 
     def configure(self, instance):
         config = instance.testcase.harness_config
@@ -131,11 +132,13 @@ class Pytest(Harness):
         self.running_dir = instance.build_dir
         self.source_dir = instance.testcase.source_dir
         self.pytest_root = 'pytest'
+        self.pytest_args = []
         self.is_pytest = True
         config = instance.testcase.harness_config
 
         if config:
             self.pytest_root = config.get('pytest_root', 'pytest')
+            self.pytest_args = config.get('pytest_args', [])
 
     def handle(self, line):
         ''' Test cases that make use of pytest more care about results given
@@ -163,6 +166,9 @@ class Pytest(Harness):
 			os.path.join(self.running_dir, 'report.xml'),
 			'-q'
         ]
+
+        for arg in self.pytest_args:
+            cmd.append(arg)
 
         log = open(log_file, "a")
         outs = []
@@ -214,8 +220,15 @@ class Pytest(Harness):
 class Test(Harness):
     RUN_PASSED = "PROJECT EXECUTION SUCCESSFUL"
     RUN_FAILED = "PROJECT EXECUTION FAILED"
+    test_suite_start_pattern = r"Running test suite (?P<suite_name>.*)"
 
     def handle(self, line):
+        test_suite_match = re.search(self.test_suite_start_pattern, line)
+        if test_suite_match:
+            suite_name = test_suite_match.group("suite_name")
+            self.detected_suite_names.append(suite_name)
+            self.ztest = True
+
         match = result_re.match(line)
         if match and match.group(2):
             name = "{}.{}".format(self.id, match.group(3))

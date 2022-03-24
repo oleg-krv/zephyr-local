@@ -62,7 +62,7 @@ static void setup(void)
  *    |<---------------------------|                   |
  *    |                            |                   |
  */
-void test_version_exchange_mas_loc(void)
+void test_version_exchange_central_loc(void)
 {
 	uint8_t err;
 	struct node_tx *tx;
@@ -107,11 +107,11 @@ void test_version_exchange_mas_loc(void)
 	ut_rx_pdu(LL_VERSION_IND, &ntf, &remote_version_ind);
 	ut_rx_q_is_empty();
 
-	zassert_equal(ctx_buffers_free(), CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM,
+	zassert_equal(ctx_buffers_free(), test_ctx_buffers_cnt(),
 		      "Free CTX buffers %d", ctx_buffers_free());
 }
 
-void test_version_exchange_mas_loc_2(void)
+void test_version_exchange_central_loc_2(void)
 {
 	uint8_t err;
 
@@ -121,14 +121,16 @@ void test_version_exchange_mas_loc_2(void)
 
 	err = ull_cp_version_exchange(&conn);
 
-	for (int i = 0U; i < CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM; i++) {
+	for (int i = 0U; i < CONFIG_BT_CTLR_LLCP_LOCAL_PROC_CTX_BUF_NUM; i++) {
 		zassert_equal(err, BT_HCI_ERR_SUCCESS, NULL);
 		err = ull_cp_version_exchange(&conn);
 	}
 
 	zassert_not_equal(err, BT_HCI_ERR_SUCCESS, NULL);
 
-	zassert_equal(ctx_buffers_free(), 0, "Free CTX buffers %d", ctx_buffers_free());
+	zassert_equal(ctx_buffers_free(),
+		      test_ctx_buffers_cnt() - CONFIG_BT_CTLR_LLCP_LOCAL_PROC_CTX_BUF_NUM,
+		      "Free CTX buffers %d", ctx_buffers_free());
 }
 
 /* +-----+ +-------+            +-----+
@@ -142,7 +144,7 @@ void test_version_exchange_mas_loc_2(void)
  *    |        |------------------>|
  *    |        |                   |
  */
-void test_version_exchange_mas_rem(void)
+void test_version_exchange_central_rem(void)
 {
 	struct node_tx *tx;
 
@@ -186,7 +188,7 @@ void test_version_exchange_mas_rem(void)
 	/* There should not be a host notifications */
 	ut_rx_q_is_empty();
 
-	zassert_equal(ctx_buffers_free(), CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM,
+	zassert_equal(ctx_buffers_free(), test_ctx_buffers_cnt(),
 		      "Free CTX buffers %d", ctx_buffers_free());
 }
 
@@ -209,7 +211,7 @@ void test_version_exchange_mas_rem(void)
  *    |<---------------------------|                   |
  *    |                            |                   |
  */
-void test_version_exchange_mas_rem_2(void)
+void test_version_exchange_central_rem_2(void)
 {
 	uint8_t err;
 	struct node_tx *tx;
@@ -254,7 +256,7 @@ void test_version_exchange_mas_rem_2(void)
 	ut_rx_pdu(LL_VERSION_IND, &ntf, &remote_version_ind);
 	ut_rx_q_is_empty();
 
-	zassert_equal(ctx_buffers_free(), CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM,
+	zassert_equal(ctx_buffers_free(), test_ctx_buffers_cnt(),
 		      "Free CTX buffers %d", ctx_buffers_free());
 }
 
@@ -284,7 +286,7 @@ void test_version_exchange_mas_rem_2(void)
  *    |<---------------------------|                   |
  *    |                            |                   |
  */
-void test_version_exchange_mas_loc_twice(void)
+void test_version_exchange_central_loc_twice(void)
 {
 	uint8_t err;
 	struct node_tx *tx;
@@ -349,23 +351,23 @@ void test_version_exchange_mas_loc_twice(void)
 	/* Second attempt to run the version exchange completes immediately in idle state.
 	 * The context is released just after that.
 	 */
-	zassert_equal(ctx_buffers_free(), CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM,
+	zassert_equal(ctx_buffers_free(), test_ctx_buffers_cnt(),
 		      "Free CTX buffers %d", ctx_buffers_free());
 }
 
 void test_main(void)
 {
 	ztest_test_suite(version_exchange,
-			 ztest_unit_test_setup_teardown(test_version_exchange_mas_loc, setup,
+			 ztest_unit_test_setup_teardown(test_version_exchange_central_loc, setup,
 							unit_test_noop),
-			 ztest_unit_test_setup_teardown(test_version_exchange_mas_loc_2, setup,
+			 ztest_unit_test_setup_teardown(test_version_exchange_central_loc_2, setup,
 							unit_test_noop),
-			 ztest_unit_test_setup_teardown(test_version_exchange_mas_rem, setup,
+			 ztest_unit_test_setup_teardown(test_version_exchange_central_rem, setup,
 							unit_test_noop),
-			 ztest_unit_test_setup_teardown(test_version_exchange_mas_rem_2, setup,
+			 ztest_unit_test_setup_teardown(test_version_exchange_central_rem_2, setup,
 							unit_test_noop),
-			 ztest_unit_test_setup_teardown(test_version_exchange_mas_loc_twice, setup,
-							unit_test_noop));
+			 ztest_unit_test_setup_teardown(test_version_exchange_central_loc_twice,
+							setup, unit_test_noop));
 
 	ztest_run_test_suite(version_exchange);
 }

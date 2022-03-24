@@ -184,7 +184,9 @@ static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 	}
 
 	/* We're only interested in connectable events */
-	if (type != BT_GAP_ADV_TYPE_ADV_IND && type != BT_GAP_ADV_TYPE_ADV_DIRECT_IND) {
+	if (type != BT_GAP_ADV_TYPE_ADV_IND &&
+	    type != BT_GAP_ADV_TYPE_ADV_DIRECT_IND &&
+	    type != BT_GAP_ADV_TYPE_EXT_ADV) {
 		return;
 	}
 
@@ -256,23 +258,14 @@ static void stream_disabled(struct bt_audio_stream *stream)
 static void stream_stopped(struct bt_audio_stream *stream)
 {
 	printk("Audio Stream %p stopped\n", stream);
+
+	/* Stop send timer */
+	k_work_cancel_delayable(&audio_send_work);
 }
 
 static void stream_released(struct bt_audio_stream *stream)
 {
 	printk("Audio Stream %p released\n", stream);
-}
-
-static void stream_connected(struct bt_audio_stream *stream)
-{
-	printk("Audio Stream %p connected, start sending\n", stream);
-}
-
-static void stream_disconnected(struct bt_audio_stream *stream, uint8_t reason)
-{
-	printk("Audio Stream %p disconnected (reason 0x%02x)\n",
-	       stream, reason);
-	k_work_cancel_delayable(&audio_send_work);
 }
 
 static struct bt_audio_stream_ops stream_ops = {
@@ -284,8 +277,6 @@ static struct bt_audio_stream_ops stream_ops = {
 	.disabled = stream_disabled,
 	.stopped = stream_stopped,
 	.released = stream_released,
-	.connected = stream_connected,
-	.disconnected = stream_disconnected,
 };
 
 static void add_remote_sink(struct bt_audio_ep *ep, uint8_t index)
@@ -535,8 +526,8 @@ static int enable_stream(struct bt_audio_stream *stream)
 {
 	int err;
 
-	err = bt_audio_stream_enable(stream, preset_16_2_1.codec.meta_count,
-				     preset_16_2_1.codec.meta);
+	err = bt_audio_stream_enable(stream, preset_16_2_1.codec.meta,
+				     preset_16_2_1.codec.meta_count);
 	if (err != 0) {
 		printk("Unable to enable stream: %d", err);
 		return err;

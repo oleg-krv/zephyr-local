@@ -49,7 +49,7 @@ The SD card will be automatically detected and initialized by the
 filesystem driver when the board boots.
 
 To read and write files and directories, see the :ref:`file_system_api` in
-:zephyr_file:`include/fs.h` such as :c:func:`fs_open()`,
+:zephyr_file:`include/fs/fs.h` such as :c:func:`fs_open()`,
 :c:func:`fs_read()`, and :c:func:`fs_write()`.
 
 Disk Access API Configuration Options
@@ -57,7 +57,7 @@ Disk Access API Configuration Options
 
 Related configuration options:
 
-* :kconfig:`CONFIG_DISK_ACCESS`
+* :kconfig:option:`CONFIG_DISK_ACCESS`
 
 API Reference
 *************
@@ -69,7 +69,7 @@ Disk Driver Configuration Options
 
 Related driver configuration options:
 
-* :kconfig:`CONFIG_DISK_DRIVERS`
+* :kconfig:option:`CONFIG_DISK_DRIVERS`
 
 Disk Driver Interface
 *********************

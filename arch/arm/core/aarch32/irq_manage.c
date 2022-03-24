@@ -19,7 +19,7 @@
 #if defined(CONFIG_CPU_CORTEX_M)
 #include <arch/arm/aarch32/cortex_m/cmsis.h>
 #elif defined(CONFIG_CPU_AARCH32_CORTEX_A) \
-	|| defined(CONFIG_CPU_CORTEX_R)
+	|| defined(CONFIG_CPU_AARCH32_CORTEX_R)
 #include <drivers/interrupt_controller/gic.h>
 #endif
 #include <sys/__assert.h>
@@ -92,7 +92,7 @@ void z_arm_irq_priority_set(unsigned int irq, unsigned int prio, uint32_t flags)
 }
 
 #elif defined(CONFIG_CPU_AARCH32_CORTEX_A) \
-	|| defined(CONFIG_CPU_CORTEX_R)
+	|| defined(CONFIG_CPU_AARCH32_CORTEX_R)
 /*
  * For Cortex-A and Cortex-R cores, the default interrupt controller is the ARM
  * Generic Interrupt Controller (GIC) and therefore the architecture interrupt
@@ -160,6 +160,7 @@ void _arch_isr_direct_pm(void)
 {
 #if defined(CONFIG_ARMV6_M_ARMV8_M_BASELINE) \
 	|| defined(CONFIG_ARMV7_R) \
+	|| defined(CONFIG_AARCH32_ARMV8_R) \
 	|| defined(CONFIG_ARMV7_A)
 	unsigned int key;
 
@@ -182,6 +183,7 @@ void _arch_isr_direct_pm(void)
 
 #if defined(CONFIG_ARMV6_M_ARMV8_M_BASELINE) \
 	|| defined(CONFIG_ARMV7_R) \
+	|| defined(CONFIG_AARCH32_ARMV8_R) \
 	|| defined(CONFIG_ARMV7_A)
 	irq_unlock(key);
 #elif defined(CONFIG_ARMV7_M_ARMV8_M_MAINLINE)

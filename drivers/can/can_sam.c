@@ -7,11 +7,13 @@
 #include "can_mcan.h"
 
 #include <drivers/can.h>
+#include <drivers/can/transceiver.h>
 #include <soc.h>
 #include <kernel.h>
-
 #include <logging/log.h>
-LOG_MODULE_DECLARE(can_driver, CONFIG_CAN_LOG_LEVEL);
+
+LOG_MODULE_REGISTER(can_sam, CONFIG_CAN_LOG_LEVEL);
+
 #define DT_DRV_COMPAT atmel_sam_can
 
 struct can_sam_config {
@@ -128,6 +130,15 @@ static int can_sam_set_timing(const struct device *dev, const struct can_timing 
 	return can_mcan_set_timing(mcan_cfg, timing, timing_data);
 }
 
+int can_sam_get_max_bitrate(const struct device *dev, uint32_t *max_bitrate)
+{
+	const struct can_sam_config *cfg = dev->config;
+
+	*max_bitrate = cfg->mcan_cfg.max_bitrate;
+
+	return 0;
+}
+
 static void can_sam_line_0_isr(const struct device *dev)
 {
 	const struct can_sam_config *cfg = dev->config;
@@ -161,6 +172,8 @@ static const struct can_driver_api can_api_funcs = {
 	.recover = can_mcan_recover,
 #endif
 	.get_core_clock = can_sam_get_core_clock,
+	.get_max_filters = can_mcan_get_max_filters,
+	.get_max_bitrate = can_sam_get_max_bitrate,
 	.set_state_change_callback =  can_sam_set_state_change_callback,
 	.timing_min = {
 		.sjw = 0x1,
@@ -222,7 +235,9 @@ static void config_can_##inst##_irq(void)                                       
 	.prop_ts1_data = DT_INST_PROP_OR(inst, prop_seg_data, 0) +                             \
 			 DT_INST_PROP_OR(inst, phase_seg1_data, 0),                            \
 	.ts2_data = DT_INST_PROP_OR(inst, phase_seg2_data, 0),                                 \
-	.tx_delay_comp_offset = DT_INST_PROP(inst, tx_delay_comp_offset)                       \
+	.tx_delay_comp_offset = DT_INST_PROP(inst, tx_delay_comp_offset),                      \
+	.phy = DEVICE_DT_GET_OR_NULL(DT_INST_PHANDLE(inst, phys)),                             \
+	.max_bitrate = DT_INST_CAN_TRANSCEIVER_MAX_BITRATE(inst, 5000000),                     \
 }
 #else /* CONFIG_CAN_FD_MODE */
 #define CAN_SAM_MCAN_CFG(inst)                                                                 \
@@ -232,6 +247,8 @@ static void config_can_##inst##_irq(void)                                       
 	.sample_point = DT_INST_PROP_OR(inst, sample_point, 0),                                \
 	.prop_ts1 = DT_INST_PROP_OR(inst, prop_seg, 0) + DT_INST_PROP_OR(inst, phase_seg1, 0), \
 	.ts2 = DT_INST_PROP_OR(inst, phase_seg2, 0),                                           \
+	.phy = DEVICE_DT_GET_OR_NULL(DT_INST_PHANDLE(inst, phys)),                             \
+	.max_bitrate = DT_INST_CAN_TRANSCEIVER_MAX_BITRATE(inst, 1000000),                     \
 }
 #endif /* CONFIG_CAN_FD_MODE */
 

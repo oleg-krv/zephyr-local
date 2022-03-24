@@ -614,12 +614,15 @@ int hawkbit_init(void)
 	int ret = 0, rc = 0;
 	struct flash_pages_info info;
 	int32_t action_id;
-	const struct device *flash_dev;
 
-	flash_dev = DEVICE_DT_GET(FLASH_NODE);
+	fs.flash_device = DEVICE_DT_GET(FLASH_NODE);
+	if (!device_is_ready(fs.flash_device)) {
+		LOG_ERR("Flash device not ready");
+		return -ENODEV;
+	}
 
 	fs.offset = FLASH_AREA_OFFSET(storage);
-	rc = flash_get_page_info_by_offs(flash_dev, fs.offset, &info);
+	rc = flash_get_page_info_by_offs(fs.flash_device, fs.offset, &info);
 	if (rc) {
 		LOG_ERR("Unable to get storage page info: %d", rc);
 		return -EIO;
@@ -628,10 +631,10 @@ int hawkbit_init(void)
 	fs.sector_size = info.size;
 	fs.sector_count = 3U;
 
-	rc = nvs_init(&fs, flash_dev->name);
+	rc = nvs_mount(&fs);
 	if (rc) {
-		LOG_ERR("Storage flash init failed: %d", rc);
-		return -ENODEV;
+		LOG_ERR("Storage flash mount failed: %d", rc);
+		return rc;
 	}
 
 	rc = nvs_read(&fs, ADDRESS_ID, &action_id, sizeof(action_id));
@@ -688,28 +691,13 @@ static void response_cb(struct http_response *rsp,
 	switch (type) {
 	case HAWKBIT_PROBE:
 		if (hb_context.dl.http_content_size == 0) {
-			body_data = rsp->body_start;
-			body_len = rsp->data_len;
-			/*
-			 * subtract the size of the HTTP header from body_len
-			 */
-			body_len -= (rsp->body_start - rsp->recv_buf);
 			hb_context.dl.http_content_size = rsp->content_length;
-		} else {
-			/*
-			 * more general case where body data is set, but no need
-			 * to take the HTTP header into account
-			 */
-			body_data = rsp->body_start;
-			body_len = rsp->data_len;
 		}
 
-		if ((rsp->body_found == 1) && (body_data == NULL)) {
-			body_data = rsp->recv_buf;
-			body_len = rsp->data_len;
-		}
+		if (rsp->body_found) {
+			body_data = rsp->body_frag_start;
+			body_len = rsp->body_frag_len;
 
-		if (body_data != NULL) {
 			if ((hb_context.dl.downloaded_size + body_len) > response_buffer_size) {
 				response_buffer_size <<= 1;
 				rsp_tmp = realloc(hb_context.response_data,
@@ -762,28 +750,13 @@ static void response_cb(struct http_response *rsp,
 
 	case HAWKBIT_PROBE_DEPLOYMENT_BASE:
 		if (hb_context.dl.http_content_size == 0) {
-			body_data = rsp->body_start;
-			body_len = rsp->data_len;
-			/*
-			 * subtract the size of the HTTP header from body_len
-			 */
-			body_len -= (rsp->body_start - rsp->recv_buf);
 			hb_context.dl.http_content_size = rsp->content_length;
-		} else {
-			/*
-			 * more general case where body data is set, but no need
-			 * to take the HTTP header into account
-			 */
-			body_data = rsp->body_start;
-			body_len = rsp->data_len;
 		}
 
-		if ((rsp->body_found == 1) && (body_data == NULL)) {
-			body_data = rsp->recv_buf;
-			body_len = rsp->data_len;
-		}
+		if (rsp->body_found) {
+			body_data = rsp->body_frag_start;
+			body_len = rsp->body_frag_len;
 
-		if (body_data != NULL) {
 			if ((hb_context.dl.downloaded_size + body_len) > response_buffer_size) {
 				response_buffer_size <<= 1;
 				rsp_tmp = realloc(hb_context.response_data,
@@ -825,28 +798,13 @@ static void response_cb(struct http_response *rsp,
 
 	case HAWKBIT_DOWNLOAD:
 		if (hb_context.dl.http_content_size == 0) {
-			body_data = rsp->body_start;
-			body_len = rsp->data_len;
-			/*
-			 * subtract the size of the HTTP header from body_len
-			 */
-			body_len -= (rsp->body_start - rsp->recv_buf);
 			hb_context.dl.http_content_size = rsp->content_length;
-		} else {
-			/*
-			 * more general case where body data is set, but no need
-			 * to take the HTTP header into account
-			 */
-			body_data = rsp->body_start;
-			body_len = rsp->data_len;
 		}
 
-		if ((rsp->body_found == 1) && (body_data == NULL)) {
-			body_data = rsp->recv_buf;
-			body_len = rsp->data_len;
-		}
+		if (rsp->body_found) {
+			body_data = rsp->body_frag_start;
+			body_len = rsp->body_frag_len;
 
-		if (body_data != NULL) {
 			ret = mbedtls_md_update(&hb_context.dl.hash_ctx, body_data,
 					  body_len);
 			if (ret != 0) {

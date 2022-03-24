@@ -37,10 +37,15 @@
 #include <arch/arm/aarch32/cortex_m/cpu.h>
 #include <arch/arm/aarch32/cortex_m/memory_map.h>
 #include <arch/common/sys_io.h>
-#elif defined(CONFIG_CPU_CORTEX_R) || defined(CONFIG_CPU_AARCH32_CORTEX_A)
+#elif defined(CONFIG_CPU_AARCH32_CORTEX_R) || defined(CONFIG_CPU_AARCH32_CORTEX_A)
 #include <arch/arm/aarch32/cortex_a_r/cpu.h>
 #include <arch/arm/aarch32/cortex_a_r/sys_io.h>
+#if defined(CONFIG_AARCH32_ARMV8_R)
+#include <arch/arm/aarch32/cortex_a_r/lib_helpers.h>
+#include <arch/arm/aarch32/cortex_a_r/armv8_timer.h>
+#else
 #include <arch/arm/aarch32/cortex_a_r/timer.h>
+#endif
 #endif
 
 #ifdef __cplusplus

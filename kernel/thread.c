@@ -191,7 +191,7 @@ int z_impl_k_thread_name_set(struct k_thread *thread, const char *value)
 		thread = _current;
 	}
 
-	strncpy(thread->name, value, CONFIG_THREAD_MAX_NAME_LEN);
+	strncpy(thread->name, value, CONFIG_THREAD_MAX_NAME_LEN - 1);
 	thread->name[CONFIG_THREAD_MAX_NAME_LEN - 1] = '\0';
 
 	SYS_PORT_TRACING_OBJ_FUNC(k_thread, name_set, thread, 0);
@@ -779,6 +779,11 @@ void z_init_thread_base(struct _thread_base *thread_base, int priority,
 	thread_base->is_idle = 0;
 #endif
 
+#ifdef CONFIG_TIMESLICE_PER_THREAD
+	thread_base->slice_ticks = 0;
+	thread_base->slice_expired = NULL;
+#endif
+
 	/* swap_data does not need to be initialized */
 
 	z_init_thread_timeout(thread_base);
@@ -890,9 +895,13 @@ K_SEM_DEFINE(offload_sem, 1, 1);
 
 void irq_offload(irq_offload_routine_t routine, const void *parameter)
 {
+#ifdef CONFIG_IRQ_OFFLOAD_NESTED
+	arch_irq_offload(routine, parameter);
+#else
 	k_sem_take(&offload_sem, K_FOREVER);
 	arch_irq_offload(routine, parameter);
 	k_sem_give(&offload_sem);
+#endif
 }
 #endif
 
@@ -901,18 +910,15 @@ void irq_offload(irq_offload_routine_t routine, const void *parameter)
 #error "Unsupported configuration for stack analysis"
 #endif
 
-int z_impl_k_thread_stack_space_get(const struct k_thread *thread,
-				    size_t *unused_ptr)
+int z_stack_space_get(const uint8_t *stack_start, size_t size, size_t *unused_ptr)
 {
-	const uint8_t *start = (uint8_t *)thread->stack_info.start;
-	size_t size = thread->stack_info.size;
 	size_t unused = 0;
-	const uint8_t *checked_stack = start;
+	const uint8_t *checked_stack = stack_start;
 	/* Take the address of any local variable as a shallow bound for the
 	 * stack pointer.  Addresses above it are guaranteed to be
 	 * accessible.
 	 */
-	const uint8_t *stack_pointer = (const uint8_t *)&start;
+	const uint8_t *stack_pointer = (const uint8_t *)&stack_start;
 
 	/* If we are currently running on the stack being analyzed, some
 	 * memory management hardware will generate an exception if we
@@ -921,7 +927,7 @@ int z_impl_k_thread_stack_space_get(const struct k_thread *thread,
 	 * This never happens when invoked from user mode, as user mode
 	 * will always run this function on the privilege elevation stack.
 	 */
-	if ((stack_pointer > start) && (stack_pointer <= (start + size)) &&
+	if ((stack_pointer > stack_start) && (stack_pointer <= (stack_start + size)) &&
 	    IS_ENABLED(CONFIG_NO_UNUSED_STACK_INSPECTION)) {
 		/* TODO: We could add an arch_ API call to temporarily
 		 * disable the stack checking in the CPU, but this would
@@ -953,6 +959,13 @@ int z_impl_k_thread_stack_space_get(const struct k_thread *thread,
 	*unused_ptr = unused;
 
 	return 0;
+}
+
+int z_impl_k_thread_stack_space_get(const struct k_thread *thread,
+				    size_t *unused_ptr)
+{
+	return z_stack_space_get((const uint8_t *)thread->stack_info.start,
+				 thread->stack_info.size, unused_ptr);
 }
 
 #ifdef CONFIG_USERSPACE

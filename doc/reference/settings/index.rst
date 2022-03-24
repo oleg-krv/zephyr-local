@@ -83,9 +83,9 @@ Zephyr Storage Backends
 ***********************
 
 Zephyr has three storage backends: a Flash Circular Buffer
-(:kconfig:`CONFIG_SETTINGS_FCB`), a file in the filesystem
-(:kconfig:`CONFIG_SETTINGS_FS`), or non-volatile storage
-(:kconfig:`CONFIG_SETTINGS_NVS`).
+(:kconfig:option:`CONFIG_SETTINGS_FCB`), a file in the filesystem
+(:kconfig:option:`CONFIG_SETTINGS_FS`), or non-volatile storage
+(:kconfig:option:`CONFIG_SETTINGS_NVS`).
 
 You can declare multiple sources for settings; settings from
 all of these are restored when ``settings_load()`` is called.
@@ -101,6 +101,17 @@ initializes the FCB area, so it must be called before calling
 Non-volatile storage read target is registered using
 ``settings_nvs_src()``, and write target by using
 ``settings_nvs_dst()``.
+
+Storage Location
+****************
+
+The FCB and non-volatile storage (NVS) backends both look for a fixed
+partition with label "storage" by default. A different partition can be
+selected by setting the ``zephyr,settings-partition`` property of the
+chosen node in the devicetree.
+
+The file path used by the file system backend to store settings
+is selected via the option ``CONFIG_SETTINGS_FS_FILE``.
 
 Loading data from persisted storage
 ***********************************
@@ -271,7 +282,7 @@ Example: Custom Backend Implementation
 **************************************
 
 This is a simple example showing how to register a simple custom backend
-handler (:kconfig:`CONFIG_SETTINGS_CUSTOM`).
+handler (:kconfig:option:`CONFIG_SETTINGS_CUSTOM`).
 
 .. code-block:: c
 

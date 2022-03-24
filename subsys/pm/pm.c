@@ -30,9 +30,9 @@ static sys_slist_t pm_notifiers = SYS_SLIST_STATIC_INIT(&pm_notifiers);
  * ACTIVE_STATE is 0
  */
 #define CPU_PM_STATE_INIT(_, __)		\
-	{ .state = PM_STATE_ACTIVE },
+	{ .state = PM_STATE_ACTIVE }
 static struct pm_state_info z_cpus_pm_state[] = {
-	UTIL_LISTIFY(CONFIG_MP_NUM_CPUS, CPU_PM_STATE_INIT)
+	LISTIFY(CONFIG_MP_NUM_CPUS, CPU_PM_STATE_INIT, (,))
 };
 
 /* bitmask to check if a power state was forced. */
@@ -102,13 +102,13 @@ static void pm_resume_devices(void)
 }
 #endif	/* CONFIG_PM_DEVICE */
 
-static inline void exit_pos_ops(struct pm_state_info info)
+static inline void pm_exit_pos_ops(struct pm_state_info *info)
 {
 	extern __weak void
-		pm_power_state_exit_post_ops(struct pm_state_info info);
+		pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id);
 
-	if (pm_power_state_exit_post_ops != NULL) {
-		pm_power_state_exit_post_ops(info);
+	if (pm_state_exit_post_ops != NULL) {
+		pm_state_exit_post_ops(info->state, info->substate_id);
 	} else {
 		/*
 		 * This function is supposed to be overridden to do SoC or
@@ -121,13 +121,13 @@ static inline void exit_pos_ops(struct pm_state_info info)
 	}
 }
 
-static inline void pm_state_set(struct pm_state_info info)
+static inline void state_set(struct pm_state_info *info)
 {
 	extern __weak void
-		pm_power_state_set(struct pm_state_info info);
+		pm_state_set(enum pm_state state, uint8_t substate_id);
 
-	if (pm_power_state_set != NULL) {
-		pm_power_state_set(info);
+	if (pm_state_set != NULL) {
+		pm_state_set(info->state, info->substate_id);
 	}
 }
 
@@ -173,23 +173,23 @@ void pm_system_resume(void)
 	 * and it may schedule another thread.
 	 */
 	if (atomic_test_and_clear_bit(z_post_ops_required, id)) {
-		exit_pos_ops(z_cpus_pm_state[id]);
+		pm_exit_pos_ops(&z_cpus_pm_state[id]);
 		pm_state_notify(false);
 		z_cpus_pm_state[id] = (struct pm_state_info){PM_STATE_ACTIVE,
 			0, 0};
 	}
 }
 
-bool pm_power_state_force(uint8_t cpu, struct pm_state_info info)
+bool pm_state_force(uint8_t cpu, const struct pm_state_info *info)
 {
 	bool ret = false;
 
-	__ASSERT(info.state < PM_STATE_COUNT,
-		 "Invalid power state %d!", info.state);
+	__ASSERT(info->state < PM_STATE_COUNT,
+		 "Invalid power state %d!", info->state);
 
 
 	if (!atomic_test_and_set_bit(z_cpus_pm_state_forced, cpu)) {
-		z_cpus_pm_state[cpu] = info;
+		z_cpus_pm_state[cpu] = *info;
 		ret = true;
 	}
 
@@ -250,7 +250,7 @@ bool pm_system_suspend(int32_t ticks)
 	/*
 	 * This function runs with interruptions locked but it is
 	 * expected the SoC to unlock them in
-	 * pm_power_state_exit_post_ops() when returning to active
+	 * pm_state_exit_post_ops() when returning to active
 	 * state. We don't want to be scheduled out yet, first we need
 	 * to send a notification about leaving the idle state. So,
 	 * we lock the scheduler here and unlock just after we have
@@ -261,7 +261,7 @@ bool pm_system_suspend(int32_t ticks)
 	/* Enter power state */
 	pm_state_notify(true);
 	atomic_set_bit(z_post_ops_required, id);
-	pm_state_set(z_cpus_pm_state[id]);
+	state_set(&z_cpus_pm_state[id]);
 	pm_stats_stop();
 
 	/* Wake up sequence starts here */
@@ -303,7 +303,7 @@ int pm_notifier_unregister(struct pm_notifier *notifier)
 	return ret;
 }
 
-struct pm_state_info pm_power_state_next_get(uint8_t cpu)
+const struct pm_state_info *pm_state_next_get(uint8_t cpu)
 {
-	return z_cpus_pm_state[cpu];
+	return &z_cpus_pm_state[cpu];
 }

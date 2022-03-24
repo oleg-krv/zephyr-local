@@ -83,7 +83,13 @@ struct bt_l2cap {
 	struct bt_l2cap_le_chan	chan;
 };
 
+static const struct bt_l2cap_ecred_cb *ecred_cb;
 static struct bt_l2cap bt_l2cap_pool[CONFIG_BT_MAX_CONN];
+
+void bt_l2cap_register_ecred_cb(const struct bt_l2cap_ecred_cb *cb)
+{
+	ecred_cb = cb;
+}
 
 static uint8_t get_ident(void)
 {
@@ -165,14 +171,14 @@ const char *bt_l2cap_chan_state_str(bt_l2cap_chan_state_t state)
 	switch (state) {
 	case BT_L2CAP_DISCONNECTED:
 		return "disconnected";
-	case BT_L2CAP_CONNECT:
-		return "connect";
+	case BT_L2CAP_CONNECTING:
+		return "connecting";
 	case BT_L2CAP_CONFIG:
 		return "config";
 	case BT_L2CAP_CONNECTED:
 		return "connected";
-	case BT_L2CAP_DISCONNECT:
-		return "disconnect";
+	case BT_L2CAP_DISCONNECTING:
+		return "disconnecting";
 	default:
 		return "unknown";
 	}
@@ -193,23 +199,23 @@ void bt_l2cap_chan_set_state_debug(struct bt_l2cap_chan *chan,
 	case BT_L2CAP_DISCONNECTED:
 		/* regardless of old state always allows this state */
 		break;
-	case BT_L2CAP_CONNECT:
+	case BT_L2CAP_CONNECTING:
 		if (chan->state != BT_L2CAP_DISCONNECTED) {
 			BT_WARN("%s()%d: invalid transition", func, line);
 		}
 		break;
 	case BT_L2CAP_CONFIG:
-		if (chan->state != BT_L2CAP_CONNECT) {
+		if (chan->state != BT_L2CAP_CONNECTING) {
 			BT_WARN("%s()%d: invalid transition", func, line);
 		}
 		break;
 	case BT_L2CAP_CONNECTED:
 		if (chan->state != BT_L2CAP_CONFIG &&
-		    chan->state != BT_L2CAP_CONNECT) {
+		    chan->state != BT_L2CAP_CONNECTING) {
 			BT_WARN("%s()%d: invalid transition", func, line);
 		}
 		break;
-	case BT_L2CAP_DISCONNECT:
+	case BT_L2CAP_DISCONNECTING:
 		if (chan->state != BT_L2CAP_CONFIG &&
 		    chan->state != BT_L2CAP_CONNECTED) {
 			BT_WARN("%s()%d: invalid transition", func, line);
@@ -339,7 +345,7 @@ static bool l2cap_chan_add(struct bt_conn *conn, struct bt_l2cap_chan *chan,
 	if (L2CAP_LE_CID_IS_DYN(ch->rx.cid)) {
 		k_work_init(&ch->rx_work, l2cap_rx_process);
 		k_fifo_init(&ch->rx_queue);
-		bt_l2cap_chan_set_state(chan, BT_L2CAP_CONNECT);
+		bt_l2cap_chan_set_state(chan, BT_L2CAP_CONNECTING);
 	}
 #endif /* CONFIG_BT_L2CAP_DYNAMIC_CHANNEL */
 
@@ -545,11 +551,17 @@ static void l2cap_le_encrypt_change(struct bt_l2cap_chan *chan, uint8_t status)
 #if defined(CONFIG_BT_L2CAP_ECRED)
 	if (chan->ident) {
 		struct bt_l2cap_chan *echan[L2CAP_ECRED_CHAN_MAX];
-		struct bt_l2cap_le_chan *ch;
+		struct bt_l2cap_chan *ch;
 		int i = 0;
 
-		while ((ch = l2cap_remove_ident(chan->conn, chan->ident))) {
-			echan[i++] = &ch->chan;
+		SYS_SLIST_FOR_EACH_CONTAINER(&chan->conn->channels, ch, node) {
+			if (chan->ident == ch->ident) {
+				__ASSERT(i < L2CAP_ECRED_CHAN_MAX,
+					 "There can only be L2CAP_ECRED_CHAN_MAX channels "
+					 "from the same request.");
+				atomic_clear_bit(ch->status, BT_L2CAP_STATUS_ENCRYPT_PENDING);
+				echan[i++] = ch;
+			}
 		}
 
 		/* Retry ecred connect */
@@ -1054,9 +1066,9 @@ static uint16_t l2cap_check_security(struct bt_conn *conn,
 
 	if (keys) {
 		if (conn->role == BT_HCI_ROLE_CENTRAL) {
-			ltk_present = keys->id & (BT_KEYS_LTK_P256 | BT_KEYS_PERIPH_LTK);
+			ltk_present = keys->keys & (BT_KEYS_LTK_P256 | BT_KEYS_PERIPH_LTK);
 		} else {
-			ltk_present = keys->id & (BT_KEYS_LTK_P256 | BT_KEYS_LTK);
+			ltk_present = keys->keys & (BT_KEYS_LTK_P256 | BT_KEYS_LTK);
 		}
 	} else {
 		ltk_present = false;
@@ -1162,6 +1174,7 @@ static void le_ecred_conn_req(struct bt_l2cap *l2cap, uint8_t ident,
 	uint16_t scid, dcid[L2CAP_ECRED_CHAN_MAX];
 	int i = 0;
 	uint8_t req_cid_count;
+	uint8_t succeeded = 0;
 
 	/* set dcid to zeros here, in case of all connections refused error */
 	memset(dcid, 0, sizeof(dcid));
@@ -1221,6 +1234,7 @@ static void le_ecred_conn_req(struct bt_l2cap *l2cap, uint8_t ident,
 		case BT_L2CAP_LE_SUCCESS:
 			ch = BT_L2CAP_LE_CHAN(chan[i]);
 			dcid[i++] = sys_cpu_to_le16(ch->rx.cid);
+			succeeded++;
 			continue;
 		/* Some connections refused – invalid Source CID */
 		/* Some connections refused – Source CID already allocated */
@@ -1241,7 +1255,7 @@ response:
 				      sizeof(*rsp) +
 				      (sizeof(scid) * req_cid_count));
 	if (!buf) {
-		return;
+		goto callback;
 	}
 
 	rsp = net_buf_add(buf, sizeof(*rsp));
@@ -1256,6 +1270,11 @@ response:
 	net_buf_add_mem(buf, dcid, sizeof(scid) * req_cid_count);
 
 	l2cap_send(conn, BT_L2CAP_CID_LE_SIG, buf);
+
+callback:
+	if (ecred_cb && ecred_cb->ecred_conn_req) {
+		ecred_cb->ecred_conn_req(conn, result, req_cid_count, succeeded);
+	}
 }
 
 static void le_ecred_reconf_req(struct bt_l2cap *l2cap, uint8_t ident,
@@ -1500,6 +1519,8 @@ static void le_ecred_conn_rsp(struct bt_l2cap *l2cap, uint8_t ident,
 	struct bt_l2cap_le_chan *chan;
 	struct bt_l2cap_ecred_conn_rsp *rsp;
 	uint16_t dcid, mtu, mps, credits, result;
+	uint8_t attempted = 0;
+	uint8_t succeeded = 0;
 
 	if (buf->len < sizeof(*rsp)) {
 		BT_ERR("Too small ecred conn rsp packet size");
@@ -1544,6 +1565,7 @@ static void le_ecred_conn_rsp(struct bt_l2cap *l2cap, uint8_t ident,
 			k_work_cancel_delayable(&chan->chan.rtx_work);
 
 			dcid = net_buf_pull_le16(buf);
+			attempted++;
 
 			BT_DBG("dcid 0x%04x", dcid);
 
@@ -1589,6 +1611,8 @@ static void le_ecred_conn_rsp(struct bt_l2cap *l2cap, uint8_t ident,
 			/* Give credits */
 			l2cap_chan_tx_give_credits(chan, credits);
 			l2cap_chan_rx_give_credits(chan, chan->rx.init_credits);
+
+			succeeded++;
 		}
 		break;
 	case BT_L2CAP_LE_ERR_PSM_NOT_SUPP:
@@ -1597,6 +1621,10 @@ static void le_ecred_conn_rsp(struct bt_l2cap *l2cap, uint8_t ident,
 			bt_l2cap_chan_del(&chan->chan);
 		}
 		break;
+	}
+
+	if (ecred_cb && ecred_cb->ecred_conn_rsp) {
+		ecred_cb->ecred_conn_rsp(conn, result, attempted, succeeded);
 	}
 }
 #endif /* CONFIG_BT_L2CAP_ECRED */
@@ -2397,7 +2425,7 @@ static void l2cap_chan_le_recv(struct bt_l2cap_le_chan *chan,
 static void l2cap_chan_recv_queue(struct bt_l2cap_le_chan *chan,
 				  struct net_buf *buf)
 {
-	if (chan->chan.state == BT_L2CAP_DISCONNECT) {
+	if (chan->chan.state == BT_L2CAP_DISCONNECTING) {
 		BT_WARN("Ignoring data received while disconnecting");
 		net_buf_unref(buf);
 		return;
@@ -2520,7 +2548,7 @@ static void l2cap_disconnected(struct bt_l2cap_chan *chan)
 	       BT_L2CAP_LE_CHAN(chan)->rx.cid);
 
 	/* Cancel RTX work on signal channel.
-	 * Disconnected callback is always called from system worqueue
+	 * Disconnected callback is always called from system workqueue
 	 * so this should always succeed.
 	 */
 	(void)k_work_cancel_delayable(&chan->rtx_work);
@@ -2831,7 +2859,7 @@ int bt_l2cap_chan_disconnect(struct bt_l2cap_chan *chan)
 	req->scid = sys_cpu_to_le16(ch->rx.cid);
 
 	l2cap_chan_send_req(chan, buf, L2CAP_DISC_TIMEOUT);
-	bt_l2cap_chan_set_state(chan, BT_L2CAP_DISCONNECT);
+	bt_l2cap_chan_set_state(chan, BT_L2CAP_DISCONNECTING);
 
 	return 0;
 }

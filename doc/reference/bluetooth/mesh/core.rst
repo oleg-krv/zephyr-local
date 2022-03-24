@@ -19,7 +19,7 @@ The radio control and polling is managed automatically by the mesh stack, but
 the LPN API allows the application to trigger the polling at any time through
 :c:func:`bt_mesh_lpn_poll`. The LPN operation parameters, including poll
 interval, poll event timing and Friend requirements is controlled through the
-:kconfig:`CONFIG_BT_MESH_LOW_POWER` option and related configuration options.
+:kconfig:option:`CONFIG_BT_MESH_LOW_POWER` option and related configuration options.
 
 Replay Protection List
 **********************
@@ -50,7 +50,15 @@ is called until all RPL entries are written to the flash.
 
 Finding the right balance between @ref CONFIG_BT_MESH_RPL_STORE_TIMEOUT and
 calling @ref bt_mesh_rpl_pending_store may reduce a risk of security
-volnurability and flash wear out.
+vulnerability and flash wear out.
+
+.. warning:
+
+   Failing to enable :kconfig:option:`CONFIG_BT_SETTINGS`, or setting
+   :kconfig:option:`CONFIG_BT_MESH_RPL_STORE_TIMEOUT` to -1 and not storing
+   the RPL between reboots, will make the device vulnerable to replay attacks
+   and not perform the replay protection required by the spec.
+
 
 API reference
 **************

@@ -51,13 +51,13 @@ enum {
 };
 
 struct flash_flexspi_nor_config {
-	char *controller_label;
 	flexspi_port_t port;
 	flexspi_device_config_t config;
 	struct flash_pages_layout layout;
 	struct flash_parameters flash_parameters;
 };
 
+/* Device variables used in critical sections should be in this structure */
 struct flash_flexspi_nor_data {
 	const struct device *controller;
 };
@@ -342,6 +342,11 @@ static int flash_flexspi_nor_write(const struct device *dev, off_t offset,
 						    offset);
 
 	if (memc_flexspi_is_running_xip(data->controller)) {
+		/*
+		 * ==== ENTER CRITICAL SECTION ====
+		 * No flash access should be performed in critical section. All
+		 * code and data accessed must reside in ram.
+		 */
 		key = irq_lock();
 	}
 
@@ -368,6 +373,7 @@ static int flash_flexspi_nor_write(const struct device *dev, off_t offset,
 	}
 
 	if (memc_flexspi_is_running_xip(data->controller)) {
+		/* ==== EXIT CRITICAL SECTION ==== */
 		irq_unlock(key);
 	}
 
@@ -402,6 +408,11 @@ static int flash_flexspi_nor_erase(const struct device *dev, off_t offset,
 	}
 
 	if (memc_flexspi_is_running_xip(data->controller)) {
+		/*
+		 * ==== ENTER CRITICAL SECTION ====
+		 * No flash access should be performed in critical section. All
+		 * code and data accessed must reside in ram.
+		 */
 		key = irq_lock();
 	}
 
@@ -421,6 +432,7 @@ static int flash_flexspi_nor_erase(const struct device *dev, off_t offset,
 	}
 
 	if (memc_flexspi_is_running_xip(data->controller)) {
+		/* ==== EXIT CRITICAL SECTION ==== */
 		irq_unlock(key);
 	}
 
@@ -456,10 +468,9 @@ static int flash_flexspi_nor_init(const struct device *dev)
 	struct flash_flexspi_nor_data *data = dev->data;
 	uint8_t vendor_id;
 
-	data->controller = device_get_binding(config->controller_label);
-	if (data->controller == NULL) {
-		LOG_ERR("Could not find controller");
-		return -EINVAL;
+	if (!device_is_ready(data->controller)) {
+		LOG_ERR("Controller device not ready");
+		return -ENODEV;
 	}
 
 	if (!memc_flexspi_is_running_xip(data->controller) &&
@@ -537,7 +548,6 @@ static const struct flash_driver_api flash_flexspi_nor_api = {
 #define FLASH_FLEXSPI_NOR(n)						\
 	static const struct flash_flexspi_nor_config			\
 		flash_flexspi_nor_config_##n = {			\
-		.controller_label = DT_INST_BUS_LABEL(n),		\
 		.port = DT_INST_REG_ADDR(n),				\
 		.config = FLASH_FLEXSPI_DEVICE_CONFIG(n),		\
 		.layout = {						\
@@ -552,7 +562,9 @@ static const struct flash_driver_api flash_flexspi_nor_api = {
 	};								\
 									\
 	static struct flash_flexspi_nor_data				\
-		flash_flexspi_nor_data_##n;				\
+		flash_flexspi_nor_data_##n = {				\
+		.controller = DEVICE_DT_GET(DT_INST_BUS(n)),		\
+	};								\
 									\
 	DEVICE_DT_INST_DEFINE(n,					\
 			      flash_flexspi_nor_init,			\

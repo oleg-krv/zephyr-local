@@ -18,6 +18,7 @@
 #include <sys/util.h>
 #include <errno.h>
 #include <soc.h>
+#include <pm/policy.h>
 #include <stm32_ll_bus.h>
 #include <stm32_ll_rcc.h>
 #include <stm32_ll_rng.h>
@@ -36,7 +37,7 @@
 
 /*
  * This driver need to take into account all STM32 family:
- *  - simple rng without harware fifo and no DMA.
+ *  - simple rng without hardware fifo and no DMA.
  *  - Variable delay between two consecutive random numbers
  *    (depending on family and clock settings)
  *
@@ -243,7 +244,9 @@ static uint16_t rng_pool_get(struct rng_pool *rngp, uint8_t *buf, uint16_t len)
 
 	len = dst - buf;
 	available = available - len;
-	if (available <= rngp->threshold) {
+	if ((available <= rngp->threshold)
+		&& !LL_RNG_IsEnabledIT(entropy_stm32_rng_data.rng)) {
+		pm_policy_state_lock_get(PM_STATE_SUSPEND_TO_IDLE);
 		LL_RNG_EnableIT(entropy_stm32_rng_data.rng);
 	}
 
@@ -297,6 +300,7 @@ static void stm32_rng_isr(const void *arg)
 				byte);
 		if (ret < 0) {
 			LL_RNG_DisableIT(entropy_stm32_rng_data.rng);
+			pm_policy_state_lock_put(PM_STATE_SUSPEND_TO_IDLE);
 		}
 
 		k_sem_give(&entropy_stm32_rng_data.sem_sync);
@@ -356,6 +360,18 @@ static int entropy_stm32_rng_get_entropy_isr(const struct device *dev,
 		irq_enabled = irq_is_enabled(IRQN);
 		irq_disable(IRQN);
 		irq_unlock(key);
+
+		/* do not proceed if a Seed error occurred */
+		if (LL_RNG_IsActiveFlag_SECS(entropy_stm32_rng_data.rng) ||
+			LL_RNG_IsActiveFlag_SEIS(entropy_stm32_rng_data.rng)) {
+
+			(void)random_byte_get(); /* this will recover the error */
+			/* restore irq as we enter */
+			if (irq_enabled) {
+				irq_enable(IRQN);
+			}
+			return 0; /* return cnt is null : no random data available */
+		}
 
 		/* Clear NVIC pending bit. This ensures that a subsequent
 		 * RNG event will set the Cortex-M single-bit event register
@@ -491,6 +507,12 @@ static int entropy_stm32_rng_init(const struct device *dev)
 	/* Write RNG HTCR configuration */
 	LL_RNG_SetHealthConfig(dev_data->rng, DT_INST_PROP(0, health_test_config));
 #endif
+
+	/* Prevent the clocks to be stopped during the duration the
+	 * rng pool is being populated. The ISR will release the constraint again
+	 * when the rng pool is filled.
+	 */
+	pm_policy_state_lock_get(PM_STATE_SUSPEND_TO_IDLE);
 
 	LL_RNG_EnableIT(dev_data->rng);
 

@@ -33,7 +33,7 @@ extern "C" {
  * If buffer is full and packet cannot be allocated then null is returned unless
  * overwrite mode is selected. In that mode, oldest entry are dropped (user is
  * notified) until allocation succeeds. It can happen that candidate for
- * dropping is currently being claimed. In that case, it is ommited and next
+ * dropping is currently being claimed. In that case, it is omitted and next
  * packet is dropped and claimed packet is marked as invalid when freeing.
  *
  * Reading packets is performed in two steps. First packet is claimed. Claiming
@@ -57,6 +57,9 @@ extern "C" {
  * dropped. When flag is not set then allocation returns null.
  */
 #define MPSC_PBUF_MODE_OVERWRITE BIT(1)
+
+/** @brief Flag indicating that maximum buffer usage is tracked. */
+#define MPSC_PBUF_MAX_UTILIZATION BIT(2)
 
 /**@} */
 
@@ -112,6 +115,9 @@ struct mpsc_pbuf_buffer {
 	/* Buffer size in 32 bit words. */
 	uint32_t size;
 
+	/* Store max buffer usage. */
+	uint32_t max_usage;
+
 	struct k_sem sem;
 };
 
@@ -131,7 +137,7 @@ struct mpsc_pbuf_buffer_config {
 	uint32_t flags;
 };
 
-/** @brief Initnialize a packet buffer.
+/** @brief Initialize a packet buffer.
  *
  * @param buffer Buffer.
  *
@@ -143,7 +149,7 @@ void mpsc_pbuf_init(struct mpsc_pbuf_buffer *buffer,
 /** @brief Allocate a packet.
  *
  * If a buffer is configured to overwrite mode then if there is no space to
- * allocated a new buffer, oldest packets are dropped. Otherwise allocation
+ * allocate a new buffer, oldest packets are dropped. Otherwise allocation
  * fails and null pointer is returned.
  *
  * @param buffer Buffer.
@@ -237,6 +243,24 @@ void mpsc_pbuf_free(struct mpsc_pbuf_buffer *buffer,
  */
 bool mpsc_pbuf_is_pending(struct mpsc_pbuf_buffer *buffer);
 
+/** @brief Get current memory utilization.
+ *
+ * @param[in, out] buffer Buffer.
+ * @param[out]     size   Buffer size in bytes.
+ * @param[out]     now    Current buffer usage in bytes.
+ */
+void mpsc_pbuf_get_utilization(struct mpsc_pbuf_buffer *buffer,
+			       uint32_t *size, uint32_t *now);
+
+/** @brief Get maximum memory utilization.
+ *
+ * @param[in, out] buffer Buffer.
+ * @param[out]     max    Maximum buffer usage in bytes.
+ *
+ * retval 0 if utilization data collected successfully.
+ * retval -ENOTSUP if Collecting utilization data is not supported.
+ */
+int mpsc_pbuf_get_max_utilization(struct mpsc_pbuf_buffer *buffer, uint32_t *max);
 /**
  * @}
  */

@@ -7,7 +7,7 @@ Overview
 ********
 
 :ref:`kernel_timing_uptime` in Zephyr is based on the a tick counter.  With
-the default :kconfig:`CONFIG_TICKLESS_KERNEL` this counter advances at a
+the default :kconfig:option:`CONFIG_TICKLESS_KERNEL` this counter advances at a
 nominally constant rate from zero at the instant the system started. The POSIX
 equivalent to this counter is something like ``CLOCK_MONOTONIC`` or, in Linux,
 ``CLOCK_MONOTONIC_RAW``.  :c:func:`k_uptime_get()` provides a millisecond
@@ -76,7 +76,7 @@ There are several factors that affect synchronizing time scales:
 
 * The rate of discrete instant representation change.  For example Zephyr
   uptime is tracked in ticks which advance at events that nominally occur at
-  :kconfig:`CONFIG_SYS_CLOCK_TICKS_PER_SEC` Hertz, while an external time
+  :kconfig:option:`CONFIG_SYS_CLOCK_TICKS_PER_SEC` Hertz, while an external time
   source may provide data in whole or fractional seconds (e.g. microseconds).
 * The absolute offset required to align the two scales at a single instant.
 * The relative error between observable instants in each scale, required to
@@ -132,7 +132,7 @@ Relevant Time Scales
 
 `International Atomic Time
 <https://en.wikipedia.org/wiki/International_Atomic_Time>`__ (TAI) is a time
-scale based on averaging clocks that count in SI seconds. TAI is a montonic
+scale based on averaging clocks that count in SI seconds. TAI is a monotonic
 and continuous time scale.
 
 `Universal Time <https://en.wikipedia.org/wiki/Universal_Time>`__ (UT) is a

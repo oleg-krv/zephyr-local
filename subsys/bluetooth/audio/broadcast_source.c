@@ -55,7 +55,7 @@ struct bt_audio_base_ad_subgroup {
 
 struct bt_audio_base_ad {
 	uint16_t uuid_val;
-	struct bt_audio_base_ad_subgroup subgroups[BROADCAST_SUBGROUP_CNT];
+	struct bt_audio_base_ad_subgroup subgroups[CONFIG_BT_AUDIO_BROADCAST_SRC_SUBGROUP_COUNT];
 } __packed;
 
 static struct bt_audio_ep broadcast_source_eps
@@ -89,6 +89,7 @@ static void broadcast_source_set_ep_state(struct bt_audio_ep *ep, uint8_t state)
 			BT_DBG("Invalid broadcast sync endpoint state transition");
 			return;
 		}
+		break;
 	case BT_AUDIO_EP_STATE_STREAMING:
 		if (state != BT_AUDIO_EP_STATE_QOS_CONFIGURED) {
 			BT_DBG("Invalid broadcast sync endpoint state transition");
@@ -114,19 +115,15 @@ static void broadcast_source_set_ep_state(struct bt_audio_ep *ep, uint8_t state)
 	}
 }
 
-static void broadcast_source_iso_recv(struct bt_iso_chan *chan,
-				    const struct bt_iso_recv_info *info,
-				    struct net_buf *buf)
+static void broadcast_source_iso_sent(struct bt_iso_chan *chan)
 {
 	struct bt_audio_ep *ep = CONTAINER_OF(chan, struct bt_audio_ep, iso);
 	struct bt_audio_stream_ops *ops = ep->stream->ops;
 
-	BT_DBG("stream %p ep %p len %zu", chan, ep, net_buf_frags_len(buf));
+	BT_DBG("stream %p ep %p", chan, ep);
 
-	if (ops != NULL && ops->recv != NULL) {
-		ops->recv(ep->stream, buf);
-	} else {
-		BT_WARN("No callback for recv set");
+	if (ops != NULL && ops->sent != NULL) {
+		ops->sent(ep->stream);
 	}
 }
 
@@ -139,8 +136,8 @@ static void broadcast_source_iso_connected(struct bt_iso_chan *chan)
 
 	broadcast_source_set_ep_state(ep, BT_AUDIO_EP_STATE_STREAMING);
 
-	if (ops != NULL && ops->connected != NULL) {
-		ops->connected(ep->stream);
+	if (ops != NULL && ops->started != NULL) {
+		ops->started(ep->stream);
 	} else {
 		BT_WARN("No callback for connected set");
 	}
@@ -154,17 +151,17 @@ static void broadcast_source_iso_disconnected(struct bt_iso_chan *chan, uint8_t 
 
 	BT_DBG("stream %p ep %p reason 0x%02x", chan, ep, reason);
 
-	broadcast_source_set_ep_state(ep, BT_AUDIO_EP_STATE_IDLE);
+	broadcast_source_set_ep_state(ep, BT_AUDIO_EP_STATE_QOS_CONFIGURED);
 
-	if (ops != NULL && ops->disconnected != NULL) {
-		ops->disconnected(stream, reason);
+	if (ops != NULL && ops->stopped != NULL) {
+		ops->stopped(stream);
 	} else {
-		BT_WARN("No callback for disconnected set");
+		BT_WARN("No callback for stopped set");
 	}
 }
 
 static struct bt_iso_chan_ops broadcast_source_iso_ops = {
-	.recv		= broadcast_source_iso_recv,
+	.sent		= broadcast_source_iso_sent,
 	.connected	= broadcast_source_iso_connected,
 	.disconnected	= broadcast_source_iso_disconnected,
 };
@@ -189,6 +186,7 @@ static void broadcast_source_ep_init(struct bt_audio_ep *ep)
 	ep->iso.qos = &ep->iso_qos;
 	ep->iso.qos->rx = &ep->iso_rx;
 	ep->iso.qos->tx = &ep->iso_tx;
+	ep->dir = BT_AUDIO_SOURCE;
 }
 
 static struct bt_audio_ep *broadcast_source_new_ep(uint8_t index)
@@ -236,7 +234,8 @@ static int bt_audio_broadcast_source_setup_stream(uint8_t index,
 
 	bt_audio_stream_attach(NULL, stream, ep, codec);
 	stream->qos = qos;
-	err = bt_audio_codec_qos_to_iso_qos(stream->iso->qos, qos);
+	stream->iso->qos->rx = NULL;
+	err = bt_audio_codec_qos_to_iso_qos(stream->iso->qos->tx, qos);
 	if (err) {
 		BT_ERR("Unable to convert codec QoS to ISO QoS");
 		return err;
@@ -253,8 +252,9 @@ static void bt_audio_encode_base(const struct bt_audio_broadcast_source *source,
 	uint8_t *start;
 	uint8_t len;
 
-	__ASSERT(source->subgroup_count == BROADCAST_SUBGROUP_CNT,
-		 "Cannot encode BASE with more than a single subgroup");
+	__ASSERT(source->subgroup_count == CONFIG_BT_AUDIO_BROADCAST_SRC_SUBGROUP_COUNT,
+		 "Cannot encode BASE with more than a %u subgroups",
+		 CONFIG_BT_AUDIO_BROADCAST_SRC_SUBGROUP_COUNT);
 
 	net_buf_simple_add_le16(buf, BT_UUID_BASIC_AUDIO_VAL);
 	net_buf_simple_add_le24(buf, source->pd);
@@ -279,7 +279,7 @@ static void bt_audio_encode_base(const struct bt_audio_broadcast_source *source,
 					sizeof(codec_data->type));
 
 	}
-	/* Calcute length of codec config data */
+	/* Calculate length of codec config data */
 	len = net_buf_simple_tail(buf) - start - sizeof(len);
 	/* Update the length field */
 	*start = len;
@@ -295,7 +295,7 @@ static void bt_audio_encode_base(const struct bt_audio_broadcast_source *source,
 				       metadata->data_len -
 					sizeof(metadata->type));
 	}
-	/* Calcute length of codec config data */
+	/* Calculate length of codec config data */
 	len = net_buf_simple_tail(buf) - start - sizeof(len);
 	/* Update the length field */
 	*start = len;
@@ -386,7 +386,7 @@ static void broadcast_source_cleanup(struct bt_audio_broadcast_source *source)
 }
 
 int bt_audio_broadcast_source_create(struct bt_audio_stream *streams,
-				     uint8_t num_stream,
+				     size_t num_stream,
 				     struct bt_codec *codec,
 				     struct bt_codec_qos *qos,
 				     struct bt_audio_broadcast_source **out_source)
@@ -507,7 +507,7 @@ int bt_audio_broadcast_source_create(struct bt_audio_stream *streams,
 		return err;
 	}
 
-	source->subgroup_count = BROADCAST_SUBGROUP_CNT;
+	source->subgroup_count = CONFIG_BT_AUDIO_BROADCAST_SRC_SUBGROUP_COUNT;
 	source->pd = qos->pd;
 	err = bt_audio_set_base(source, codec);
 	if (err != 0) {

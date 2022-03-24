@@ -67,8 +67,8 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #define CLIENT_EP_LEN		CONFIG_LWM2M_RD_CLIENT_ENDPOINT_NAME_MAX_LENGTH
 
-/* Up to 3 characters + NULL */
-#define CLIENT_BINDING_LEN sizeof("UQS")
+#define CLIENT_BINDING_LEN sizeof("U")
+#define CLIENT_QUEUE_LEN sizeof("Q")
 
 /* The states for the RD client state machine */
 /*
@@ -144,7 +144,8 @@ static void set_sm_state(uint8_t sm_state)
 	} else
 #endif
 	if (client.engine_state == ENGINE_UPDATE_SENT &&
-	    sm_state == ENGINE_REGISTRATION_DONE) {
+	    (sm_state == ENGINE_REGISTRATION_DONE ||
+	     sm_state == ENGINE_REGISTRATION_DONE_RX_OFF)) {
 		event = LWM2M_RD_CLIENT_EVENT_REG_UPDATE_COMPLETE;
 	} else if (sm_state == ENGINE_REGISTRATION_DONE) {
 		event = LWM2M_RD_CLIENT_EVENT_REGISTRATION_COMPLETE;
@@ -712,6 +713,7 @@ static int sm_send_registration(bool send_obj_support_data,
 	struct lwm2m_message *msg;
 	int ret;
 	char binding[CLIENT_BINDING_LEN];
+	char queue[CLIENT_QUEUE_LEN];
 
 	msg = lwm2m_get_message(client.ctx);
 	if (!msg) {
@@ -793,8 +795,9 @@ static int sm_send_registration(bool send_obj_support_data,
 	}
 
 	lwm2m_engine_get_binding(binding);
-	/* UDP is a default binding, no need to add option if UDP is used. */
-	if ((!sm_is_registered() && strcmp(binding, "U") != 0)) {
+	lwm2m_engine_get_queue_mode(queue);
+	/* UDP is a default binding, no need to add option if UDP without queue is used. */
+	if ((!sm_is_registered() && (strcmp(binding, "U") != 0 || strcmp(queue, "Q") == 0))) {
 		snprintk(query_buffer, sizeof(query_buffer) - 1,
 			 "b=%s", binding);
 
@@ -804,6 +807,20 @@ static int sm_send_registration(bool send_obj_support_data,
 		if (ret < 0) {
 			goto cleanup;
 		}
+
+#if CONFIG_LWM2M_VERSION_1_1
+		/* In LwM2M 1.1, queue mode is a separate parameter */
+		uint16_t len = strlen(queue);
+
+		if (len) {
+			ret = coap_packet_append_option(
+				&msg->cpkt, COAP_OPTION_URI_QUERY,
+				queue, len);
+			if (ret < 0) {
+				goto cleanup;
+			}
+		}
+#endif
 	}
 
 	if (send_obj_support_data) {
@@ -830,6 +847,7 @@ static int sm_send_registration(bool send_obj_support_data,
 	return 0;
 
 cleanup:
+	LOG_ERR("error %d when sending registration message", ret);
 	lwm2m_reset_message(msg, true);
 	return ret;
 }

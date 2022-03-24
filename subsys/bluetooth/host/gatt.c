@@ -78,8 +78,6 @@ struct gatt_sub {
 static struct gatt_sub subscriptions[SUB_MAX];
 static sys_slist_t callback_list;
 
-static const uint16_t gap_appearance = CONFIG_BT_DEVICE_APPEARANCE;
-
 #if defined(CONFIG_BT_GATT_DYNAMIC_DB)
 static sys_slist_t db;
 #endif /* CONFIG_BT_GATT_DYNAMIC_DB */
@@ -125,11 +123,52 @@ static ssize_t read_appearance(struct bt_conn *conn,
 			       const struct bt_gatt_attr *attr, void *buf,
 			       uint16_t len, uint16_t offset)
 {
-	uint16_t appearance = sys_cpu_to_le16(gap_appearance);
+	uint16_t appearance = sys_cpu_to_le16(bt_get_appearance());
 
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &appearance,
 				 sizeof(appearance));
 }
+
+#if defined(CONFIG_BT_DEVICE_APPEARANCE_GATT_WRITABLE)
+static ssize_t write_appearance(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+			 const void *buf, uint16_t len, uint16_t offset,
+			 uint8_t flags)
+{
+	uint16_t appearance_le = sys_cpu_to_le16(bt_get_appearance());
+	char * const appearance_le_bytes = (char *)&appearance_le;
+	uint16_t appearance;
+	int err;
+
+	if (offset >= sizeof(appearance_le)) {
+		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+	}
+
+	if ((offset + len) > sizeof(appearance_le)) {
+		return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+	}
+
+	memcpy(&appearance_le_bytes[offset], buf, len);
+	appearance = sys_le16_to_cpu(appearance_le);
+
+	err = bt_set_appearance(appearance);
+
+	if (err) {
+		return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+	}
+
+	return len;
+}
+#endif /* CONFIG_BT_DEVICE_APPEARANCE_GATT_WRITABLE */
+
+#if CONFIG_BT_DEVICE_APPEARANCE_GATT_WRITABLE
+	#define GAP_APPEARANCE_PROPS (BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE)
+	#define GAP_APPEARANCE_PERMS (BT_GATT_PERM_READ | BT_GATT_PERM_WRITE_AUTHEN)
+	#define GAP_APPEARANCE_WRITE_HANDLER write_appearance
+#else
+	#define GAP_APPEARANCE_PROPS BT_GATT_CHRC_READ
+	#define GAP_APPEARANCE_PERMS BT_GATT_PERM_READ
+	#define GAP_APPEARANCE_WRITE_HANDLER NULL
+#endif
 
 #if defined (CONFIG_BT_GAP_PERIPHERAL_PREF_PARAMS)
 /* This checks if the range entered is valid */
@@ -142,6 +181,9 @@ BUILD_ASSERT(!(CONFIG_BT_PERIPHERAL_PREF_TIMEOUT > 3200 &&
 BUILD_ASSERT((CONFIG_BT_PERIPHERAL_PREF_MIN_INT == 0xffff) ||
 	     (CONFIG_BT_PERIPHERAL_PREF_MIN_INT <=
 	     CONFIG_BT_PERIPHERAL_PREF_MAX_INT));
+BUILD_ASSERT((CONFIG_BT_PERIPHERAL_PREF_TIMEOUT * 4U) >
+	     ((1U + CONFIG_BT_PERIPHERAL_PREF_LATENCY) *
+	      CONFIG_BT_PERIPHERAL_PREF_MAX_INT));
 
 static ssize_t read_ppcp(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 			 void *buf, uint16_t len, uint16_t offset)
@@ -194,8 +236,9 @@ BT_GATT_SERVICE_DEFINE(_2_gap_svc,
 	BT_GATT_CHARACTERISTIC(BT_UUID_GAP_DEVICE_NAME, BT_GATT_CHRC_READ,
 			       BT_GATT_PERM_READ, read_name, NULL, NULL),
 #endif /* CONFIG_BT_DEVICE_NAME_GATT_WRITABLE */
-	BT_GATT_CHARACTERISTIC(BT_UUID_GAP_APPEARANCE, BT_GATT_CHRC_READ,
-			       BT_GATT_PERM_READ, read_appearance, NULL, NULL),
+	BT_GATT_CHARACTERISTIC(BT_UUID_GAP_APPEARANCE, GAP_APPEARANCE_PROPS,
+			       GAP_APPEARANCE_PERMS, read_appearance,
+			       GAP_APPEARANCE_WRITE_HANDLER, NULL),
 #if defined(CONFIG_BT_CENTRAL) && defined(CONFIG_BT_PRIVACY)
 	BT_GATT_CHARACTERISTIC(BT_UUID_CENTRAL_ADDR_RES,
 			       BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
@@ -1270,6 +1313,18 @@ void bt_gatt_init(void)
 #if defined(CONFIG_BT_SETTINGS_CCC_STORE_ON_WRITE)
 	k_work_init_delayable(&gatt_ccc_store.work, ccc_delayed_store);
 #endif
+
+#if defined(CONFIG_BT_GATT_CLIENT) && defined(CONFIG_BT_SETTINGS) && defined(CONFIG_BT_SMP)
+	static struct bt_conn_cb gatt_conn_cb = {
+		.identity_resolved = bt_gatt_identity_resolved,
+	};
+
+	/* Register the gatt module for connection callbacks so it can be
+	 * notified when pairing has completed. This is used to enable CCC and
+	 * CF storage on pairing complete.
+	 */
+	bt_conn_cb_register(&gatt_conn_cb);
+#endif /* CONFIG_BT_GATT_CLIENT && CONFIG_BT_SETTINGS && CONFIG_BT_SMP */
 }
 
 #if defined(CONFIG_BT_GATT_DYNAMIC_DB) || \
@@ -1877,7 +1932,7 @@ ssize_t bt_gatt_attr_write_ccc(struct bt_conn *conn,
 	if (!cfg) {
 		/* If there's no existing entry, but the new value is zero,
 		 * we don't need to do anything, since a disabled CCC is
-		 * behavioraly the same as no written CCC.
+		 * behaviorally the same as no written CCC.
 		 */
 		if (!value) {
 			return len;
@@ -2950,6 +3005,15 @@ static struct gatt_sub *gatt_sub_add_by_addr(uint8_t id,
 	return sub;
 }
 
+static bool check_subscribe_security_level(struct bt_conn *conn,
+					   const struct bt_gatt_subscribe_params *params)
+{
+#if defined(CONFIG_BT_SMP)
+	return conn->sec_level >= params->min_security;
+#endif
+	return true;
+}
+
 void bt_gatt_notification(struct bt_conn *conn, uint16_t handle,
 			  const void *data, uint16_t length)
 {
@@ -2968,9 +3032,11 @@ void bt_gatt_notification(struct bt_conn *conn, uint16_t handle,
 			continue;
 		}
 
-		if (params->notify(conn, params, data, length) ==
-		    BT_GATT_ITER_STOP) {
-			bt_gatt_unsubscribe(conn, params);
+		if (check_subscribe_security_level(conn, params)) {
+			if (params->notify(conn, params, data, length) ==
+			    BT_GATT_ITER_STOP) {
+				bt_gatt_unsubscribe(conn, params);
+			}
 		}
 	}
 }
@@ -3014,9 +3080,11 @@ void bt_gatt_mult_notification(struct bt_conn *conn, const void *data,
 				continue;
 			}
 
-			if (params->notify(conn, params, nfy->value, len) ==
-			    BT_GATT_ITER_STOP) {
-				bt_gatt_unsubscribe(conn, params);
+			if (check_subscribe_security_level(conn, params)) {
+				if (params->notify(conn, params, nfy->value, len) ==
+					BT_GATT_ITER_STOP) {
+					bt_gatt_unsubscribe(conn, params);
+				}
 			}
 		}
 
@@ -5091,17 +5159,6 @@ void bt_gatt_connected(struct bt_conn *conn)
 #if defined(CONFIG_BT_GATT_CLIENT)
 	add_subscriptions(conn);
 
-#if defined(CONFIG_BT_SETTINGS) && defined(CONFIG_BT_SMP)
-	static struct bt_conn_cb gatt_conn_cb = {
-		.identity_resolved = bt_gatt_identity_resolved,
-	};
-
-	/* Register the gatt module for connection callbacks so it can be
-	 * notified when pairing has completed. This is used to enable CCC and
-	 * CF storage on pairing complete.
-	 */
-	bt_conn_cb_register(&gatt_conn_cb);
-#endif /* CONFIG_BT_SETTINGS && CONFIG_BT_SMP */
 #endif /* CONFIG_BT_GATT_CLIENT */
 }
 

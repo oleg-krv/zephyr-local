@@ -1007,7 +1007,7 @@ General rules
 
   This ``|`` style prevents YAML parsers from removing the newlines in
   multi-line descriptions. This in turn makes these long strings
-  display propertly in the :ref:`devicetree_binding_index`.
+  display properly in the :ref:`devicetree_binding_index`.
 
   Do not use any other style for long or multi-line strings.
 
@@ -1143,7 +1143,7 @@ gpio_dt_spec``, then use it like this:
    gpio_pin_configure_dt(&signal, GPIO_OUTPUT_INACTIVE);
 
    /* Set the pin to its active level */
-   gpio_pin_set(signal.port, signal.pin, 1);
+   gpio_pin_set_dt(&signal, 1);
 
 (See :c:struct:`gpio_dt_spec`, :c:macro:`GPIO_DT_SPEC_GET`, and
 :c:func:`gpio_pin_configure_dt` for details on these APIs.)

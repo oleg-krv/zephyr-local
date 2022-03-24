@@ -23,8 +23,8 @@ For more information about the protocol itself, see
 SOCKS5 API
 **********
 
-The SOCKS5 support is enabled by :kconfig:`CONFIG_SOCKS` Kconfig variable.
-Application wanting to use the SOCKS5 must set the SOCKS5 proxy host adddress
+The SOCKS5 support is enabled by :kconfig:option:`CONFIG_SOCKS` Kconfig variable.
+Application wanting to use the SOCKS5 must set the SOCKS5 proxy host address
 by calling :c:func:`setsockopt()` like this:
 
 .. code-block:: c

@@ -45,6 +45,7 @@
 #define LWM2M_OBJECT_LOCATION_ID                6
 #define LWM2M_OBJECT_CONNECTIVITY_STATISTICS_ID 7
 #define LWM2M_OBJECT_SOFTWARE_MANAGEMENT_ID     9
+#define LWM2M_OBJECT_PORTFOLIO_ID               16
 #define LWM2M_OBJECT_GATEWAY_ID                 25
 /* clang-format on */
 
@@ -545,14 +546,16 @@ struct lwm2m_objlnk {
  * LwM2M clients use this function to modify the pmin attribute
  * for an observation being made.
  * Example to update the pmin of a temperature sensor value being observed:
- * lwm2m_engine_update_observer_min_period("3303/0/5700",5);
+ * lwm2m_engine_update_observer_min_period("client_ctx, 3303/0/5700", 5);
  *
+ * @param[in] client_ctx LwM2M context
  * @param[in] pathstr LwM2M path string "obj/obj-inst/res"
  * @param[in] period_s Value of pmin to be given (in seconds).
  *
  * @return 0 for success or negative in case of error.
  */
-int lwm2m_engine_update_observer_min_period(const char *pathstr, uint32_t period_s);
+int lwm2m_engine_update_observer_min_period(struct lwm2m_ctx *client_ctx, const char *pathstr,
+					    uint32_t period_s);
 
 /**
  * @brief Change an observer's pmax value.
@@ -560,14 +563,16 @@ int lwm2m_engine_update_observer_min_period(const char *pathstr, uint32_t period
  * LwM2M clients use this function to modify the pmax attribute
  * for an observation being made.
  * Example to update the pmax of a temperature sensor value being observed:
- * lwm2m_engine_update_observer_max_period("3303/0/5700",5);
+ * lwm2m_engine_update_observer_max_period("client_ctx, 3303/0/5700", 5);
  *
+ * @param[in] client_ctx LwM2M context
  * @param[in] pathstr LwM2M path string "obj/obj-inst/res"
  * @param[in] period_s Value of pmax to be given (in seconds).
  *
  * @return 0 for success or negative in case of error.
  */
-int lwm2m_engine_update_observer_max_period(const char *pathstr, uint32_t period_s);
+int lwm2m_engine_update_observer_max_period(struct lwm2m_ctx *client_ctx, const char *pathstr,
+					    uint32_t period_s);
 
 /**
  * @brief Create an LwM2M object instance.
@@ -1063,6 +1068,19 @@ int lwm2m_engine_update_service_period(k_work_handler_t service, uint32_t period
 int lwm2m_update_device_service_period(uint32_t period_ms);
 
 /**
+ * @brief Check whether a path is observed
+ *
+ * @param[in] pathstr LwM2M path string to check, e.g. "3/0/1"
+ *
+ * @return true when there exists an observation of the same level
+ *         or lower as the given path, false if it doesn't or path is not a
+ *         valid LwM2M-path.
+ *         E.g. true if path refers to a resource and the parent object has an
+ *         observation, false for the inverse.
+ */
+bool lwm2m_engine_path_is_observed(const char *pathstr);
+
+/**
  * @brief Start the LwM2M engine
  *
  * LwM2M clients normally do not need to call this function as it is called
@@ -1184,6 +1202,20 @@ void lwm2m_rd_client_update(void);
  * @return Resulting formatted path string
  */
 char *lwm2m_path_log_strdup(char *buf, struct lwm2m_obj_path *path);
+
+/** 
+ * @brief LwM2M SEND operation to given path list
+ *
+ * @param ctx LwM2M context
+ * @param path_list LwM2M Path string list
+ * @param path_list_size Length of path list. Max size is CONFIG_LWM2M_COMPOSITE_PATH_LIST_SIZE
+ * @param confirmation_request True request confirmation for operation.
+ * 
+ * @return 0 for success or negative in case of error.
+ *
+ */
+int lwm2m_engine_send(struct lwm2m_ctx *ctx, char const *path_list[], uint8_t path_list_size,
+		      bool confirmation_request);
 
 #endif	/* ZEPHYR_INCLUDE_NET_LWM2M_H_ */
 /**@}  */

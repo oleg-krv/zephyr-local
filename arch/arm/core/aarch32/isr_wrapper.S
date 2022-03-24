@@ -47,7 +47,7 @@ SECTION_FUNC(TEXT, _isr_wrapper)
 
 #if defined(CONFIG_CPU_CORTEX_M)
 	push {r0,lr}		/* r0, lr are now the first items on the stack */
-#elif defined(CONFIG_CPU_CORTEX_R) || defined(CONFIG_CPU_AARCH32_CORTEX_A)
+#elif defined(CONFIG_CPU_AARCH32_CORTEX_R) || defined(CONFIG_CPU_AARCH32_CORTEX_A)
 
 #if defined(CONFIG_USERSPACE)
 	/* See comment below about svc stack usage */
@@ -163,7 +163,8 @@ _idle_state_cleared:
 		/* clear kernel idle state */
 		strne	r1, [r2, #_kernel_offset_to_idle]
 		blne	z_pm_save_idle_exit
-#elif defined(CONFIG_ARMV7_R) || defined(CONFIG_ARMV7_A)
+#elif defined(CONFIG_ARMV7_R) || defined(CONFIG_AARCH32_ARMV8_R) \
+	|| defined(CONFIG_ARMV7_A)
 	beq _idle_state_cleared
 	movs r1, #0
 	/* clear kernel idle state */
@@ -190,7 +191,7 @@ _idle_state_cleared:
 	sub r0, r0, #16	/* get IRQ number */
 	lsl r0, r0, #3	/* table is 8-byte wide */
 #endif /* CONFIG_ARMV6_M_ARMV8_M_BASELINE */
-#elif defined(CONFIG_CPU_CORTEX_R) || defined(CONFIG_CPU_AARCH32_CORTEX_A)
+#elif defined(CONFIG_CPU_AARCH32_CORTEX_R) || defined(CONFIG_CPU_AARCH32_CORTEX_A)
 	/* Get active IRQ number from the interrupt controller */
 #if !defined(CONFIG_ARM_CUSTOM_INTERRUPT_CONTROLLER)
 	bl arm_gic_get_active
@@ -232,7 +233,7 @@ _idle_state_cleared:
 	ldm r1!,{r0,r3}	/* arg in r0, ISR in r3 */
 	blx r3		/* call ISR */
 
-#if defined(CONFIG_CPU_CORTEX_R) || defined(CONFIG_CPU_AARCH32_CORTEX_A)
+#if defined(CONFIG_CPU_AARCH32_CORTEX_R) || defined(CONFIG_CPU_AARCH32_CORTEX_A)
 spurious_continue:
 	/* Signal end-of-interrupt */
 	pop {r0, r1}
@@ -241,7 +242,7 @@ spurious_continue:
 #else
 	bl z_soc_irq_eoi
 #endif /* !CONFIG_ARM_CUSTOM_INTERRUPT_CONTROLLER */
-#endif /* CONFIG_CPU_CORTEX_R || CONFIG_CPU_AARCH32_CORTEX_A */
+#endif /* CONFIG_CPU_AARCH32_CORTEX_R || CONFIG_CPU_AARCH32_CORTEX_A */
 
 #ifdef CONFIG_TRACING_ISR
 	bl sys_trace_isr_exit
@@ -252,7 +253,8 @@ spurious_continue:
 	mov lr, r3
 #elif defined(CONFIG_ARMV7_M_ARMV8_M_MAINLINE)
 	pop {r0, lr}
-#elif defined(CONFIG_ARMV7_R) || defined(CONFIG_ARMV7_A)
+#elif defined(CONFIG_ARMV7_R) || defined(CONFIG_AARCH32_ARMV8_R) \
+	|| defined(CONFIG_ARMV7_A)
 	/*
 	 * r0 and lr_irq were saved on the process stack since a swap could
 	 * happen.  exc_exit will handle getting those values back

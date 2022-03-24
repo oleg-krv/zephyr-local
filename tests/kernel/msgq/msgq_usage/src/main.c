@@ -10,7 +10,7 @@
 #include <limits.h>
 
 #define MSGQ_LEN (2)
-#define STACK_SIZE (512 + CONFIG_TEST_EXTRA_STACKSIZE)
+#define STACK_SIZE (512 + CONFIG_TEST_EXTRA_STACK_SIZE)
 #define NUM_SERVICES 2
 #define TIMEOUT K_MSEC(100)
 
@@ -267,7 +267,7 @@ void test_msgq_usage(void)
 	/* waiting to continue */
 	k_sem_take(&test_continue, K_FOREVER);
 
-	/* rather than schedule this thread by k_msleep(), use semaphor with
+	/* rather than schedule this thread by k_msleep(), use semaphore with
 	 * a timeout value, so there is no give operation over service_sema
 	 */
 	TC_PRINT("try to kill service1\n");

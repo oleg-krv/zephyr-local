@@ -38,7 +38,7 @@ extern "C" {
 /*
  * Bitmask definitions for the struct k_thread.thread_state field.
  *
- * Must be before kerneL_arch_data.h because it might need them to be already
+ * Must be before kernel_arch_data.h because it might need them to be already
  * defined.
  */
 
@@ -242,6 +242,8 @@ struct _timeout {
 	int32_t dticks;
 #endif
 };
+
+typedef void (*k_thread_timeslice_fn_t)(struct k_thread *thread, void *data);
 
 #ifdef __cplusplus
 }

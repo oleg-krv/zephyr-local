@@ -23,14 +23,25 @@ static struct k_thread ztest_thread;
 
 /* ZTEST_DMEM and ZTEST_BMEM are used for the application shared memory test  */
 
-ZTEST_DMEM enum {
+/**
+ * @brief Each enum member represents a distinct phase of execution for the
+ *        test binary. TEST_PHASE_FRAMEWORK is active when internal ztest code
+ *        is executing; the rest refer to corresponding phases of user test
+ *        code.
+ */
+enum ztest_phase {
 	TEST_PHASE_SETUP,
 	TEST_PHASE_BEFORE,
 	TEST_PHASE_TEST,
 	TEST_PHASE_AFTER,
 	TEST_PHASE_TEARDOWN,
 	TEST_PHASE_FRAMEWORK
-} phase = TEST_PHASE_FRAMEWORK;
+};
+
+/**
+ * @brief Tracks the current phase that ztest is operating in.
+ */
+ZTEST_DMEM enum ztest_phase phase = TEST_PHASE_FRAMEWORK;
 
 static ZTEST_BMEM int test_status;
 
@@ -97,7 +108,7 @@ static int cleanup_test(struct ztest_unit_test *test)
 #else
 #define NUM_CPUHOLD 0
 #endif
-#define CPUHOLD_STACK_SZ (512 + CONFIG_TEST_EXTRA_STACKSIZE)
+#define CPUHOLD_STACK_SZ (512 + CONFIG_TEST_EXTRA_STACK_SIZE)
 
 static struct k_thread cpuhold_threads[NUM_CPUHOLD];
 K_KERNEL_STACK_ARRAY_DEFINE(cpuhold_stacks, NUM_CPUHOLD, CPUHOLD_STACK_SZ);
@@ -248,14 +259,34 @@ void ztest_test_pass(void)
 	longjmp(test_pass, 1);
 }
 
+/**
+ * @brief Get a friendly name string for a given test phrase.
+ *
+ * @param phase an enum ztest_phase value describing the desired test phase
+ * @returns a string name for `phase`
+ */
+static inline const char *get_friendly_phase_name(enum ztest_phase phase)
+{
+	switch (phase) {
+	case TEST_PHASE_SETUP:
+		return "setup";
+	case TEST_PHASE_BEFORE:
+		return "before";
+	case TEST_PHASE_TEST:
+		return "test";
+	case TEST_PHASE_AFTER:
+		return "after";
+	case TEST_PHASE_TEARDOWN:
+		return "teardown";
+	case TEST_PHASE_FRAMEWORK:
+		return "framework";
+	default:
+		return "(unknown)";
+	}
+}
+
 static void handle_signal(int sig)
 {
-	static const char *const phase_str[] = {
-		"setup",
-		"unit test",
-		"teardown",
-	};
-
 	PRINT("    %s", strsignal(sig));
 	switch (phase) {
 	case TEST_PHASE_SETUP:
@@ -263,7 +294,7 @@ static void handle_signal(int sig)
 	case TEST_PHASE_TEST:
 	case TEST_PHASE_AFTER:
 	case TEST_PHASE_TEARDOWN:
-		PRINT(" at %s function\n", phase_str[phase]);
+		PRINT(" at %s function\n", get_friendly_phase_name(phase));
 		longjmp(test_fail, 1);
 	case TEST_PHASE_FRAMEWORK:
 		PRINT("\n");
@@ -317,7 +348,7 @@ out:
 #define FAIL_FAST 0
 #endif
 
-K_THREAD_STACK_DEFINE(ztest_thread_stack, CONFIG_ZTEST_STACKSIZE + CONFIG_TEST_EXTRA_STACKSIZE);
+K_THREAD_STACK_DEFINE(ztest_thread_stack, CONFIG_ZTEST_STACK_SIZE + CONFIG_TEST_EXTRA_STACK_SIZE);
 static ZTEST_BMEM int test_result;
 
 static void test_finalize(void)
@@ -555,11 +586,21 @@ int ztest_run_test_suites(const void *state)
 void ztest_verify_all_test_suites_ran(void)
 {
 	bool all_tests_run = true;
-	struct ztest_suite_node *ptr;
+	struct ztest_suite_node *suite;
+	struct ztest_unit_test *test;
 
-	for (ptr = _ztest_suite_node_list_start; ptr < _ztest_suite_node_list_end; ++ptr) {
-		if (ptr->stats.run_count < 1) {
-			PRINT("ERROR: Test '%s' did not run.\n", ptr->name);
+	for (suite = _ztest_suite_node_list_start; suite < _ztest_suite_node_list_end; ++suite) {
+		if (suite->stats.run_count < 1) {
+			PRINT("ERROR: Test suite '%s' did not run.\n", suite->name);
+			all_tests_run = false;
+		}
+	}
+
+	for (test = _ztest_unit_test_list_start; test < _ztest_unit_test_list_end; ++test) {
+		suite = ztest_find_test_suite(test->test_suite_name);
+		if (suite == NULL) {
+			PRINT("ERROR: Test '%s' assigned to test suite '%s' which doesn't exist\n",
+			      test->name, test->test_suite_name);
 			all_tests_run = false;
 		}
 	}

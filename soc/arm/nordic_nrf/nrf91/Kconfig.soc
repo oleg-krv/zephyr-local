@@ -8,6 +8,7 @@ config SOC_NRF9160
 	bool
 	select HAS_HW_NRF_CC310
 	select HAS_HW_NRF_CLOCK
+	select HAS_HW_NRF_CTRLAP
 	select HAS_HW_NRF_DPPIC
 	select HAS_HW_NRF_EGU0
 	select HAS_HW_NRF_EGU1
@@ -69,6 +70,6 @@ config SOC_NRF9160_SICA
 endchoice
 
 config NRF_ENABLE_ICACHE
-	bool "Enable the instruction cache (I-Cache)"
+	bool "Instruction cache (I-Cache)"
 	depends on SOC_NRF9160
 	default y

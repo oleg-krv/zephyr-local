@@ -337,7 +337,7 @@ struct media_proxy_ctrl_cbs {
 	 * @brief Track Duration receive callback
 	 *
 	 * Called when the Track Duration is read or changed
-	 * Seel also media_proxy_ctrl_get_track_duration()
+	 * See also media_proxy_ctrl_get_track_duration()
 	 *
 	 * @param player     Media player instance pointer
 	 * @param err        Error value. 0 on success, GATT error on positive value
@@ -834,7 +834,7 @@ int media_proxy_ctrl_set_playback_speed(struct media_player *player, int8_t spee
  * the real-time playback speed. Positive values are for
  * forward seeking, negative values for backwards seeking.
  *
- * The seeking speed is not setable - a non-zero seeking speed
+ * The seeking speed is not settable - a non-zero seeking speed
  * is the result of "fast rewind" of "fast forward" commands.
  *
  * @param player   Media player instance pointer
@@ -1097,7 +1097,7 @@ uint8_t media_proxy_ctrl_get_content_ctrl_id(struct media_player *player);
 
 /* PUBLIC API FOR PLAYERS */
 
-/** @brief Availalable calls in a player, that the media proxy can call
+/** @brief Available calls in a player, that the media proxy can call
  *
  * Given by a player when registering.
  */
@@ -1217,7 +1217,7 @@ struct media_proxy_pl_calls {
 	 * the real-time playback speed. Positive values are for
 	 * forward seeking, negative values for backwards seeking.
 	 *
-	 * The seeking speed is not setable - a non-zero seeking speed
+	 * The seeking speed is not settable - a non-zero seeking speed
 	 * is the result of "fast rewind" of "fast forward" commands.
 	 *
 	 * @return The seeking speed factor

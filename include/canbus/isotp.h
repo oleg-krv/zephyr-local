@@ -15,7 +15,7 @@
 #define ZEPHYR_INCLUDE_ISOTP_H_
 
 /**
- * @brief CAN ISO-TP Interf
+ * @brief CAN ISO-TP Interface
  * @defgroup can_isotp CAN ISO-TP Interface
  * @ingroup CAN
  * @{
@@ -391,6 +391,7 @@ struct isotp_send_ctx {
 	struct isotp_fc_opts opts;
 	uint8_t state;
 	uint8_t tx_backlog;
+	struct k_sem tx_sem;
 	struct isotp_msg_id rx_addr;
 	struct isotp_msg_id tx_addr;
 	uint8_t wft;

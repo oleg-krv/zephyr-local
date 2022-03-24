@@ -137,7 +137,7 @@ to you.
   duplication between services.
 
 The current isolation level can be checked via
-:kconfig:`CONFIG_TFM_ISOLATION_LEVEL`.
+:kconfig:option:`CONFIG_TFM_ISOLATION_LEVEL`.
 
 Secure Boot
 ===========
@@ -150,11 +150,11 @@ the secure MCU, etc.).
 All images in TF-M are hashed and signed, with the hash and signature verified
 by MCUBoot during the firmware update process.
 
-Some key features of MCUBooot as used in TF-M are:
+Some key features of MCUBoot as used in TF-M are:
 
 * Public signing key(s) are baked into the bootloader
 * S and NS images can be signed using different keys
-* Firmware images can optionally be encyrpted
+* Firmware images can optionally be encrypted
 * Client software is responsible for writing a new image to the secondary slot
 * By default, uses static flash layout of two identically-sized memory regions
 * Optional security counter for rollback protection
@@ -174,9 +174,9 @@ When dealing with (optionally) encrypted images:
 
 Key config properties to control secure boot in Zephyr are:
 
-* :kconfig:`CONFIG_TFM_BL2` toggles the bootloader (default = ``y``).
-* :kconfig:`CONFIG_TFM_KEY_FILE_S` overrides the secure signing key.
-* :kconfig:`CONFIG_TFM_KEY_FILE_NS` overrides the non-secure signing key.
+* :kconfig:option:`CONFIG_TFM_BL2` toggles the bootloader (default = ``y``).
+* :kconfig:option:`CONFIG_TFM_KEY_FILE_S` overrides the secure signing key.
+* :kconfig:option:`CONFIG_TFM_KEY_FILE_NS` overrides the non-secure signing key.
 
 Secure Processing Environment
 =============================
@@ -260,7 +260,7 @@ Non-Secure Processing Environment
 =================================
 
 Zephyr is used for the NSPE, using a board that is supported by TF-M where the
-:kconfig:`CONFIG_BUILD_WITH_TFM` flag has been enabled.
+:kconfig:option:`CONFIG_BUILD_WITH_TFM` flag has been enabled.
 
 Generally, you simply need to select the ``*_ns`` variant of a valid target
 (for example ``mps2_an521_ns``), which will configure your Zephyr application
