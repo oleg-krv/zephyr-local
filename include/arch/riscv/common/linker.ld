@@ -81,9 +81,7 @@ MEMORY
 #endif
     RAM (rwx) : ORIGIN = RAM_BASE, LENGTH = RAM_SIZE
 
-    /* Data & Instruction Tightly Coupled Memory */
-    LINKER_DT_REGION_FROM_NODE(DT_CHOSEN(zephyr_itcm), rw)
-    LINKER_DT_REGION_FROM_NODE(DT_CHOSEN(zephyr_dtcm), rw)
+    LINKER_DT_REGIONS()
 
     /* Used by and documented in include/linker/intlist.ld */
     IDT_LIST  (wx)      : ORIGIN = 0xFFFFF7FF, LENGTH = 2K
@@ -190,7 +188,7 @@ SECTIONS
 
 	/* For non-XIP system, __rom_region_end symbol should be set to
 	 * the end of common ROMABLE_REGIONs (text and rodata) instead of
-	 * the linker script end, so it wouldn't mistakely contain
+	 * the linker script end, so it wouldn't mistakenly contain
 	 * RAMABLE_REGION in it.
 	 */
 #ifndef CONFIG_XIP
@@ -208,13 +206,19 @@ SECTIONS
 
     GROUP_START(RAMABLE_REGION)
 
+	. = RAM_BASE;
+	_image_ram_start = .;
+/* Located in generated directory. This file is populated by the
+ * zephyr_linker_sources() Cmake function.
+ */
+#include <snippets-ram-sections.ld>
+
 #if defined(CONFIG_USERSPACE)
 #define APP_SHARED_ALIGN MPU_MIN_SIZE_ALIGN
 #define SMEM_PARTITION_ALIGN MPU_ALIGN
 
 #include <app_smem.ld>
 
-	_image_ram_start = _app_smem_start;
 	_app_smem_size = _app_smem_end - _app_smem_start;
 	_app_smem_rom_start = LOADADDR(_APP_SMEM_SECTION_NAME);
 #endif /* CONFIG_USERSPACE */
@@ -228,9 +232,6 @@ SECTIONS
 		 */
 		 . = ALIGN(4);
 		 __bss_start = .;
-#if !defined(CONFIG_USERSPACE)
-		 _image_ram_start = .;
-#endif /* CONFIG_USERSPACE */
 		__kernel_ram_start = .;
 		 *(.sbss)
 		 *(".sbss.*")
@@ -289,11 +290,6 @@ SECTIONS
 #include <linker/common-ram.ld>
 #include <linker/kobject-data.ld>
 #include <linker/cplusplus-ram.ld>
-
-/* Located in generated directory. This file is populated by the
- * zephyr_linker_sources() Cmake function.
- */
-#include <snippets-ram-sections.ld>
 
 /* Located in generated directory. This file is populated by the
  * zephyr_linker_sources() Cmake function.
@@ -381,7 +377,7 @@ GROUP_END(DTCM)
 
 /* Because ROMABLE_REGION != RAMABLE_REGION in XIP-system, it is valid
  * to set __rom_region_end symbol at the end of linker script and
- * doesn't mistakely contain the RAMABLE_REGION in it.
+ * doesn't mistakenly contain the RAMABLE_REGION in it.
  */
 #ifdef CONFIG_XIP
 /* Must be last in romable region */

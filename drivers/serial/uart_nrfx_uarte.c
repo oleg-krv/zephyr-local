@@ -14,9 +14,11 @@
 #include <nrfx_timer.h>
 #include <sys/util.h>
 #include <kernel.h>
-#include <logging/log.h>
+#include <soc.h>
 #include <helpers/nrfx_gppi.h>
-LOG_MODULE_REGISTER(uart_nrfx_uarte, LOG_LEVEL_ERR);
+
+#include <logging/log.h>
+LOG_MODULE_REGISTER(uart_nrfx_uarte, CONFIG_UART_LOG_LEVEL);
 
 #ifdef CONFIG_PINCTRL
 #include <drivers/pinctrl.h>
@@ -854,8 +856,7 @@ static void notify_uart_rx_rdy(const struct device *dev, size_t len)
 	user_callback(dev, &evt);
 }
 
-static void notify_rx_buf_release(const struct device *dev,
-				  uint8_t **buf, bool clear)
+static void rx_buf_release(const struct device *dev, uint8_t **buf)
 {
 	if (*buf) {
 		struct uart_event evt = {
@@ -864,9 +865,7 @@ static void notify_rx_buf_release(const struct device *dev,
 		};
 
 		user_callback(dev, &evt);
-		if (clear) {
-			*buf = NULL;
-		}
+		*buf = NULL;
 	}
 }
 
@@ -927,8 +926,7 @@ static int uarte_nrfx_rx_enable(const struct device *dev, uint8_t *buf,
 			if (!len) {
 				data->async->rx_flush_cnt -= cpy_len;
 				notify_uart_rx_rdy(dev, cpy_len);
-				notify_rx_buf_release(dev, &data->async->rx_buf,
-						      true);
+				rx_buf_release(dev, &data->async->rx_buf);
 				notify_rx_disable(dev);
 				return 0;
 			}
@@ -1077,7 +1075,7 @@ static void rx_timeout(struct k_timer *timer)
 	}
 
 	/* Check for current buffer being full.
-	 * if the UART receives characters before the the ENDRX is handled
+	 * if the UART receives characters before the ENDRX is handled
 	 * and the 'next' buffer is set up, then the SHORT between ENDRX and
 	 * STARTRX will mean that data will be going into to the 'next' buffer
 	 * until the ENDRX event gets a chance to be handled.
@@ -1102,7 +1100,7 @@ static void rx_timeout(struct k_timer *timer)
 				data->async->rx_timeout_slab;
 		}
 
-		/* If theres nothing left to report until the buffers are
+		/* If there's nothing left to report until the buffers are
 		 * switched then the timer can be stopped
 		 */
 		if (clipped) {
@@ -1194,7 +1192,7 @@ static void endrx_isr(const struct device *dev)
 		return;
 	}
 
-	notify_rx_buf_release(dev, &data->async->rx_buf, false);
+	rx_buf_release(dev, &data->async->rx_buf);
 
 	/* If there is a next buffer, then STARTRX will have already been
 	 * invoked by the short (the next buffer will be filling up already)
@@ -1327,8 +1325,8 @@ static void rxto_isr(const struct device *dev)
 	const struct uarte_nrfx_config *config = dev->config;
 	struct uarte_nrfx_data *data = dev->data;
 
-	notify_rx_buf_release(dev, &data->async->rx_buf, true);
-	notify_rx_buf_release(dev, &data->async->rx_next_buf, true);
+	rx_buf_release(dev, &data->async->rx_buf);
+	rx_buf_release(dev, &data->async->rx_next_buf);
 
 	/* If the rx_enabled flag is still set at this point, it means that
 	 * RX is being disabled because all provided RX buffers have been
@@ -2025,7 +2023,7 @@ static int uarte_nrfx_pm_action(const struct device *dev,
  * kconfig option is enabled.
  */
 #define USE_LOW_POWER(idx) \
-	((!UARTE_HAS_PROP(idx, disable_rx) &&				       \
+	((!UARTE_PROP(idx, disable_rx) &&				       \
 	COND_CODE_1(CONFIG_UART_##idx##_ASYNC,				       \
 		(!IS_ENABLED(CONFIG_UART_##idx##_NRF_ASYNC_LOW_POWER)),	       \
 		(1))) ? 0 : UARTE_CFG_FLAG_LOW_POWER)
@@ -2047,6 +2045,8 @@ static int uarte_nrfx_pm_action(const struct device *dev,
 #endif /* CONFIG_PINCTRL */
 
 #define UART_NRF_UARTE_DEVICE(idx)					       \
+	NRF_DT_CHECK_PIN_ASSIGNMENTS(UARTE(idx), 1,			       \
+				     tx_pin, rx_pin, rts_pin, cts_pin);        \
 	UARTE_INT_DRIVEN(idx);						       \
 	UARTE_ASYNC(idx);						       \
 	IF_ENABLED(CONFIG_PINCTRL, (PINCTRL_DT_DEFINE(UARTE(idx));))	       \

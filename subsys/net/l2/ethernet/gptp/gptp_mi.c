@@ -706,9 +706,9 @@ static void gptp_mi_clk_slave_sync_compute(void)
 
 	pss = &state->pss_rcv_ptr->sync_info;
 
-	sync_receipt_time = pss->rate_ratio;
+	sync_receipt_time = port_ds->neighbor_prop_delay;
+	sync_receipt_time *= pss->rate_ratio;
 	sync_receipt_time /= port_ds->neighbor_rate_ratio;
-	sync_receipt_time *= port_ds->neighbor_prop_delay;
 	sync_receipt_time += pss->follow_up_correction_field;
 	sync_receipt_time += port_ds->delay_asymmetry;
 
@@ -1527,7 +1527,7 @@ static void gptp_mi_port_announce_information_state_machine(int port)
 	case GPTP_PA_INFO_SUPERIOR_MASTER_PORT:
 		/* We copy directly the content of the message to the port
 		 * priority vector without using an intermediate
-		 * messagePrioriry structure.
+		 * messagePriority structure.
 		 */
 
 		if (!bmca_data->rcvd_announce_ptr) {

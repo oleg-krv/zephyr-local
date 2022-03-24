@@ -44,6 +44,7 @@
 #include "ll_sw/lll_sync_iso.h"
 #include "ll_sw/lll_conn.h"
 #include "ll_sw/lll_conn_iso.h"
+#include "ll_sw/lll_iso_tx.h"
 
 #include "ll_sw/isoal.h"
 
@@ -206,6 +207,34 @@ static uint64_t le_event_mask = DEFAULT_LE_EVENT_MASK;
 static struct net_buf *cmd_complete_status(uint8_t status);
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
+#if defined(CONFIG_BT_HCI_RAW)
+static uint8_t ll_adv_cmds;
+
+__weak int ll_adv_cmds_set(uint8_t adv_cmds)
+{
+	if (!ll_adv_cmds) {
+		ll_adv_cmds = adv_cmds;
+	}
+
+	if (ll_adv_cmds != adv_cmds) {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+__weak int ll_adv_cmds_is_ext(void)
+{
+	return ll_adv_cmds == LL_ADV_CMDS_EXT;
+}
+
+#else /* !CONFIG_BT_HCI_RAW */
+__weak int ll_adv_cmds_is_ext(void)
+{
+	return 1;
+}
+#endif /* !CONFIG_BT_HCI_RAW */
+
 static int adv_cmds_legacy_check(struct net_buf **cc_evt)
 {
 	int err;
@@ -862,6 +891,17 @@ static void read_supported_commands(struct net_buf *buf, struct net_buf **evt)
 	rp->commands[35] |= BIT(7);
 	/* LE Enhanced TX Test. */
 	rp->commands[36] |= BIT(0);
+#if defined(CONFIG_BT_CTLR_DTM_HCI_RX_V3)
+	rp->commands[39] |= BIT(3);
+#endif /* CONFIG_BT_CTLR_DTM_HCI_RX_V3 */
+
+#if defined(CONFIG_BT_CTLR_DTM_HCI_TX_V3)
+	rp->commands[39] |= BIT(4);
+#endif
+
+#if defined(CONFIG_BT_CTLR_DTM_HCI_TX_V4)
+	rp->commands[45] |= BIT(0);
+#endif
 #endif /* CONFIG_BT_CTLR_DTM_HCI */
 
 #if defined(CONFIG_BT_CTLR_PRIVACY)
@@ -2768,17 +2808,23 @@ static void le_df_set_cl_iq_sampling_enable(struct net_buf *buf, struct net_buf 
 	rp->status = status;
 	rp->sync_handle = sys_cpu_to_le16(sync_handle);
 }
+#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX */
 
+#if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX) || defined(CONFIG_BT_CTLR_DTM_HCI_DF_IQ_REPORT)
 static void le_df_connectionless_iq_report(struct pdu_data *pdu_rx,
 					   struct node_rx_pdu *node_rx,
 					   struct net_buf *buf)
 {
 	struct bt_hci_evt_le_connectionless_iq_report *sep;
 	struct node_rx_iq_report *iq_report;
-	struct ll_sync_set *sync;
 	struct lll_sync *lll;
 	uint8_t samples_cnt;
 	int16_t rssi;
+	uint16_t sync_handle;
+	uint16_t per_evt_counter;
+#if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX)
+	struct ll_sync_set *sync = NULL;
+#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX */
 
 	iq_report =  (struct node_rx_iq_report *)node_rx;
 
@@ -2788,18 +2834,42 @@ static void le_df_connectionless_iq_report(struct pdu_data *pdu_rx,
 	}
 
 	lll = iq_report->hdr.rx_ftr.param;
-	sync = HDR_LLL2ULL(lll);
 
-	/* TX LL thread has higher priority than RX thread. It may happen that
-	 * host successfully disables CTE sampling in the meantime.
-	 * It should be verified here, to avoid reporting IQ samples after
-	 * the functionality was disabled or if sync was lost.
+	/* If there is not LLL context and CONFIG_BT_CTLR_DTM_HCI_DF_IQ_REPORT is enabled
+	 * the controller is in the Direct Test Mode and may generate
+	 * the Connectionless IQ Report.
 	 */
-	if (ull_df_sync_cfg_is_not_enabled(&lll->df_cfg) ||
-	    !sync->timeout_reload) {
-		/* Drop further processing of the event. */
-		return;
+	if (!lll && IS_ENABLED(CONFIG_BT_CTLR_DTM_HCI_DF_IQ_REPORT)) {
+		/* Set sync_handle to 0x0FFF according to the BT Core 5.3 specification
+		 * Vol 4 7.7.65.21
+		 */
+		sync_handle = 0x0FFF;
+		/* Set periodic event counter to 0 since there is not periodic advertising train. */
+		per_evt_counter = 0;
 	}
+
+#if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX)
+	else {
+		sync = HDR_LLL2ULL(lll);
+
+		/* TX LL thread has higher priority than RX thread. It may happen that
+		 * host successfully disables CTE sampling in the meantime.
+		 * It should be verified here, to avoid reporting IQ samples after
+		 * the functionality was disabled or if sync was lost.
+		 */
+		if (ull_df_sync_cfg_is_not_enabled(&lll->df_cfg) ||
+		    !sync->timeout_reload) {
+			/* Drop further processing of the event. */
+			return;
+		}
+
+		/* Get the sync handle corresponding to the LLL context passed in the
+		 * node rx footer field.
+		 */
+		sync_handle = ull_sync_handle_get(sync);
+		per_evt_counter = lll->event_counter;
+	}
+#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX */
 
 	/* If there are no IQ samples due to insufficient resources
 	 * HCI event should inform about it by storing single octet with
@@ -2813,16 +2883,14 @@ static void le_df_connectionless_iq_report(struct pdu_data *pdu_rx,
 
 	rssi = RSSI_DBM_TO_DECI_DBM(iq_report->hdr.rx_ftr.rssi);
 
-	/* Get the sync handle corresponding to the LLL context passed in the
-	 * node rx footer field.
-	 */
-	sep->sync_handle = sys_cpu_to_le16(ull_sync_handle_get(sync));
+
+	sep->sync_handle = sys_cpu_to_le16(sync_handle);
 	sep->rssi = sys_cpu_to_le16(rssi);
 	sep->rssi_ant_id = iq_report->rssi_ant_id;
 	sep->cte_type = iq_report->cte_info.type;
 
 	sep->chan_idx = iq_report->chan_idx;
-	sep->per_evt_counter = sys_cpu_to_le16(lll->event_counter);
+	sep->per_evt_counter = sys_cpu_to_le16(per_evt_counter);
 
 	if (sep->cte_type == BT_HCI_LE_AOA_CTE) {
 		sep->slot_durations = iq_report->local_slot_durations;
@@ -2847,7 +2915,7 @@ static void le_df_connectionless_iq_report(struct pdu_data *pdu_rx,
 		sep->sample_count = samples_cnt;
 	}
 }
-#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX */
+#endif /* defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX) || defined(CONFIG_BT_CTLR_DTM_HCI_DF_IQ_REPORT) */
 
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_TX)
 static void le_df_set_conn_cte_tx_params(struct net_buf *buf,
@@ -3053,7 +3121,10 @@ static void le_rx_test(struct net_buf *buf, struct net_buf **evt)
 	struct bt_hci_cp_le_rx_test *cmd = (void *)buf->data;
 	uint8_t status;
 
-	status = ll_test_rx(cmd->rx_ch, 0x01, 0);
+	status = ll_test_rx(cmd->rx_ch, BT_HCI_LE_RX_PHY_1M, BT_HCI_LE_MOD_INDEX_STANDARD,
+			    BT_HCI_LE_TEST_CTE_DISABLED, BT_HCI_LE_TEST_CTE_TYPE_ANY,
+			    BT_HCI_LE_TEST_SLOT_DURATION_ANY, BT_HCI_LE_TEST_SWITCH_PATTERN_LEN_ANY,
+			    NULL);
 
 	*evt = cmd_complete_status(status);
 }
@@ -3064,7 +3135,9 @@ static void le_tx_test(struct net_buf *buf, struct net_buf **evt)
 	uint8_t status;
 
 	status = ll_test_tx(cmd->tx_ch, cmd->test_data_len, cmd->pkt_payload,
-			    0x01);
+			    BT_HCI_LE_TX_PHY_1M, BT_HCI_LE_TEST_CTE_DISABLED,
+			    BT_HCI_LE_TEST_CTE_TYPE_ANY, BT_HCI_LE_TEST_SWITCH_PATTERN_LEN_ANY,
+			    NULL, BT_HCI_TX_TEST_POWER_MAX_SET);
 
 	*evt = cmd_complete_status(status);
 }
@@ -3073,11 +3146,12 @@ static void le_test_end(struct net_buf *buf, struct net_buf **evt)
 {
 	struct bt_hci_rp_le_test_end *rp;
 	uint16_t rx_pkt_count;
+	uint8_t status;
 
-	ll_test_end(&rx_pkt_count);
+	status = ll_test_end(&rx_pkt_count);
 
 	rp = hci_cmd_complete(evt, sizeof(*rp));
-	rp->status = 0x00;
+	rp->status = status;
 	rp->rx_pkt_count = sys_cpu_to_le16(rx_pkt_count);
 }
 
@@ -3086,21 +3160,69 @@ static void le_enh_rx_test(struct net_buf *buf, struct net_buf **evt)
 	struct bt_hci_cp_le_enh_rx_test *cmd = (void *)buf->data;
 	uint8_t status;
 
-	status = ll_test_rx(cmd->rx_ch, cmd->phy, cmd->mod_index);
+	status = ll_test_rx(cmd->rx_ch, cmd->phy, cmd->mod_index, BT_HCI_LE_TEST_CTE_DISABLED,
+			    BT_HCI_LE_TEST_CTE_TYPE_ANY, BT_HCI_LE_TEST_SLOT_DURATION_ANY,
+			    BT_HCI_LE_TEST_SWITCH_PATTERN_LEN_ANY, NULL);
 
 	*evt = cmd_complete_status(status);
 }
+
+#if defined(CONFIG_BT_CTLR_DTM_HCI_RX_V3)
+static void le_rx_test_v3(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_rx_test_v3 *cmd = (void *)buf->data;
+	uint8_t status;
+
+	status = ll_test_rx(cmd->rx_ch, cmd->phy, cmd->mod_index, cmd->expected_cte_len,
+			    cmd->expected_cte_type, cmd->slot_durations, cmd->switch_pattern_len,
+			    cmd->ant_ids);
+
+	*evt = cmd_complete_status(status);
+}
+#endif /* CONFIG_BT_CTLR_DTM_HCI_RX_V3 */
 
 static void le_enh_tx_test(struct net_buf *buf, struct net_buf **evt)
 {
 	struct bt_hci_cp_le_enh_tx_test *cmd = (void *)buf->data;
 	uint8_t status;
 
-	status = ll_test_tx(cmd->tx_ch, cmd->test_data_len, cmd->pkt_payload,
-			    cmd->phy);
+	status = ll_test_tx(cmd->tx_ch, cmd->test_data_len, cmd->pkt_payload, cmd->phy,
+			    BT_HCI_LE_TEST_CTE_DISABLED, BT_HCI_LE_TEST_CTE_TYPE_ANY,
+			    BT_HCI_LE_TEST_SWITCH_PATTERN_LEN_ANY, NULL,
+			    BT_HCI_TX_TEST_POWER_MAX_SET);
 
 	*evt = cmd_complete_status(status);
 }
+
+#if defined(CONFIG_BT_CTLR_DTM_HCI_TX_V3)
+static void le_tx_test_v3(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_tx_test_v3 *cmd = (void *)buf->data;
+	uint8_t status;
+
+	status = ll_test_tx(cmd->tx_ch, cmd->test_data_len, cmd->pkt_payload, cmd->phy,
+			    cmd->cte_len, cmd->cte_type, cmd->switch_pattern_len, cmd->ant_ids,
+			    BT_HCI_TX_TEST_POWER_MAX_SET);
+
+	*evt = cmd_complete_status(status);
+}
+#endif /* CONFIG_BT_CTLR_DTM_HCI_TX_V3 */
+
+#if defined(CONFIG_BT_CTLR_DTM_HCI_TX_V4)
+static void le_tx_test_v4(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_tx_test_v4 *cmd = (void *)buf->data;
+	struct bt_hci_cp_le_tx_test_v4_tx_power *tx_power = (void *)(buf->data +
+			sizeof(struct bt_hci_cp_le_tx_test_v4) + cmd->switch_pattern_len);
+	uint8_t status;
+
+	status = ll_test_tx(cmd->tx_ch, cmd->test_data_len, cmd->pkt_payload, cmd->phy,
+			    cmd->cte_len, cmd->cte_type, cmd->switch_pattern_len, cmd->ant_ids,
+			    tx_power->tx_power);
+
+	*evt = cmd_complete_status(status);
+}
+#endif /* CONFIG_BT_CTLR_DTM_HCI_TX_V4 */
 #endif /* CONFIG_BT_CTLR_DTM_HCI */
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
@@ -4400,9 +4522,24 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 	case BT_OCF(BT_HCI_OP_LE_ENH_RX_TEST):
 		le_enh_rx_test(cmd, evt);
 		break;
+#if defined(CONFIG_BT_CTLR_DTM_HCI_RX_V3)
+	case BT_OCF(BT_HCI_OP_LE_RX_TEST_V3):
+		le_rx_test_v3(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_DTM_HCI_RX_V3 */
 	case BT_OCF(BT_HCI_OP_LE_ENH_TX_TEST):
 		le_enh_tx_test(cmd, evt);
 		break;
+#if defined(CONFIG_BT_CTLR_DTM_HCI_TX_V3)
+	case BT_OCF(BT_HCI_OP_LE_TX_TEST_V3):
+		le_tx_test_v3(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_DTM_HCI_TX_V3 */
+#if defined(CONFIG_BT_CTLR_DTM_HCI_TX_V4)
+	case BT_OCF(BT_HCI_OP_LE_TX_TEST_V4):
+		le_tx_test_v4(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_DTM_HCI_TX_V4 */
 #endif /* CONFIG_BT_CTLR_DTM_HCI */
 
 	default:
@@ -4887,8 +5024,9 @@ struct net_buf *hci_cmd_handle(struct net_buf *cmd, void **node_rx)
 	return evt;
 }
 
-#if defined(CONFIG_BT_CONN)
-static void data_buf_overflow(struct net_buf **buf)
+#if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_CTLR_ADV_ISO) || \
+	defined(CONFIG_BT_CTLR_CONN_ISO)
+static void data_buf_overflow(struct net_buf **buf, uint8_t link_type)
 {
 	struct bt_hci_evt_data_buf_overflow *ep;
 
@@ -4900,9 +5038,13 @@ static void data_buf_overflow(struct net_buf **buf)
 	hci_evt_create(*buf, BT_HCI_EVT_DATA_BUF_OVERFLOW, sizeof(*ep));
 	ep = net_buf_add(*buf, sizeof(*ep));
 
-	ep->link_type = BT_OVERFLOW_LINK_ACL;
+	ep->link_type = link_type;
 }
+#endif /* CONFIG_BT_CONN || CONFIG_BT_CTLR_SYNC_ISO ||
+	* CONFIG_BT_CTLR_CONN_ISO
+	*/
 
+#if defined(CONFIG_BT_CONN)
 int hci_acl_handle(struct net_buf *buf, struct net_buf **evt)
 {
 	struct node_tx *node_tx;
@@ -4940,7 +5082,7 @@ int hci_acl_handle(struct net_buf *buf, struct net_buf **evt)
 	node_tx = ll_tx_mem_acquire();
 	if (!node_tx) {
 		BT_ERR("Tx Buffer Overflow");
-		data_buf_overflow(evt);
+		data_buf_overflow(evt, BT_OVERFLOW_LINK_ACL);
 		return -ENOBUFS;
 	}
 
@@ -4976,6 +5118,144 @@ int hci_acl_handle(struct net_buf *buf, struct net_buf **evt)
 	return 0;
 }
 #endif /* CONFIG_BT_CONN */
+
+#if defined(CONFIG_BT_CTLR_ADV_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
+int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_iso_data_hdr *iso_data_hdr;
+	struct bt_hci_iso_hdr *iso_hdr;
+	uint16_t stream_handle;
+	struct node_tx_iso *tx;
+	uint16_t handle;
+	uint8_t flags;
+	uint16_t slen;
+	uint16_t len;
+
+	*evt = NULL;
+
+	if (buf->len < sizeof(*iso_hdr)) {
+		BT_ERR("No HCI ISO header");
+		return -EINVAL;
+	}
+
+	iso_hdr = net_buf_pull_mem(buf, sizeof(*iso_hdr));
+	handle = sys_le16_to_cpu(iso_hdr->handle);
+	len = sys_le16_to_cpu(iso_hdr->len);
+
+	if (buf->len < len) {
+		BT_ERR("Invalid HCI ISO packet length");
+		return -EINVAL;
+	}
+
+	/* assigning flags first because handle will be overwritten */
+	flags = bt_iso_flags(handle);
+	if (bt_iso_flags_ts(flags)) {
+		struct bt_hci_iso_ts_data_hdr *iso_ts_data_hdr;
+
+		iso_ts_data_hdr = net_buf_pull_mem(buf,
+						   sizeof(*iso_ts_data_hdr));
+	}
+
+	iso_data_hdr = net_buf_pull_mem(buf, sizeof(*iso_data_hdr));
+	slen = iso_data_hdr->slen;
+
+#if defined(CONFIG_BT_CTLR_ADV_ISO)
+	/* Check invalid BIS PDU length */
+	if (slen > LL_BIS_OCTETS_TX_MAX) {
+		BT_ERR("Invalid HCI ISO Data length");
+		return -EINVAL;
+	}
+
+	/* Get BIS stream handle and stream context */
+	handle = bt_iso_handle(handle);
+	if (handle < BT_CTLR_ADV_ISO_STREAM_HANDLE_BASE) {
+		return -EINVAL;
+	}
+	stream_handle = handle - BT_CTLR_ADV_ISO_STREAM_HANDLE_BASE;
+
+	struct lll_adv_iso_stream *stream;
+
+	stream = ull_adv_iso_stream_get(stream_handle);
+	if (!stream) {
+		BT_ERR("Invalid BIS stream");
+		return -EINVAL;
+	}
+
+	struct ll_adv_iso_set *adv_iso;
+
+	adv_iso = ull_adv_iso_by_stream_get(stream_handle);
+	if (!adv_iso) {
+		BT_ERR("No BIG associated with stream handle");
+		return -EINVAL;
+	}
+
+	/* Get free node tx */
+	tx = ll_iso_tx_mem_acquire();
+	if (!tx) {
+		BT_ERR("ISO Tx Buffer Overflow");
+		data_buf_overflow(evt, BT_OVERFLOW_LINK_ISO);
+		return -ENOBUFS;
+	}
+
+	struct pdu_bis *pdu = (void *)tx->pdu;
+
+	/* FIXME: Update to use correct LLID for BIS and CIS */
+	switch (bt_iso_flags_pb(flags)) {
+	case BT_ISO_SINGLE:
+		pdu->ll_id = PDU_BIS_LLID_COMPLETE_END;
+		break;
+	default:
+		ll_iso_tx_mem_release(tx);
+		return -EINVAL;
+	}
+
+	pdu->len = slen;
+	memcpy(pdu->payload, buf->data, slen);
+
+	struct lll_adv_iso *lll_iso;
+
+	lll_iso = &adv_iso->lll;
+
+	uint64_t pkt_seq_num;
+
+	pkt_seq_num = lll_iso->payload_count / lll_iso->bn;
+	if (((pkt_seq_num - stream->pkt_seq_num) & BIT64_MASK(39)) <=
+	    BIT64_MASK(38)) {
+		stream->pkt_seq_num = pkt_seq_num;
+	} else {
+		pkt_seq_num = stream->pkt_seq_num;
+	}
+
+	tx->payload_count = pkt_seq_num * lll_iso->bn;
+
+	stream->pkt_seq_num++;
+
+#else /* CONFIG_BT_CTLR_CONN_ISO */
+	/* FIXME: Add Connected ISO implementation */
+	stream_handle = 0U;
+
+	/* NOTE: Keeping the code below to pass compilation until Connected ISO
+	 *       integration.
+	 */
+	/* Get free node tx */
+	tx = ll_iso_tx_mem_acquire();
+	if (!tx) {
+		BT_ERR("ISO Tx Buffer Overflow");
+		data_buf_overflow(evt, BT_OVERFLOW_LINK_ISO);
+		return -ENOBUFS;
+	}
+
+#endif /* CONFIG_BT_CTLR_CONN_ISO */
+
+	if (ll_iso_tx_mem_enqueue(stream_handle, tx)) {
+		BT_ERR("Invalid ISO Tx Enqueue");
+		ll_iso_tx_mem_release(tx);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+#endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
 
 #if CONFIG_BT_CTLR_DUP_FILTER_LEN > 0
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
@@ -5447,9 +5727,6 @@ static void le_ext_adv_legacy_report(struct pdu_data *pdu_data,
 #if defined(CONFIG_BT_CTLR_PRIVACY)
 	uint8_t rl_idx;
 #endif /* CONFIG_BT_CTLR_PRIVACY */
-#if defined(CONFIG_BT_CTLR_EXT_SCAN_FP)
-	uint8_t direct_report;
-#endif /* CONFIG_BT_CTLR_EXT_SCAN_FP */
 
 	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
 	    !(le_event_mask & BT_EVT_MASK_LE_EXT_ADVERTISING_REPORT)) {
@@ -5462,10 +5739,6 @@ static void le_ext_adv_legacy_report(struct pdu_data *pdu_data,
 #if defined(CONFIG_BT_CTLR_PRIVACY)
 	rl_idx = node_rx->hdr.rx_ftr.rl_idx;
 #endif /* CONFIG_BT_CTLR_PRIVACY */
-
-#if defined(CONFIG_BT_CTLR_EXT_SCAN_FP)
-	direct_report = node_rx->hdr.rx_ftr.direct;
-#endif /* CONFIG_BT_CTLR_EXT_SCAN_FP */
 
 #if defined(CONFIG_BT_CTLR_PRIVACY)
 	if (adv->tx_addr) {
@@ -5519,15 +5792,14 @@ static void le_ext_adv_legacy_report(struct pdu_data *pdu_data,
 	adv_info->rssi = rssi;
 	adv_info->interval = 0U;
 
-	adv_info->direct_addr.type = adv->rx_addr;
-#if defined(CONFIG_BT_CTLR_EXT_SCAN_FP)
-	if (direct_report) {
-		memcpy(&adv_info->direct_addr.a.val[0],
-		       &adv->direct_ind.tgt_addr[0], sizeof(bt_addr_t));
-	} else
-#endif /* CONFIG_BT_CTLR_EXT_SCAN_FP */
-	{
-		memset(&adv_info->direct_addr.a.val[0], 0, sizeof(bt_addr_t));
+	if (adv->type == PDU_ADV_TYPE_DIRECT_IND) {
+		adv_info->direct_addr.type = adv->rx_addr;
+		bt_addr_copy(&adv_info->direct_addr.a,
+			     (void *)adv->direct_ind.tgt_addr);
+	} else {
+		adv_info->direct_addr.type = 0U;
+		(void)memset(adv_info->direct_addr.a.val, 0U,
+			     sizeof(adv_info->direct_addr.a.val));
 	}
 
 	adv_info->length = data_len;
@@ -5580,7 +5852,7 @@ static uint8_t ext_adv_direct_addr_type(struct lll_scan *lll,
 }
 
 static uint8_t ext_adv_data_get(const struct node_rx_pdu *node_rx_data,
-				uint8_t *const sec_phy,
+				uint8_t *const sec_phy, int8_t *const tx_pwr,
 				const uint8_t **const data)
 {
 	const struct pdu_adv *adv = (void *)node_rx_data->pdu;
@@ -5589,6 +5861,8 @@ static uint8_t ext_adv_data_get(const struct node_rx_pdu *node_rx_data,
 	uint8_t hdr_buf_len;
 	const uint8_t *ptr;
 	uint8_t hdr_len;
+
+	*tx_pwr = BT_HCI_LE_ADV_TX_POWER_NO_PREF;
 
 	p = (void *)&adv->adv_ext_ind;
 	h = (void *)p->ext_hdr_adv_data;
@@ -5628,6 +5902,7 @@ static uint8_t ext_adv_data_get(const struct node_rx_pdu *node_rx_data,
 	}
 
 	if (h->tx_pwr) {
+		*tx_pwr = *(int8_t *)ptr;
 		ptr++;
 	}
 
@@ -5764,7 +6039,7 @@ static void ext_adv_data_frag(const struct node_rx_pdu *node_rx_data,
 			      uint8_t *const sec_phy, uint8_t adv_addr_type,
 			      const uint8_t *adv_addr, uint8_t direct_addr_type,
 			      const uint8_t *direct_addr, uint8_t rl_idx,
-			      int8_t tx_pwr, int8_t rssi,
+			      int8_t *const tx_pwr, int8_t rssi,
 			      uint16_t interval_le16,
 			      const struct pdu_adv_adi *adi,
 			      uint8_t data_len_max, uint16_t data_len_total,
@@ -5778,7 +6053,7 @@ static void ext_adv_data_frag(const struct node_rx_pdu *node_rx_data,
 		/* Fragment the PDU data */
 		ext_adv_pdu_frag(evt_type, phy, *sec_phy, adv_addr_type,
 				 adv_addr, direct_addr_type, direct_addr,
-				 rl_idx, tx_pwr, rssi, interval_le16, adi,
+				 rl_idx, *tx_pwr, rssi, interval_le16, adi,
 				 data_len_max, &data_len_total, data_len,
 				 data, buf, evt_buf);
 
@@ -5796,7 +6071,7 @@ static void ext_adv_data_frag(const struct node_rx_pdu *node_rx_data,
 				ext_adv_pdu_frag(evt_type, phy, *sec_phy,
 						 adv_addr_type, adv_addr,
 						 direct_addr_type, direct_addr,
-						 rl_idx, tx_pwr, rssi,
+						 rl_idx, *tx_pwr, rssi,
 						 interval_le16, adi,
 						 data_len_max, &data_len_total,
 						 data_len, data, buf, evt_buf);
@@ -5804,7 +6079,7 @@ static void ext_adv_data_frag(const struct node_rx_pdu *node_rx_data,
 
 			/* Get next PDU data in list */
 			*data_len = ext_adv_data_get(node_rx_data, sec_phy,
-						     data);
+						     tx_pwr, data);
 
 			/* Restrict PDU data to maximum scan data length */
 			if (*data_len > data_len_total) {
@@ -5823,6 +6098,7 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 			      struct node_rx_pdu *node_rx,
 			      struct net_buf *buf, uint8_t phy)
 {
+	int8_t scan_rsp_tx_pwr = BT_HCI_LE_ADV_TX_POWER_NO_PREF;
 	int8_t tx_pwr = BT_HCI_LE_ADV_TX_POWER_NO_PREF;
 	struct node_rx_pdu *node_rx_scan_data = NULL;
 	struct node_rx_pdu *node_rx_data = NULL;
@@ -5844,6 +6120,7 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 	uint8_t *adv_addr = NULL;
 	uint8_t data_status = 0U;
 	struct net_buf *evt_buf;
+	bool devmatch = false;
 	uint8_t data_len = 0U;
 	uint8_t evt_type = 0U;
 	uint8_t sec_phy = 0U;
@@ -5871,6 +6148,7 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 	node_rx_curr = node_rx;
 	node_rx_next = node_rx_curr->hdr.rx_ftr.extra;
 	do {
+		int8_t tx_pwr_curr = BT_HCI_LE_ADV_TX_POWER_NO_PREF;
 		struct pdu_adv_adi *adi_curr = NULL;
 		uint8_t direct_addr_type_curr = 0U;
 		bool direct_resolved_curr = false;
@@ -5896,6 +6174,11 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 
 		direct_resolved_curr = node_rx_curr->hdr.rx_ftr.direct_resolved;
 #endif /* CONFIG_BT_CTLR_PRIVACY */
+
+#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC) && \
+	defined(CONFIG_BT_CTLR_FILTER_ACCEPT_LIST)
+		const bool devmatch_curr = node_rx_curr->hdr.rx_ftr.devmatch;
+#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC && CONFIG_BT_CTLR_FILTER_ACCEPT_LIST */
 
 		/* The Link Layer currently returns RSSI as an absolute value */
 		rssi = -(node_rx_curr->hdr.rx_ftr.rssi);
@@ -6017,10 +6300,10 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 		}
 
 		if (h->tx_pwr) {
-			tx_pwr = *(int8_t *)ptr;
+			tx_pwr_curr = *(int8_t *)ptr;
 			ptr++;
 
-			BT_DBG("    Tx pwr= %d dB", tx_pwr);
+			BT_DBG("    Tx pwr= %d dB", tx_pwr_curr);
 		}
 
 		hdr_len = ptr - (uint8_t *)p;
@@ -6058,12 +6341,21 @@ no_ext_hdr:
 			data_len_total = data_len;
 			data = data_curr;
 			scan_data_len_total = 0U;
+			tx_pwr = tx_pwr_curr;
+
 #if defined(CONFIG_BT_CTLR_PRIVACY)
 			rl_idx = rl_idx_curr;
 #endif /* CONFIG_BT_CTLR_PRIVACY */
+
 #if defined(CONFIG_BT_CTLR_EXT_SCAN_FP)
 			direct_report = direct_report_curr;
 #endif /* CONFIG_BT_CTLR_EXT_SCAN_FP */
+
+#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC) && \
+	defined(CONFIG_BT_CTLR_FILTER_ACCEPT_LIST)
+			devmatch = devmatch_curr;
+#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC && CONFIG_BT_CTLR_FILTER_ACCEPT_LIST */
+
 		} else {
 			/* TODO: Validate current value with previous */
 
@@ -6077,6 +6369,7 @@ no_ext_hdr:
 				}
 				scan_data_len = data_len_curr;
 				scan_data = data_curr;
+				scan_rsp_tx_pwr = tx_pwr_curr;
 			}
 
 			if (!adv_addr) {
@@ -6096,6 +6389,7 @@ no_ext_hdr:
 				data_len = data_len_curr;
 				data_len_total = data_len;
 				data = data_curr;
+				tx_pwr = tx_pwr_curr;
 			} else {
 				data_len_total += data_len_curr;
 			}
@@ -6111,6 +6405,13 @@ no_ext_hdr:
 				direct_report = direct_report_curr;
 			}
 #endif /* CONFIG_BT_CTLR_EXT_SCAN_FP */
+
+#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC) && \
+	defined(CONFIG_BT_CTLR_FILTER_ACCEPT_LIST)
+			if (!devmatch) {
+				devmatch = devmatch_curr;
+			}
+#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC && CONFIG_BT_CTLR_FILTER_ACCEPT_LIST */
 		}
 
 		if (!node_rx_next) {
@@ -6133,6 +6434,13 @@ no_ext_hdr:
 		node_rx_next = node_rx_curr->hdr.rx_ftr.extra;
 		adv = (void *)node_rx_curr->pdu;
 	} while (1);
+
+	if (IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) &&
+	    IS_ENABLED(CONFIG_BT_CTLR_FILTER_ACCEPT_LIST) &&
+	    !devmatch) {
+		node_rx_extra_list_release(node_rx->hdr.rx_ftr.extra);
+		return;
+	}
 
 #if CONFIG_BT_CTLR_DUP_FILTER_LEN > 0
 	if (adv_addr) {
@@ -6191,7 +6499,7 @@ no_ext_hdr:
 	if ((data_len < data_len_total) || (data_len > data_len_max)) {
 		ext_adv_data_frag(node_rx_data, evt_type, phy, &sec_phy,
 				  adv_addr_type, adv_addr, direct_addr_type,
-				  direct_addr, rl_idx, tx_pwr, rssi,
+				  direct_addr, rl_idx, &tx_pwr, rssi,
 				  interval_le16, adi, data_len_max,
 				  data_len_total, &data_len, &data, buf,
 				  &evt_buf);
@@ -6241,10 +6549,10 @@ no_ext_hdr:
 	    (scan_data_len > data_len_max)) {
 		ext_adv_data_frag(node_rx_scan_data, evt_type, phy,
 				  &sec_phy_scan, adv_addr_type, adv_addr,
-				  direct_addr_type, direct_addr, rl_idx, tx_pwr,
-				  rssi, interval_le16, adi, data_len_max,
-				  scan_data_len_total, &scan_data_len,
-				  &scan_data, buf, &evt_buf);
+				  direct_addr_type, direct_addr, rl_idx,
+				  &scan_rsp_tx_pwr, rssi, interval_le16, adi,
+				  data_len_max, scan_data_len_total,
+				  &scan_data_len, &scan_data, buf, &evt_buf);
 	}
 
 	/* set scan data status bits */
@@ -6252,9 +6560,9 @@ no_ext_hdr:
 
 	/* Start constructing the event for remainder of the PDU data */
 	ext_adv_info_fill(evt_type, phy, sec_phy_scan, adv_addr_type, adv_addr,
-			  direct_addr_type, direct_addr, rl_idx, tx_pwr, rssi,
-			  interval_le16, adi, scan_data_len, scan_data,
-			  evt_buf);
+			  direct_addr_type, direct_addr, rl_idx,
+			  scan_rsp_tx_pwr, rssi, interval_le16, adi,
+			  scan_data_len, scan_data, evt_buf);
 
 	node_rx_extra_list_release(node_rx->hdr.rx_ftr.extra);
 }
@@ -6363,6 +6671,7 @@ static void le_per_adv_sync_report(struct pdu_data *pdu_data,
 	struct pdu_adv_aux_ptr *aux_ptr = NULL;
 	const struct pdu_adv_adi *adi = NULL;
 	uint8_t cte_type = BT_HCI_LE_NO_CTE;
+	const struct ll_sync_set *sync;
 	struct pdu_adv_com_ext_adv *p;
 	struct pdu_adv_ext_hdr *h;
 	uint16_t data_len_total;
@@ -6381,6 +6690,22 @@ static void le_per_adv_sync_report(struct pdu_data *pdu_data,
 	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
 	    (!(le_event_mask & BT_EVT_MASK_LE_PER_ADVERTISING_REPORT) &&
 	     !(le_event_mask & BT_EVT_MASK_LE_BIGINFO_ADV_REPORT))) {
+		return;
+	}
+
+	/* NOTE: The timeout_reload field in the sync context is checked under
+	 *       race condition between HCI Tx and Rx thread wherein a sync
+	 *       terminate was performed which resets the timeout_reload field
+	 *       before releasing the sync context back into its memory pool.
+	 *       It is important that timeout_reload field is at safe offset
+	 *       inside the sync context such that it is not corrupt while being
+	 *       in the memory pool.
+	 *
+	 *       This check ensures reports are not sent out after sync
+	 *       terminate.
+	 */
+	sync = HDR_LLL2ULL(ftr->param);
+	if (unlikely(!sync->timeout_reload)) {
 		return;
 	}
 
@@ -6507,14 +6832,13 @@ no_ext_hdr:
 	defined(CONFIG_BT_CTLR_SYNC_PERIODIC_ADI_SUPPORT)
 	} else if (IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC_ADI_SUPPORT) &&
 		   adi) {
-		const struct ll_sync_set *sync = HDR_LLL2ULL(ftr->param);
 		uint8_t data_status;
 
 		data_status = (aux_ptr) ?
 			      BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL :
 			      BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE;
 
-		accept = ftr->sync_rx_enabled &&
+		accept = sync->rx_enable && ftr->sync_rx_enabled &&
 			 (!sync->nodups ||
 			  !dup_found(PDU_ADV_TYPE_EXT_IND,
 				     sync->peer_id_addr_type,
@@ -6526,7 +6850,7 @@ no_ext_hdr:
 	*/
 
 	} else {
-		accept = ftr->sync_rx_enabled;
+		accept = sync->rx_enable && ftr->sync_rx_enabled;
 	}
 
 	data_len_max = CONFIG_BT_BUF_EVT_RX_SIZE -
@@ -6538,6 +6862,25 @@ no_ext_hdr:
 
 	if ((le_event_mask & BT_EVT_MASK_LE_PER_ADVERTISING_REPORT) && accept &&
 	    ((data_len_total - data_len) < CONFIG_BT_CTLR_SCAN_DATA_LEN_MAX)) {
+
+		/* Pass verdict in LL.TS.p19 section 4.2.3.6 Extended Scanning,
+		 * Passive, Periodic Advertising Report, RSSI and TX_Power
+		 * states:
+		 * TX_Power is set to value of the TxPower field for the
+		 * AUX_SYNC_IND received, and RSSI set to a valid value.
+		 * Subsequent reports with data and the status set to
+		 * "Incomplete, more data to come" or "complete" can have the
+		 * TX_Power field set to 0x7F.
+		 *
+		 * In the implementation data_len_total is the running total
+		 * AD data length so far, data_len is the current PDU's AD data
+		 * length. For AUX_SYNC_IND received, data_len_total ==
+		 * data_len.
+		 */
+		if (data_len_total > data_len) {
+			/* Subsequent reports */
+			tx_pwr = BT_HCI_LE_ADV_TX_POWER_NO_PREF;
+		}
 
 		data_len = MIN(data_len, (CONFIG_BT_CTLR_SCAN_DATA_LEN_MAX +
 					  data_len - data_len_total));
@@ -7323,6 +7666,12 @@ static void encode_control(struct node_rx_pdu *node_rx,
 		return;
 #endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 
+#if defined(CONFIG_BT_CTLR_DTM_HCI_DF_IQ_REPORT)
+	case NODE_RX_TYPE_DTM_IQ_SAMPLE_REPORT:
+		le_df_connectionless_iq_report(pdu_data, node_rx, buf);
+		return;
+#endif /* CONFIG_BT_CTLR_DTM_HCI_DF_IQ_REPORT */
+
 #if defined(CONFIG_BT_HCI_MESH_EXT)
 	case NODE_RX_TYPE_MESH_ADV_CPLT:
 		mesh_adv_cplt(pdu_data, node_rx, buf);
@@ -7625,7 +7974,8 @@ void hci_evt_encode(struct node_rx_pdu *node_rx, struct net_buf *buf)
 	}
 }
 
-#if defined(CONFIG_BT_CONN)
+#if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_CTLR_ADV_ISO) || \
+	defined(CONFIG_BT_CTLR_CONN_ISO)
 void hci_num_cmplt_encode(struct net_buf *buf, uint16_t handle, uint8_t num)
 {
 	struct bt_hci_evt_num_completed_packets *ep;
@@ -7644,7 +7994,7 @@ void hci_num_cmplt_encode(struct net_buf *buf, uint16_t handle, uint8_t num)
 	hc->handle = sys_cpu_to_le16(handle);
 	hc->count = sys_cpu_to_le16(num);
 }
-#endif /* CONFIG_BT_CONN */
+#endif /* CONFIG_BT_CONN || CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
 
 uint8_t hci_get_class(struct node_rx_pdu *node_rx)
 {
@@ -7769,6 +8119,11 @@ uint8_t hci_get_class(struct node_rx_pdu *node_rx)
 		case NODE_RX_TYPE_ISO_PDU:
 			return HCI_CLASS_ISO_DATA;
 #endif /* CONFIG_BT_CTLR_SYNC_ISO || CONFIG_BT_CTLR_CONN_ISO */
+
+#if defined(CONFIG_BT_CTLR_DTM_HCI_DF_IQ_REPORT)
+		case NODE_RX_TYPE_DTM_IQ_SAMPLE_REPORT:
+			return HCI_CLASS_EVT_REQUIRED;
+#endif /* CONFIG_BT_CTLR_DTM_HCI_DF_IQ_REPORT */
 
 #if CONFIG_BT_CTLR_USER_EVT_RANGE > 0
 		case NODE_RX_TYPE_USER_START ... NODE_RX_TYPE_USER_END - 1:

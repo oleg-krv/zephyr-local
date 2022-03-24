@@ -11,18 +11,29 @@
 #include <storage/flash_map.h>
 
 #if (CONFIG_NORDIC_QSPI_NOR - 0)
-#define FLASH_DEVICE DT_LABEL(DT_INST(0, nordic_qspi_nor))
+#define NORDIC_QSPI_NOR_NODE DT_INST(0, nordic_qspi_nor)
+#define FLASH_DEVICE DT_LABEL(NORDIC_QSPI_NOR_NODE)
 #define FLASH_TEST_REGION_OFFSET 0xff000
-#define TEST_AREA_MAX DT_PROP(DT_INST(0, nordic_qspi_nor), size)
+
+#if DT_NODE_HAS_PROP(NORDIC_QSPI_NOR_NODE, size_in_bytes)
+#define TEST_AREA_MAX (DT_PROP(DT_INST(0, nordic_qspi_nor), size_in_bytes))
+#else
+#define TEST_AREA_MAX (DT_PROP(DT_INST(0, nordic_qspi_nor), size) / 8)
+#endif
 
 #elif defined(CONFIG_FLASH_MCUX_FLEXSPI_NOR)
 
 #define FLASH_DEVICE DT_LABEL(DT_INST(0, nxp_imx_flexspi_nor))
 #define FLASH_TEST_REGION_OFFSET FLASH_AREA_OFFSET(storage)
 #define TEST_AREA_MAX ((FLASH_AREA_SIZE(storage)) + (FLASH_TEST_REGION_OFFSET))
+#elif defined(CONFIG_FLASH_MCUX_FLEXSPI_MX25UM51345G)
+
+#define FLASH_DEVICE DT_LABEL(DT_INST(0, nxp_imx_flexspi_mx25um51345g))
+#define FLASH_TEST_REGION_OFFSET FLASH_AREA_OFFSET(storage)
+#define TEST_AREA_MAX ((FLASH_AREA_SIZE(storage)) + (FLASH_TEST_REGION_OFFSET))
 #else
 
-/* SoC emebded NVM */
+/* SoC embedded NVM */
 #define FLASH_DEVICE DT_CHOSEN_ZEPHYR_FLASH_CONTROLLER_LABEL
 
 #ifdef CONFIG_TRUSTED_EXECUTION_NONSECURE

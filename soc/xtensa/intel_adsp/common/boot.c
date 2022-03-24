@@ -45,7 +45,11 @@
 #elif defined(CONFIG_SOC_SERIES_INTEL_CAVS_V20)
 #define PLATFORM_INIT_HPSRAM
 #define PLATFORM_INIT_LPSRAM
+#if defined(CONFIG_BOARD_INTEL_ADSP_CAVS20_JSL)
+#define PLATFORM_HPSRAM_EBB_COUNT 16
+#else
 #define PLATFORM_HPSRAM_EBB_COUNT 47
+#endif
 #define EBB_SEGMENT_SIZE          32
 
 #elif defined(CONFIG_SOC_SERIES_INTEL_CAVS_V18)
@@ -163,7 +167,7 @@ static __imr void parse_module(struct sof_man_fw_header *hdr,
 #define MAN_SKIP_ENTRIES 1
 
 /* parse FW manifest and copy modules */
-static __imr void parse_manifest(void)
+__imr void parse_manifest(void)
 {
 	struct sof_man_fw_desc *desc =
 		(struct sof_man_fw_desc *)CONFIG_IMR_MANIFEST_ADDR;
@@ -251,7 +255,7 @@ static __imr void hp_sram_pm_banks(uint32_t banks)
 #endif
 }
 
-static __imr void hp_sram_init(uint32_t memory_size)
+__imr void hp_sram_init(uint32_t memory_size)
 {
 	uint32_t ebb_in_use;
 
@@ -265,7 +269,7 @@ static __imr void hp_sram_init(uint32_t memory_size)
 	bbzero((void *)L2_SRAM_BASE, L2_SRAM_SIZE);
 }
 
-static __imr void lp_sram_init(void)
+__imr void lp_sram_init(void)
 {
 #ifdef PLATFORM_INIT_LPRSRAM
 	uint32_t timeout_counter, delay_count = 256;
@@ -294,7 +298,7 @@ static __imr void lp_sram_init(void)
 #endif
 }
 
-static __imr void win_setup(void)
+__imr void win_setup(void)
 {
 	uint32_t *win0 = z_soc_uncached_ptr((void *)HP_SRAM_WIN0_BASE);
 
@@ -310,6 +314,7 @@ static __imr void win_setup(void)
 			     | CAVS_DMWBA_ENABLE);
 }
 
+#ifdef CONFIG_INTEL_ADSP_CAVS
 __imr void boot_core0(void)
 {
 	cpu_early_init();
@@ -333,3 +338,4 @@ __imr void boot_core0(void)
 	extern FUNC_NORETURN void z_cstart(void);
 	z_cstart();
 }
+#endif

@@ -7,7 +7,7 @@
 menu "System Monitoring Options"
 
 menuconfig THREAD_ANALYZER
-	bool "Enable Thread analyzer"
+	bool "Thread analyzer"
 	select INIT_STACKS
 	select THREAD_MONITOR
 	select THREAD_STACK_INFO
@@ -38,6 +38,10 @@ config THREAD_ANALYZER_USE_PRINTK
 	  Use kernel printk function to print thread information.
 
 endchoice
+
+config THREAD_ANALYZER_ISR_STACK_USAGE
+	bool "Analyze interrupt stacks usage"
+	default y
 
 config THREAD_ANALYZER_RUN_UNLOCKED
 	bool "Run analysis with interrupts unlocked"
@@ -76,6 +80,7 @@ config THREAD_ANALYZER_AUTO_INTERVAL
 
 config THREAD_ANALYZER_AUTO_STACK_SIZE
 	int "Stack size for the periodic thread analysis thread"
+	default 2048 if THREAD_ANALYZER_USE_LOG && LOG_MODE_IMMEDIATE && NO_OPTIMIZATIONS
 	default 1024
 
 endif # THREAD_ANALYZER_AUTO
@@ -137,7 +142,7 @@ config STACK_USAGE
 	  on a per-function basis.
 
 config STACK_SENTINEL
-	bool "Enable stack sentinel"
+	bool "Stack sentinel"
 	select THREAD_STACK_INFO
 	depends on MULTITHREADING
 	depends on !USERSPACE
@@ -190,7 +195,7 @@ config EARLY_CONSOLE
 	  sent through the console at the earliest stage possible.
 
 config ASSERT
-	bool "Enable __ASSERT() macro"
+	bool "__ASSERT() macro"
 	default y if TEST
 	help
 	  This enables the __ASSERT() macro in the kernel code. If an assertion
@@ -201,11 +206,20 @@ config ASSERT
 	  Disabling this option will cause assertions to compile to nothing,
 	  improving performance and system footprint.
 
+config FORCE_NO_ASSERT
+	bool "Force-disable no assertions"
+	help
+	  This boolean option disables Zephyr assertion testing even
+	  in circumstances (twister) where it is enabled via
+	  CFLAGS and not Kconfig.  Added solely to be able to work
+	  around compiler bugs for specific tests.
+
+if ASSERT
+
 config ASSERT_LEVEL
 	int "__ASSERT() level"
 	default 2
 	range 0 2
-	depends on ASSERT
 	help
 	  This option specifies the assertion level used by the __ASSERT()
 	  macro. It can be set to one of three possible values:
@@ -215,8 +229,7 @@ config ASSERT_LEVEL
 	  Level 2: on + no warning
 
 config SPIN_VALIDATE
-	bool "Enable spinlock validation"
-	depends on ASSERT
+	bool "Spinlock validation"
 	depends on MULTITHREADING
 	depends on MP_NUM_CPUS <= 4
 	default y if !FLASH || FLASH_SIZE > 32
@@ -225,16 +238,8 @@ config SPIN_VALIDATE
 	  enabled. It adds a relatively hefty overhead (about 3k or so) to
 	  kernel code size, don't use on platforms known to be small.
 
-config FORCE_NO_ASSERT
-	bool "Force-disable no assertions"
-	help
-	  This boolean option disables Zephyr assertion testing even
-	  in circumstances (twister) where it is enabled via
-	  CFLAGS and not Kconfig.  Added solely to be able to work
-	  around compiler bugs for specific tests.
-
 config ASSERT_VERBOSE
-	bool "Enable verbose assertions"
+	bool "Verbose assertions"
 	default y
 	help
 	  This option enables printing an assert message with information about
@@ -267,6 +272,8 @@ config ASSERT_NO_MSG_INFO
 	  before disabling file info since the message can be found in the
 	  source using file info.
 
+endif # ASSERT
+
 config OVERRIDE_FRAME_POINTER_DEFAULT
 	bool "Override compiler defaults for -fomit-frame-pointer"
 	help
@@ -288,7 +295,7 @@ config OMIT_FRAME_POINTER
 	depends on OVERRIDE_FRAME_POINTER_DEFAULT
 	help
 	  Choose Y for best performance. On some architectures (including x86)
-	  this will favor code size and performance over debugability.
+	  this will favor code size and performance over debuggability.
 
 	  Choose N in you wish to retain the frame pointer. This option may
 	  be useful if your application uses runtime backtracing and does not
@@ -302,7 +309,7 @@ config OMIT_FRAME_POINTER
 # Generic Debugging Options
 #
 config DEBUG_INFO
-	bool "Enable system debugging information"
+	bool "System debugging information"
 	help
 	  This option enables the addition of various information that can be
 	  used by debuggers in debugging the system, or enable additional

@@ -299,6 +299,9 @@ struct bt_conn_le_info {
 #endif /* defined(CONFIG_BT_USER_DATA_LEN_UPDATE) */
 };
 
+/* Multiply bt 1.25 to get MS */
+#define BT_CONN_INTERVAL_TO_MS(interval) ((interval) * 5 / 4)
+
 /** BR/EDR Connection Info Structure */
 struct bt_conn_br_info {
 	const bt_addr_t *dst; /** Destination (Remote) BR/EDR address */
@@ -1050,7 +1053,7 @@ int bt_le_oob_get_sc_data(struct bt_conn *conn,
  *  configuration option has been enabled.
  *
  *  Sets a fixed passkey to be used for pairing. If set, the
- *  pairing_confim() callback will be called for all incoming pairings.
+ *  pairing_confirm() callback will be called for all incoming pairings.
  *
  *  @param passkey A valid passkey (0 - 999999) or BT_PASSKEY_INVALID
  *                 to disable a previously set fixed passkey.

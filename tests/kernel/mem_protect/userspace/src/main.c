@@ -33,7 +33,7 @@ extern void arm_core_mpu_disable(void);
 #define INFO(fmt, ...) printk(fmt, ##__VA_ARGS__)
 #define PIPE_LEN 1
 #define BYTES_TO_READ_WRITE 1
-#define STACKSIZE (256 + CONFIG_TEST_EXTRA_STACKSIZE)
+#define STACKSIZE (256 + CONFIG_TEST_EXTRA_STACK_SIZE)
 
 K_SEM_DEFINE(test_revoke_sem, 0, 1);
 
@@ -364,7 +364,7 @@ K_APP_DMEM(default_part) int32_t size = (0 - CONFIG_PRIVILEGED_STACK_SIZE -
 #endif
 
 /**
- * @brief Test to read provileged stack
+ * @brief Test to read privileged stack
  *
  * @ingroup kernel_memprotect_tests
  */

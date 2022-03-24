@@ -85,6 +85,9 @@ struct bt_dev bt_dev = {
 #if !defined(CONFIG_BT_RECV_IS_RX_THREAD)
 	.rx_queue      = Z_FIFO_INITIALIZER(bt_dev.rx_queue),
 #endif
+#if defined(CONFIG_BT_DEVICE_APPEARANCE_DYNAMIC)
+	.appearance = CONFIG_BT_DEVICE_APPEARANCE,
+#endif
 };
 
 static bt_ready_cb_t ready_cb;
@@ -784,9 +787,7 @@ static int hci_le_read_remote_features(struct bt_conn *conn)
 
 	cp = net_buf_add(buf, sizeof(*cp));
 	cp->handle = sys_cpu_to_le16(conn->handle);
-	bt_hci_cmd_send(BT_HCI_OP_LE_READ_REMOTE_FEATURES, buf);
-
-	return 0;
+	return bt_hci_cmd_send_sync(BT_HCI_OP_LE_READ_REMOTE_FEATURES, buf, NULL);
 }
 
 static int hci_read_remote_version(struct bt_conn *conn)
@@ -834,7 +835,7 @@ int bt_le_set_data_len(struct bt_conn *conn, uint16_t tx_octets, uint16_t tx_tim
 	cp->tx_octets = sys_cpu_to_le16(tx_octets);
 	cp->tx_time = sys_cpu_to_le16(tx_time);
 
-	return bt_hci_cmd_send(BT_HCI_OP_LE_SET_DATA_LEN, buf);
+	return bt_hci_cmd_send_sync(BT_HCI_OP_LE_SET_DATA_LEN, buf, NULL);
 }
 
 #if defined(CONFIG_BT_USER_PHY_UPDATE)
@@ -885,7 +886,7 @@ int bt_le_set_phy(struct bt_conn *conn, uint8_t all_phys,
 	cp->rx_phys = pref_rx_phy;
 	cp->phy_opts = phy_opts;
 
-	return bt_hci_cmd_send(BT_HCI_OP_LE_SET_PHY, buf);
+	return bt_hci_cmd_send_sync(BT_HCI_OP_LE_SET_PHY, buf, NULL);
 }
 
 static struct bt_conn *find_pending_connect(uint8_t role, bt_addr_le_t *peer_addr)
@@ -923,6 +924,35 @@ static struct bt_conn *find_pending_connect(uint8_t role, bt_addr_le_t *peer_add
 	return NULL;
 }
 
+/* We don't want the application to get a PHY update callback upon connection
+ * establishment on 2M PHY. Therefore we must prevent issuing LE Set PHY
+ * in this scenario.
+ */
+static bool skip_auto_phy_update_on_conn_establishment(struct bt_conn *conn)
+{
+#if defined(CONFIG_BT_USER_PHY_UPDATE)
+	if (IS_ENABLED(CONFIG_BT_AUTO_PHY_UPDATE) &&
+	    IS_ENABLED(CONFIG_BT_EXT_ADV) &&
+	    BT_DEV_FEAT_LE_EXT_ADV(bt_dev.le.features)) {
+		int err;
+
+		err = hci_le_read_phy(conn);
+		if (err) {
+			BT_WARN("Failed to read PHY (%d)", err);
+		} else {
+			if (conn->le.phy.tx_phy == BT_HCI_LE_PHY_2M &&
+			    conn->le.phy.rx_phy == BT_HCI_LE_PHY_2M) {
+				return true;
+			}
+		}
+	}
+#else
+	ARG_UNUSED(conn);
+#endif /* defined(CONFIG_BT_USER_PHY_UPDATE) */
+
+	return false;
+}
+
 static void conn_auto_initiate(struct bt_conn *conn)
 {
 	int err;
@@ -939,31 +969,28 @@ static void conn_auto_initiate(struct bt_conn *conn)
 	    ((conn->role == BT_HCI_ROLE_CENTRAL) ||
 	     BT_FEAT_LE_PER_INIT_FEAT_XCHG(bt_dev.le.features))) {
 		err = hci_le_read_remote_features(conn);
-		if (!err) {
-			return;
+		if (err) {
+			BT_ERR("Failed read remote features (%d)", err);
 		}
 	}
 
 	if (IS_ENABLED(CONFIG_BT_REMOTE_VERSION) &&
 	    !atomic_test_bit(conn->flags, BT_CONN_AUTO_VERSION_INFO)) {
 		err = hci_read_remote_version(conn);
-		if (!err) {
-			return;
+		if (err) {
+			BT_ERR("Failed read remote version (%d)", err);
 		}
 	}
 
 	if (IS_ENABLED(CONFIG_BT_AUTO_PHY_UPDATE) &&
-	    !atomic_test_bit(conn->flags, BT_CONN_AUTO_PHY_COMPLETE) &&
-	    BT_FEAT_LE_PHY_2M(bt_dev.le.features)) {
+	    BT_FEAT_LE_PHY_2M(bt_dev.le.features) &&
+	    !skip_auto_phy_update_on_conn_establishment(conn)) {
 		err = bt_le_set_phy(conn, 0U, BT_HCI_LE_PHY_PREFER_2M,
 				    BT_HCI_LE_PHY_PREFER_2M,
 				    BT_HCI_LE_PHY_CODED_ANY);
-		if (!err) {
-			atomic_set_bit(conn->flags, BT_CONN_AUTO_PHY_UPDATE);
-			return;
+		if (err) {
+			BT_ERR("Failed LE Set PHY (%d)", err);
 		}
-
-		BT_ERR("Failed to set LE PHY (%d)", err);
 	}
 
 	if (IS_ENABLED(CONFIG_BT_AUTO_DATA_LEN_UPDATE) &&
@@ -1272,26 +1299,6 @@ void bt_hci_le_enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 		}
 	}
 
-#if defined(CONFIG_BT_USER_PHY_UPDATE)
-	if (IS_ENABLED(CONFIG_BT_EXT_ADV) &&
-	    BT_DEV_FEAT_LE_EXT_ADV(bt_dev.le.features)) {
-		int err;
-
-		err = hci_le_read_phy(conn);
-		if (err) {
-			BT_WARN("Failed to read PHY (%d)", err);
-		} else {
-			if (IS_ENABLED(CONFIG_BT_AUTO_PHY_UPDATE) &&
-			    conn->le.phy.tx_phy == BT_HCI_LE_PHY_PREFER_2M &&
-			    conn->le.phy.rx_phy == BT_HCI_LE_PHY_PREFER_2M) {
-				/* Already on 2M, skip auto-phy update. */
-				atomic_set_bit(conn->flags,
-					       BT_CONN_AUTO_PHY_COMPLETE);
-			}
-		}
-	}
-#endif /* defined(CONFIG_BT_USER_PHY_UPDATE) */
-
 	bt_conn_set_state(conn, BT_CONN_CONNECTED);
 
 	if (is_disconnected) {
@@ -1373,9 +1380,6 @@ static void le_remote_feat_complete(struct net_buf *buf)
 		notify_remote_info(conn);
 	}
 
-	/* Continue with auto-initiated procedures */
-	conn_auto_initiate(conn);
-
 	bt_conn_unref(conn);
 }
 
@@ -1397,10 +1401,6 @@ static void le_data_len_change(struct net_buf *buf)
 	uint16_t max_rx_octets = sys_le16_to_cpu(evt->max_rx_octets);
 	uint16_t max_tx_time = sys_le16_to_cpu(evt->max_tx_time);
 	uint16_t max_rx_time = sys_le16_to_cpu(evt->max_rx_time);
-
-	if (IS_ENABLED(CONFIG_BT_AUTO_DATA_LEN_UPDATE)) {
-		atomic_set_bit(conn->flags, BT_CONN_AUTO_DATA_LEN_COMPLETE);
-	}
 
 	BT_DBG("max. tx: %u (%uus), max. rx: %u (%uus)",
 		max_tx_octets, max_tx_time, max_rx_octets, max_rx_time);
@@ -1431,14 +1431,6 @@ static void le_phy_update_complete(struct net_buf *buf)
 
 	BT_DBG("PHY updated: status: 0x%02x, tx: %u, rx: %u",
 	       evt->status, evt->tx_phy, evt->rx_phy);
-
-	if (IS_ENABLED(CONFIG_BT_AUTO_PHY_UPDATE) &&
-	    atomic_test_and_clear_bit(conn->flags, BT_CONN_AUTO_PHY_UPDATE)) {
-		atomic_set_bit(conn->flags, BT_CONN_AUTO_PHY_COMPLETE);
-
-		/* Continue with auto-initiated procedures */
-		conn_auto_initiate(conn);
-	}
 
 #if defined(CONFIG_BT_USER_PHY_UPDATE)
 	conn->le.phy.tx_phy = bt_get_phy(evt->tx_phy);
@@ -1891,9 +1883,6 @@ static void bt_hci_evt_read_remote_version_complete(struct net_buf *buf)
 		/* Remote features is already present */
 		notify_remote_info(conn);
 	}
-
-	/* Continue with auto-initiated procedures */
-	conn_auto_initiate(conn);
 
 	bt_conn_unref(conn);
 }
@@ -2807,7 +2796,7 @@ static int le_init_iso(void)
 	int err;
 	struct net_buf *rsp;
 
-	/* Set Isochronus Channels - Host support */
+	/* Set Isochronous Channels - Host support */
 	err = le_set_host_feature(BT_LE_FEAT_BIT_ISO_CHANNELS, 1);
 	if (err) {
 		return err;
@@ -3585,6 +3574,8 @@ int bt_enable(bt_ready_cb_t cb)
 		return -ENODEV;
 	}
 
+	atomic_clear_bit(bt_dev.flags, BT_DEV_DISABLE);
+
 	if (atomic_test_and_set_bit(bt_dev.flags, BT_DEV_ENABLE)) {
 		return -EALREADY;
 	}
@@ -3641,6 +3632,61 @@ int bt_enable(bt_ready_cb_t cb)
 	return 0;
 }
 
+int bt_disable(void)
+{
+	int err;
+
+	if (!bt_dev.drv) {
+		BT_ERR("No HCI driver registered");
+		return -ENODEV;
+	}
+
+	if (!bt_dev.drv->close) {
+		return -ENOTSUP;
+	}
+
+	if (atomic_test_and_set_bit(bt_dev.flags, BT_DEV_DISABLE)) {
+		return -EALREADY;
+	}
+
+	/* Clear BT_DEV_READY before disabling HCI link */
+	atomic_clear_bit(bt_dev.flags, BT_DEV_READY);
+
+	err = bt_dev.drv->close();
+	if (err) {
+		BT_ERR("HCI driver close failed (%d)", err);
+
+		/* Re-enable BT_DEV_READY to avoid inconsistent stack state */
+		atomic_set_bit(bt_dev.flags, BT_DEV_READY);
+
+		return err;
+	}
+
+	/* Abort TX thread */
+	k_thread_abort(&tx_thread_data);
+
+#if !defined(CONFIG_BT_RECV_IS_RX_THREAD)
+	/* Abort RX thread */
+	k_thread_abort(&rx_thread_data);
+#endif
+
+	if (IS_ENABLED(CONFIG_BT_TINYCRYPT_ECC)) {
+		bt_hci_ecc_deinit();
+	}
+
+	bt_monitor_send(BT_MONITOR_CLOSE_INDEX, NULL, 0);
+
+	/* Clear BT_DEV_ENABLE here to prevent early bt_enable() calls */
+	atomic_clear_bit(bt_dev.flags, BT_DEV_ENABLE);
+
+	return 0;
+}
+
+bool bt_is_ready(void)
+{
+	return atomic_test_bit(bt_dev.flags, BT_DEV_READY);
+}
+
 #define DEVICE_NAME_LEN (sizeof(CONFIG_BT_DEVICE_NAME) - 1)
 #if defined(CONFIG_BT_DEVICE_NAME_DYNAMIC)
 BUILD_ASSERT(DEVICE_NAME_LEN < CONFIG_BT_DEVICE_NAME_MAX);
@@ -3686,6 +3732,33 @@ const char *bt_get_name(void)
 	return CONFIG_BT_DEVICE_NAME;
 #endif
 }
+
+uint16_t bt_get_appearance(void)
+{
+#if defined(CONFIG_BT_DEVICE_APPEARANCE_DYNAMIC)
+	return bt_dev.appearance;
+#else
+	return CONFIG_BT_DEVICE_APPEARANCE;
+#endif
+}
+
+#if defined(CONFIG_BT_DEVICE_APPEARANCE_DYNAMIC)
+int bt_set_appearance(uint16_t appearance)
+{
+	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+		int err = settings_save_one("bt/appearance", &appearance, sizeof(appearance));
+
+		if (err) {
+			BT_ERR("Unable to save setting 'bt/appearance' (err %d).", err);
+			return err;
+		}
+	}
+
+	bt_dev.appearance = appearance;
+
+	return 0;
+}
+#endif
 
 bool bt_addr_le_is_bonded(uint8_t id, const bt_addr_le_t *addr)
 {

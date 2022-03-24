@@ -33,7 +33,12 @@ LOG_MODULE_REGISTER(net_tcp, CONFIG_NET_TCP_LOG_LEVEL);
 
 static int tcp_rto = CONFIG_NET_TCP_INIT_RETRANSMISSION_TIMEOUT;
 static int tcp_retries = CONFIG_NET_TCP_RETRY_COUNT;
-static int tcp_window = NET_IPV6_MTU;
+static int tcp_window =
+#if (CONFIG_NET_TCP_MAX_RECV_WINDOW_SIZE != 0)
+	CONFIG_NET_TCP_MAX_RECV_WINDOW_SIZE;
+#else
+	(CONFIG_NET_BUF_RX_COUNT * CONFIG_NET_BUF_DATA_SIZE) / 3;
+#endif
 
 static sys_slist_t tcp_conns = SYS_SLIST_STATIC_INIT(&tcp_conns);
 
@@ -282,9 +287,7 @@ end:
 	 ((IS_ENABLED(CONFIG_NET_L2_BT) &&				\
 	   net_pkt_lladdr_dst(pkt)->type == NET_LINK_BLUETOOTH) ||	\
 	  (IS_ENABLED(CONFIG_NET_L2_IEEE802154) &&			\
-	   net_pkt_lladdr_dst(pkt)->type == NET_LINK_IEEE802154) ||	\
-	  (IS_ENABLED(CONFIG_NET_L2_CANBUS) &&				\
-	   net_pkt_lladdr_dst(pkt)->type == NET_LINK_CANBUS)))
+	   net_pkt_lladdr_dst(pkt)->type == NET_LINK_IEEE802154)))
 
 static void tcp_send(struct net_pkt *pkt)
 {
@@ -730,6 +733,8 @@ static int tcp_data_get(struct tcp *conn, struct net_pkt *pkt, size_t *len)
 
 		net_pkt_skip(up, net_pkt_get_len(up) - *len);
 
+		net_context_update_recv_wnd(conn->context, -*len);
+
 		/* Do not pass data to application with TCP conn
 		 * locked as there could be an issue when the app tries
 		 * to send the data and the conn is locked. So the recv
@@ -909,7 +914,7 @@ static int tcp_out_ext(struct tcp *conn, uint8_t flags, struct net_pkt *data,
 	if (is_destination_local(pkt)) {
 		/* If the destination is local, we have to let the current
 		 * thread to finish with any state-machine changes before
-		 * sending the packet, or it might lead to state unconsistencies
+		 * sending the packet, or it might lead to state inconsistencies
 		 */
 		k_work_schedule_for_queue(&tcp_work_q,
 					  &conn->send_timer, K_NO_WAIT);
@@ -1669,6 +1674,10 @@ static void tcp_queue_recv_data(struct tcp *conn, struct net_pkt *pkt,
 static bool tcp_data_received(struct tcp *conn, struct net_pkt *pkt,
 			      size_t *len)
 {
+	if (*len == 0) {
+		return false;
+	}
+
 	if (tcp_data_get(conn, pkt, len) < 0) {
 		return false;
 	}
@@ -1684,6 +1693,10 @@ static void tcp_out_of_order_data(struct tcp *conn, struct net_pkt *pkt,
 				  size_t data_len, uint32_t seq)
 {
 	size_t headers_len;
+
+	if (data_len == 0) {
+		return;
+	}
 
 	headers_len = net_pkt_get_len(pkt) - data_len;
 
@@ -1812,11 +1825,13 @@ next_state:
 					      NET_CONTEXT_CONNECTED);
 
 			if (conn->accepted_conn) {
-				conn->accepted_conn->accept_cb(
-					conn->context,
-					&conn->accepted_conn->context->remote,
-					sizeof(struct sockaddr), 0,
-					conn->accepted_conn->context);
+				if (conn->accepted_conn->accept_cb) {
+					conn->accepted_conn->accept_cb(
+						conn->context,
+						&conn->accepted_conn->context->remote,
+						sizeof(struct sockaddr), 0,
+						conn->accepted_conn->context);
+				}
 
 				/* Make sure the accept_cb is only called once.
 				 */
@@ -1952,7 +1967,7 @@ next_state:
 			}
 		}
 
-		if (th && len) {
+		if (th) {
 			if (th_seq(th) == conn->ack) {
 				if (!tcp_data_received(conn, pkt, &len)) {
 					break;
@@ -2146,10 +2161,21 @@ int net_tcp_listen(struct net_context *context)
 
 int net_tcp_update_recv_wnd(struct net_context *context, int32_t delta)
 {
-	ARG_UNUSED(context);
-	ARG_UNUSED(delta);
+	int32_t new_win;
 
-	return -EPROTONOSUPPORT;
+	if (!context->tcp) {
+		NET_ERR("context->tcp == NULL");
+		return -EPROTOTYPE;
+	}
+
+	new_win = ((struct tcp *)context->tcp)->recv_win + delta;
+	if (new_win < 0 || new_win > UINT16_MAX) {
+		return -EINVAL;
+	}
+
+	((struct tcp *)context->tcp)->recv_win = new_win;
+
+	return 0;
 }
 
 /* net_context queues the outgoing data for the TCP connection */
@@ -2281,6 +2307,11 @@ int net_tcp_connect(struct net_context *context,
 		const struct in6_addr *ip6;
 
 	case AF_INET:
+		if (!IS_ENABLED(CONFIG_NET_IPV4)) {
+			ret = -EINVAL;
+			goto out;
+		}
+
 		memset(&conn->src, 0, sizeof(struct sockaddr_in));
 		memset(&conn->dst, 0, sizeof(struct sockaddr_in));
 
@@ -2303,6 +2334,11 @@ int net_tcp_connect(struct net_context *context,
 		break;
 
 	case AF_INET6:
+		if (!IS_ENABLED(CONFIG_NET_IPV6)) {
+			ret = -EINVAL;
+			goto out;
+		}
+
 		memset(&conn->src, 0, sizeof(struct sockaddr_in6));
 		memset(&conn->dst, 0, sizeof(struct sockaddr_in6));
 
@@ -2395,6 +2431,10 @@ int net_tcp_accept(struct net_context *context, net_tcp_accept_cb_t cb,
 		struct sockaddr_in6 *in6;
 
 	case AF_INET:
+		if (!IS_ENABLED(CONFIG_NET_IPV4)) {
+			return -EINVAL;
+		}
+
 		in = (struct sockaddr_in *)&local_addr;
 
 		if (net_sin_ptr(&context->local)->sin_addr) {
@@ -2410,6 +2450,10 @@ int net_tcp_accept(struct net_context *context, net_tcp_accept_cb_t cb,
 		break;
 
 	case AF_INET6:
+		if (!IS_ENABLED(CONFIG_NET_IPV6)) {
+			return -EINVAL;
+		}
+
 		in6 = (struct sockaddr_in6 *)&local_addr;
 
 		if (net_sin6_ptr(&context->local)->sin6_addr) {

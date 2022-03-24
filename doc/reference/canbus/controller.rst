@@ -132,7 +132,7 @@ You can read more about CAN bus in this
 
 Zephyr supports following CAN features:
 
-* Standard and Extended Identifers
+* Standard and Extended Identifiers
 * Filters with Masking
 * Loopback and Silent mode
 * Remote Request
@@ -158,10 +158,8 @@ a mailbox. When a transmitting mailbox is assigned, sending cannot be canceled.
           .dlc = 8,
           .data = {1,2,3,4,5,6,7,8}
   };
-  const struct device *can_dev;
+  const struct device *can_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_canbus));
   int ret;
-
-  can_dev = device_get_binding("CAN_0");
 
   ret = can_send(can_dev, &frame, K_MSEC(100), NULL, NULL);
   if (ret != 0) {
@@ -177,12 +175,12 @@ occurred. It does not block until the message is sent like the example above.
 
 .. code-block:: C
 
-  void tx_irq_callback(int error, void *arg)
+  void tx_callback(const struct device *dev, int error, void *user_data)
   {
-          char *sender = (char *)arg;
+          char *sender = (char *)user_data;
 
           if (error != 0) {
-                  LOG_ERR("Sendig failed [%d]\nSender: %s\n", error, sender);
+                  LOG_ERR("Sending failed [%d]\nSender: %s\n", error, sender);
           }
   }
 
@@ -213,7 +211,7 @@ added.
 
 .. code-block:: C
 
-  void rx_callback_function(struct zcan_frame *frame, void *user_data)
+  void rx_callback_function(const struct device *dev, struct zcan_frame *frame, void *user_data)
   {
           ... do something with the frame ...
   }
@@ -236,9 +234,7 @@ The filter for this example is configured to match the identifier 0x123 exactly.
           .id_mask = CAN_STD_ID_MASK
   };
   int filter_id;
-  const struct device *can_dev;
-
-  can_dev = device_get_binding("CAN_0");
+  const struct device *can_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_canbus));
 
   filter_id = can_add_rx_filter(can_dev, rx_callback_function, callback_arg, &my_filter);
   if (filter_id < 0) {
@@ -265,9 +261,7 @@ The filter for this example is configured to match the extended identifier
   CAN_MSGQ_DEFINE(my_can_msgq, 2);
   struct zcan_frame rx_frame;
   int filter_id;
-  const struct device *can_dev;
-
-  can_dev = device_get_binding("CAN_0");
+  const struct device *can_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_canbus));
 
   filter_id = can_add_rx_filter_msgq(can_dev, &my_can_msgq, &my_filter);
   if (filter_id < 0) {
@@ -302,10 +296,8 @@ The following example sets the bitrate to 250k baud with the sampling point at
 .. code-block:: C
 
   struct can_timing timing;
-  const struct device *can_dev;
+  const struct device *can_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_canbus));
   int ret;
-
-  can_dev = device_get_binding("CAN_0");
 
   ret = can_calc_timing(can_dev, &timing, 250000, 875);
   if (ret > 0) {
@@ -341,7 +333,13 @@ We have two ready-to-build samples demonstrating use of the Zephyr CAN API
 :ref:`SocketCAN sample <socket-can-sample>`.
 
 
-API Reference
-*************
+CAN Controller API Reference
+****************************
 
 .. doxygengroup:: can_interface
+
+
+CAN Transceiver API Reference
+*****************************
+
+.. doxygengroup:: can_transceiver

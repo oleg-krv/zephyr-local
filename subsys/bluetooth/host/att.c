@@ -71,7 +71,7 @@ K_MEM_SLAB_DEFINE(req_slab, sizeof(struct bt_att_req),
 enum {
 	ATT_PENDING_RSP,
 	ATT_PENDING_CFM,
-	ATT_DISCONNECTED,
+	ATT_CONNECTED,
 	ATT_ENHANCED,
 	ATT_PENDING_SENT,
 
@@ -103,6 +103,11 @@ struct bt_att {
 #endif
 	/* Contains bt_att_chan instance(s) */
 	sys_slist_t		chans;
+#if defined(CONFIG_BT_EATT)
+	struct k_work_delayable connection_work;
+	uint16_t previous_ecred_connection_result;
+	uint8_t eatt_chans_to_connect;
+#endif /* CONFIG_BT_EATT */
 };
 
 K_MEM_SLAB_DEFINE(att_slab, sizeof(struct bt_att),
@@ -149,6 +154,10 @@ static int chan_send(struct bt_att_chan *chan, struct net_buf *buf,
 
 	BT_DBG("code 0x%02x", hdr->code);
 
+	if (!atomic_test_bit(chan->flags, ATT_CONNECTED)) {
+		return -EINVAL;
+	}
+
 	if (IS_ENABLED(CONFIG_BT_EATT) && hdr->code == BT_ATT_OP_MTU_REQ &&
 	    chan->chan.tx.cid != BT_L2CAP_CID_ATT) {
 		/* The Exchange MTU sub-procedure shall only be supported on
@@ -180,7 +189,7 @@ static int chan_send(struct bt_att_chan *chan, struct net_buf *buf,
 		}
 
 		/* bt_l2cap_chan_send does actually return the number of bytes
-		 * that could be sent immediatelly.
+		 * that could be sent immediately.
 		 */
 		err = bt_l2cap_chan_send(&chan->chan.chan, buf);
 		if (err < 0) {
@@ -433,12 +442,6 @@ struct net_buf *bt_att_chan_create_pdu(struct bt_att_chan *chan, uint8_t op,
 	hdr->code = op;
 
 	return buf;
-}
-
-static inline bool att_chan_is_connected(struct bt_att_chan *chan)
-{
-	return (chan->att->conn->state != BT_CONN_CONNECTED ||
-		!atomic_test_bit(chan->flags, ATT_DISCONNECTED));
 }
 
 static int bt_att_chan_send(struct bt_att_chan *chan, struct net_buf *buf,
@@ -1131,7 +1134,7 @@ static uint8_t read_type_cb(const struct bt_gatt_attr *attr, uint16_t handle,
 	 */
 	data->err = 0x00;
 
-	/* Fast foward to next item position */
+	/* Fast forward to next item position */
 	data->item = net_buf_add(net_buf_frag_last(data->buf),
 				 sizeof(*data->item));
 	data->item->handle = sys_cpu_to_le16(handle);
@@ -2464,6 +2467,7 @@ static att_type_t att_op_get_type(uint8_t op)
 	case BT_ATT_OP_READ_REQ:
 	case BT_ATT_OP_READ_BLOB_REQ:
 	case BT_ATT_OP_READ_MULT_REQ:
+	case BT_ATT_OP_READ_MULT_VL_REQ:
 	case BT_ATT_OP_READ_GROUP_REQ:
 	case BT_ATT_OP_WRITE_REQ:
 	case BT_ATT_OP_PREPARE_WRITE_REQ:
@@ -2482,12 +2486,14 @@ static att_type_t att_op_get_type(uint8_t op)
 	case BT_ATT_OP_READ_RSP:
 	case BT_ATT_OP_READ_BLOB_RSP:
 	case BT_ATT_OP_READ_MULT_RSP:
+	case BT_ATT_OP_READ_MULT_VL_RSP:
 	case BT_ATT_OP_READ_GROUP_RSP:
 	case BT_ATT_OP_WRITE_RSP:
 	case BT_ATT_OP_PREPARE_WRITE_RSP:
 	case BT_ATT_OP_EXEC_WRITE_RSP:
 		return ATT_RESPONSE;
 	case BT_ATT_OP_NOTIFY:
+	case BT_ATT_OP_NOTIFY_MULT:
 		return ATT_NOTIFICATION;
 	case BT_ATT_OP_INDICATE:
 		return ATT_INDICATION;
@@ -2584,10 +2590,8 @@ static struct bt_att *att_get(struct bt_conn *conn)
 	}
 
 	att_chan = ATT_CHAN(chan);
-	if (atomic_test_bit(att_chan->flags, ATT_DISCONNECTED)) {
-		BT_WARN("ATT channel flagged as disconnected");
-		return NULL;
-	}
+	__ASSERT(atomic_test_bit(att_chan->flags, ATT_CONNECTED),
+		 "ATT channel not connected");
 
 	return att_chan->att;
 }
@@ -2719,15 +2723,12 @@ static void att_chan_attach(struct bt_att *att, struct bt_att_chan *chan)
 
 static void bt_att_connected(struct bt_l2cap_chan *chan)
 {
-	struct bt_att_chan *att_chan = att_get_fixed_chan(chan->conn);
-	struct bt_att *att = att_chan->att;
+	struct bt_att_chan *att_chan = ATT_CHAN(chan);
 	struct bt_l2cap_le_chan *ch = BT_L2CAP_LE_CHAN(chan);
 
 	BT_DBG("chan %p cid 0x%04x", ch, ch->tx.cid);
 
-	att_chan = ATT_CHAN(chan);
-
-	att_chan_attach(att, att_chan);
+	atomic_set_bit(att_chan->flags, ATT_CONNECTED);
 
 	if (!atomic_test_bit(att_chan->flags, ATT_ENHANCED)) {
 		ch->tx.mtu = BT_ATT_DEFAULT_LE_MTU;
@@ -2737,6 +2738,8 @@ static void bt_att_connected(struct bt_l2cap_chan *chan)
 	att_chan_mtu_updated(att_chan);
 
 	k_work_init_delayable(&att_chan->timeout_work, att_timeout);
+
+	bt_gatt_connected(ch->chan.conn);
 }
 
 static void bt_att_disconnected(struct bt_l2cap_chan *chan)
@@ -2910,13 +2913,13 @@ static struct bt_att_chan *att_chan_new(struct bt_att *att, atomic_val_t flags)
 		}
 
 		if (quota == ATT_CHAN_MAX) {
-			BT_ERR("Maximum number of channels reached: %d", quota);
+			BT_WARN("Maximum number of channels reached: %d", quota);
 			return NULL;
 		}
 	}
 
 	if (k_mem_slab_alloc(&chan_slab, (void **)&chan, K_NO_WAIT)) {
-		BT_ERR("No available ATT channel for conn %p", att->conn);
+		BT_WARN("No available ATT channel for conn %p", att->conn);
 		return NULL;
 	}
 
@@ -2925,9 +2928,41 @@ static struct bt_att_chan *att_chan_new(struct bt_att *att, atomic_val_t flags)
 	k_fifo_init(&chan->tx_queue);
 	atomic_set(chan->flags, flags);
 	chan->att = att;
+	att_chan_attach(att, chan);
 
 	return chan;
 }
+
+#if defined(CONFIG_BT_EATT)
+#if defined(CONFIG_BT_TESTING)
+size_t bt_eatt_count(struct bt_conn *conn)
+{
+	struct bt_att *att = att_get(conn);
+	struct bt_att_chan *chan;
+	size_t eatt_count = 0;
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&att->chans, chan, node) {
+		if (atomic_test_bit(chan->flags, ATT_ENHANCED)) {
+			eatt_count++;
+		}
+	}
+
+	return eatt_count;
+}
+#endif /* CONFIG_BT_TESTING */
+
+static void att_enhanced_connection_work_handler(struct k_work *work)
+{
+	const struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	const struct bt_att *att = CONTAINER_OF(dwork, struct bt_att, connection_work);
+	const int err = bt_eatt_connect(att->conn, att->eatt_chans_to_connect);
+
+	if (err < 0) {
+		BT_WARN("Failed to connect EATT channels (err: %d)", err);
+	}
+
+}
+#endif /* CONFIG_BT_EATT */
 
 static int bt_att_accept(struct bt_conn *conn, struct bt_l2cap_chan **ch)
 {
@@ -2946,6 +2981,10 @@ static int bt_att_accept(struct bt_conn *conn, struct bt_l2cap_chan **ch)
 	sys_slist_init(&att->reqs);
 	sys_slist_init(&att->chans);
 
+#if defined(CONFIG_BT_EATT)
+	k_work_init_delayable(&att->connection_work, att_enhanced_connection_work_handler);
+#endif /* CONFIG_BT_EATT */
+
 	chan = att_chan_new(att, 0);
 	if (!chan) {
 		return -ENOMEM;
@@ -2959,6 +2998,70 @@ static int bt_att_accept(struct bt_conn *conn, struct bt_l2cap_chan **ch)
 BT_L2CAP_CHANNEL_DEFINE(att_fixed_chan, BT_L2CAP_CID_ATT, bt_att_accept, NULL);
 
 #if defined(CONFIG_BT_EATT)
+static k_timeout_t credit_based_connection_delay(struct bt_conn *conn)
+{
+	/*
+	 * 5.3 Vol 3, Part G, Section 5.4 L2CAP COLLISION MITIGATION
+	 * ... In this situation, the Central may retry
+	 * immediately but the Peripheral shall wait a minimum of 100 ms before retrying;
+	 * on LE connections, the Peripheral shall wait at least 2 *
+	 * (connPeripheralLatency + 1) * connInterval if that is longer.
+	 */
+
+	if (IS_ENABLED(CONFIG_BT_CENTRAL) && conn->role == BT_CONN_ROLE_CENTRAL) {
+		return K_NO_WAIT;
+	} else if (IS_ENABLED(CONFIG_BT_PERIPHERAL)) {
+		uint8_t random;
+		int err;
+
+		err = bt_rand(&random, sizeof(random));
+		if (err) {
+			random = 0;
+		}
+
+		const uint8_t rand_delay = random & 0x7; /* Small random delay for IOP */
+		const uint32_t calculated_delay =
+			2 * (conn->le.latency + 1) * BT_CONN_INTERVAL_TO_MS(conn->le.interval);
+
+		return K_MSEC(MAX(100, calculated_delay + rand_delay));
+	}
+
+	/* Must be either central or peripheral */
+	__ASSERT_NO_MSG(false);
+	CODE_UNREACHABLE;
+}
+
+static int att_schedule_eatt_connect(struct bt_conn *conn, uint8_t eatt_chans_to_connect)
+{
+	struct bt_att *att = att_get(conn);
+
+	att->eatt_chans_to_connect = eatt_chans_to_connect;
+
+	return k_work_reschedule(&att->connection_work, credit_based_connection_delay(conn));
+}
+
+static void ecred_connect_cb(struct bt_conn *conn, uint16_t result, uint8_t attempted_to_connect,
+			     uint8_t succeeded_to_connect)
+{
+	struct bt_att *att = att_get(conn);
+	int err;
+
+	if (att->previous_ecred_connection_result == BT_L2CAP_LE_ERR_NO_RESOURCES &&
+	    result == BT_L2CAP_LE_ERR_NO_RESOURCES) {
+		BT_DBG("Credit based connection request collision detected");
+
+		err = att_schedule_eatt_connect(conn, attempted_to_connect - succeeded_to_connect);
+		if (err < 0) {
+			BT_ERR("Failed to schedule EATT connection retry (err: %d)", err);
+		}
+
+		/* Reset to not keep retrying on repeated failures */
+		att->previous_ecred_connection_result = 0;
+	} else {
+		att->previous_ecred_connection_result = result;
+	}
+}
+
 int bt_eatt_connect(struct bt_conn *conn, uint8_t num_channels)
 {
 	struct bt_att_chan *att_chan = att_get_fixed_chan(conn);
@@ -3065,6 +3168,15 @@ static void bt_eatt_init(void)
 	if (err < 0) {
 		BT_ERR("EATT Server registration failed %d", err);
 	}
+
+#if defined(CONFIG_BT_EATT)
+	static const struct bt_l2cap_ecred_cb cb = {
+		.ecred_conn_rsp = ecred_connect_cb,
+		.ecred_conn_req = ecred_connect_cb,
+	};
+
+	bt_l2cap_register_ecred_cb(&cb);
+#endif /* CONFIG_BT_EATT */
 }
 
 void bt_att_init(void)

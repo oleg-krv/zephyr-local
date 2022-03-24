@@ -92,7 +92,7 @@ static void prov_invite(const uint8_t *data)
 	/* Number of Elements supported */
 	net_buf_simple_add_u8(&buf, bt_mesh_elem_count());
 
-	/* Supported algorithms - FIPS P-256 Eliptic Curve */
+	/* Supported algorithms - FIPS P-256 Elliptic Curve */
 	net_buf_simple_add_be16(&buf, BIT(PROV_ALG_P256));
 
 	/* Public Key Type */
@@ -650,7 +650,7 @@ int bt_mesh_prov_disable(bt_mesh_prov_bearer_t bearers)
 
 	if (IS_ENABLED(CONFIG_BT_MESH_PB_GATT) &&
 	    (bearers & BT_MESH_PROV_GATT)) {
-		(void)bt_mesh_pb_gatt_disable();
+		(void)bt_mesh_pb_gatt_srv_disable();
 	}
 
 	return 0;

@@ -122,7 +122,7 @@
 
 	pwm2: pwm {
 		status = "okay";
-		pinctrl-0 = <&tim2_ch3_pb10>;
+		pinctrl-0 = <&tim2_ch1_pa5>;
 		pinctrl-names = "default";
 	};
 };
@@ -142,10 +142,6 @@
 };
 
 &flash0 {
-	/*
-	 * For more information, see:
-	 * http://docs.zephyrproject.org/latest/guides/dts/index.html#flash-partitions
-	 */
 	partitions {
 		compatible = "fixed-partitions";
 		#address-cells = <1>;
@@ -173,14 +169,16 @@
 	status = "okay";
 };
 
+&dac1 {
+	pinctrl-0 = <&dac1_out1_pa4>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
 &can1 {
 	pinctrl-0 = <&fdcan1_rx_pa11 &fdcan1_tx_pa12>;
 	pinctrl-names = "default";
 	bus-speed = <125000>;
-	sjw = <1>;
-	sample-point = <875>;
 	bus-speed-data = <1000000>;
-	sjw-data = <1>;
-	sample-point-data = <875>;
 	status = "okay";
 };

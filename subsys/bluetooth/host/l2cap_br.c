@@ -185,8 +185,8 @@ static void l2cap_br_rtx_timeout(struct k_work *work)
 	case BT_L2CAP_CONFIG:
 		bt_l2cap_br_chan_disconnect(&chan->chan);
 		break;
-	case BT_L2CAP_DISCONNECT:
-	case BT_L2CAP_CONNECT:
+	case BT_L2CAP_DISCONNECTING:
+	case BT_L2CAP_CONNECTING:
 		l2cap_br_chan_cleanup(&chan->chan);
 		break;
 	default:
@@ -749,7 +749,7 @@ static void l2cap_br_conn_req(struct bt_l2cap_br *l2cap, uint8_t ident,
 	l2cap_br_chan_add(conn, chan, l2cap_br_chan_destroy);
 	BR_CHAN(chan)->tx.cid = scid;
 	chan->ident = ident;
-	bt_l2cap_chan_set_state(chan, BT_L2CAP_CONNECT);
+	bt_l2cap_chan_set_state(chan, BT_L2CAP_CONNECTING);
 	atomic_set_bit(BR_CHAN(chan)->flags, L2CAP_FLAG_CONN_ACCEPTOR);
 
 	/* Disable fragmentation of l2cap rx pdu */
@@ -1022,7 +1022,7 @@ send_rsp:
 	rsp->scid = sys_cpu_to_le16(BR_CHAN(chan)->tx.cid);
 
 	/*
-	 * TODO: If options other than MTU bacame meaningful then processing
+	 * TODO: If options other than MTU became meaningful then processing
 	 * the options chain need to be modified and taken into account when
 	 * sending back to peer.
 	 */
@@ -1135,7 +1135,7 @@ static void l2cap_br_disconnected(struct bt_l2cap_chan *chan)
 	if (atomic_test_and_clear_bit(BR_CHAN(chan)->flags,
 				      L2CAP_FLAG_SIG_INFO_PENDING)) {
 		/* Cancel RTX work on signal channel.
-		 * Disconnected callback is always called from system worqueue
+		 * Disconnected callback is always called from system workqueue
 		 * so this should always succeed.
 		 */
 		(void)k_work_cancel_delayable(&chan->rtx_work);
@@ -1154,7 +1154,7 @@ int bt_l2cap_br_chan_disconnect(struct bt_l2cap_chan *chan)
 		return -ENOTCONN;
 	}
 
-	if (chan->state == BT_L2CAP_DISCONNECT) {
+	if (chan->state == BT_L2CAP_DISCONNECTING) {
 		return -EALREADY;
 	}
 
@@ -1175,7 +1175,7 @@ int bt_l2cap_br_chan_disconnect(struct bt_l2cap_chan *chan)
 	req->scid = sys_cpu_to_le16(ch->rx.cid);
 
 	l2cap_br_chan_send_req(ch, buf, L2CAP_BR_DISCONN_TIMEOUT);
-	bt_l2cap_chan_set_state(chan, BT_L2CAP_DISCONNECT);
+	bt_l2cap_chan_set_state(chan, BT_L2CAP_DISCONNECTING);
 
 	return 0;
 }
@@ -1242,7 +1242,7 @@ int bt_l2cap_br_chan_connect(struct bt_conn *conn, struct bt_l2cap_chan *chan,
 		/* Can connect */
 		break;
 	case BT_L2CAP_CONFIG:
-	case BT_L2CAP_DISCONNECT:
+	case BT_L2CAP_DISCONNECTING:
 	default:
 		/* Bad context */
 		return -EBUSY;
@@ -1253,7 +1253,7 @@ int bt_l2cap_br_chan_connect(struct bt_conn *conn, struct bt_l2cap_chan *chan,
 	}
 
 	chan->psm = psm;
-	bt_l2cap_chan_set_state(chan, BT_L2CAP_CONNECT);
+	bt_l2cap_chan_set_state(chan, BT_L2CAP_CONNECTING);
 	atomic_set_bit(BR_CHAN(chan)->flags, L2CAP_FLAG_CONN_PENDING);
 
 	switch (l2cap_br_conn_security(chan, psm)) {
@@ -1317,7 +1317,7 @@ static void l2cap_br_conn_rsp(struct bt_l2cap_br *l2cap, uint8_t ident,
 	/* Release RTX work since got the response */
 	k_work_cancel_delayable(&chan->rtx_work);
 
-	if (chan->state != BT_L2CAP_CONNECT) {
+	if (chan->state != BT_L2CAP_CONNECTING) {
 		BT_DBG("Invalid channel %p state %s", chan,
 		       bt_l2cap_chan_state_str(chan->state));
 		return;
@@ -1419,7 +1419,7 @@ static void l2cap_br_conn_pend(struct bt_l2cap_chan *chan, uint8_t status)
 	struct bt_l2cap_sig_hdr *hdr;
 	struct bt_l2cap_conn_req *req;
 
-	if (chan->state != BT_L2CAP_CONNECT) {
+	if (chan->state != BT_L2CAP_CONNECTING) {
 		return;
 	}
 

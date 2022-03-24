@@ -51,6 +51,42 @@ static const struct pll_config_t pll_configuration[] = {
 	 .div_usbpd = 5}
 };
 
+uint32_t chip_get_pll_freq(void)
+{
+	uint32_t pllfreq;
+
+	switch (IT8XXX2_ECPM_PLLFREQR & 0x0F) {
+	case 0:
+		pllfreq = MHZ(8);
+		break;
+	case 1:
+		pllfreq = MHZ(16);
+		break;
+	case 2:
+		pllfreq = MHZ(24);
+		break;
+	case 3:
+		pllfreq = MHZ(32);
+		break;
+	case 4:
+		pllfreq = MHZ(48);
+		break;
+	case 5:
+		pllfreq = MHZ(64);
+		break;
+	case 6:
+		pllfreq = MHZ(72);
+		break;
+	case 7:
+		pllfreq = MHZ(96);
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	return pllfreq;
+}
+
 void __intc_ram_code chip_pll_ctrl(enum chip_pll_mode mode)
 {
 	volatile uint8_t _pll_ctrl __unused;
@@ -135,7 +171,9 @@ static int chip_change_pll(const struct device *dev)
 
 	return 0;
 }
-SYS_INIT(chip_change_pll, POST_KERNEL, 0);
+SYS_INIT(chip_change_pll, PRE_KERNEL_1, CONFIG_IT8XXX2_PLL_SEQUENCE_PRIORITY);
+BUILD_ASSERT(CONFIG_FLASH_INIT_PRIORITY < CONFIG_IT8XXX2_PLL_SEQUENCE_PRIORITY,
+	"CONFIG_FLASH_INIT_PRIORITY must be less than CONFIG_IT8XXX2_PLL_SEQUENCE_PRIORITY");
 #endif /* CONFIG_SOC_IT8XXX2_PLL_FLASH_48M */
 
 extern volatile int wait_interrupt_fired;
@@ -178,6 +216,11 @@ void arch_cpu_idle(void)
 void arch_cpu_atomic_idle(unsigned int key)
 {
 	riscv_idle(CHIP_PLL_DOZE, key);
+}
+
+void soc_interrupt_init(void)
+{
+	ite_intc_init();
 }
 
 static int ite_it8xxx2_init(const struct device *arg)

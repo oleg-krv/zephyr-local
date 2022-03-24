@@ -345,7 +345,7 @@ UpdateHub Might Dereference An Uninitialized Pointer
 In updatehub_probe, right after JSON parsing is complete, objects\[1]
 is accessed from the output structure in two different places. If the
 JSON contained less than two elements, this access would reference
-unitialized stack memory. This could result in a crash, denial of
+uninitialized stack memory. This could result in a crash, denial of
 service, or possibly an information leak.
 
 Recommend disabling updatehub until such a time as a fix can be made
@@ -1140,3 +1140,19 @@ This has been fixed in main for v3.0.0
 
 - `PR 39725 fix for main
   <https://github.com/zephyrproject-rtos/zephyr/pull/39725>`_
+
+CVE-2021-3966
+-------------
+
+Usb bluetooth device ACL read cb buffer overflow
+
+This has been fixed in main for v3.0.0
+
+- `Zephyr project bug tracker GHSA-hfxq-3w6x-fv2m
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-hfxq-3w6x-fv2m>`_
+
+- `PR 42093 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/42093>`_
+
+- `PR 42167 fix for v2.7.0
+  <https://github.com/zephyrproject-rtos/zephyr/pull/42167>`_

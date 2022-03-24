@@ -41,13 +41,13 @@ LOG_MODULE_REGISTER(timer, LOG_LEVEL_ERR);
  * One system (kernel) tick is as how much HW timer counts
  *
  * NOTE: Event and free run timer individually select the same clock source
- *       frequency, so they can use the same HW_CNT_PER_SYS_TICK to tranform
+ *       frequency, so they can use the same HW_CNT_PER_SYS_TICK to transform
  *       unit between HW count and system tick. If clock source frequency is
- *       different, then we should define another to tranform.
+ *       different, then we should define another to transform.
  */
 #define HW_CNT_PER_SYS_TICK	(CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC \
 				 / CONFIG_SYS_CLOCK_TICKS_PER_SEC)
-/* Event timer max count is as how much system (kernal) tick */
+/* Event timer max count is as how much system (kernel) tick */
 #define EVEN_TIMER_MAX_CNT_SYS_TICK	(EVENT_TIMER_MAX_CNT \
 					/ HW_CNT_PER_SYS_TICK)
 
@@ -122,6 +122,13 @@ void timer_5ms_one_shot(void)
 }
 #endif /* CONFIG_SOC_IT8XXX2_PLL_FLASH_48M */
 
+static void evt_timer_enable(void)
+{
+	/* Enable and re-start event timer */
+	IT8XXX2_EXT_CTRLX(EVENT_TIMER) |= (IT8XXX2_EXT_ETXEN |
+					   IT8XXX2_EXT_ETXRST);
+}
+
 static void evt_timer_isr(const void *unused)
 {
 	ARG_UNUSED(unused);
@@ -134,7 +141,7 @@ static void evt_timer_isr(const void *unused)
 	if (IS_ENABLED(CONFIG_TICKLESS_KERNEL)) {
 		/*
 		 * Get free run observer count from last time announced and
-		 * trnaform unit to system tick
+		 * transform unit to system tick
 		 */
 		uint32_t dticks = (~(IT8XXX2_EXT_CNTOX(FREE_RUN_TIMER)) -
 				   last_announced_hw_cnt) / HW_CNT_PER_SYS_TICK;
@@ -142,10 +149,8 @@ static void evt_timer_isr(const void *unused)
 
 		sys_clock_announce(dticks);
 	} else {
-		/* Enable and re-start event timer */
-		IT8XXX2_EXT_CTRLX(EVENT_TIMER) |= (IT8XXX2_EXT_ETXEN |
-						   IT8XXX2_EXT_ETXRST);
-
+		/* enable event timer */
+		evt_timer_enable();
 		/* Informs kernel that one system tick has elapsed */
 		sys_clock_announce(1);
 	}
@@ -215,11 +220,8 @@ void sys_clock_set_timeout(int32_t ticks, bool idle)
 	/* W/C event timer interrupt status */
 	ite_intc_isr_clear(EVENT_TIMER_IRQ);
 
-	/*
-	 * When timer enable bit is from 0->1, timer will reload counts and
-	 * start countdown.
-	 */
-	IT8XXX2_EXT_CTRLX(EVENT_TIMER) |= IT8XXX2_EXT_ETXEN;
+	/* enable event timer */
+	evt_timer_enable();
 
 	k_spin_unlock(&lock, key);
 
@@ -236,7 +238,7 @@ uint32_t sys_clock_elapsed(void)
 	/* Critical section */
 	k_spinlock_key_t key = k_spin_lock(&lock);
 	/*
-	 * Get free run observer count from last time announced and trnaform
+	 * Get free run observer count from last time announced and transform
 	 * unit to system tick
 	 */
 	uint32_t dticks = (~(IT8XXX2_EXT_CNTOX(FREE_RUN_TIMER)) -
@@ -249,7 +251,7 @@ uint32_t sys_clock_elapsed(void)
 uint32_t sys_clock_cycle_get_32(void)
 {
 	/*
-	 * Get free run observer count and trnaform unit to system tick
+	 * Get free run observer count and transform unit to system tick
 	 *
 	 * NOTE: Timer is counting down from 0xffffffff. In not combined
 	 *       mode, the observer count value is the same as count, so after

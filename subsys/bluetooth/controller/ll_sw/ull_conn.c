@@ -508,7 +508,7 @@ uint8_t ll_chm_get(uint16_t handle, uint8_t *chm)
 	 * for the specified Connection_Handle. The returned value indicates the state of
 	 * the Channel_Map specified by the last transmitted or received Channel_Map
 	 * (in a CONNECT_IND or LL_CHANNEL_MAP_IND message) for the specified
-	 * Connection_Handle, regardless of whether the Master has received an
+	 * Connection_Handle, regardless of whether the Central has received an
 	 * acknowledgment
 	 */
 	const uint8_t *pending_chm;
@@ -2244,6 +2244,15 @@ static void conn_setup_adv_scan_disabled_cb(void *param)
 	ftr = &(rx->rx_ftr);
 	lll = *((struct lll_conn **)((uint8_t *)ftr->param +
 				     sizeof(struct lll_hdr)));
+
+	if (IS_ENABLED(CONFIG_BT_CTLR_JIT_SCHEDULING)) {
+		struct ull_hdr *hdr;
+
+		/* Prevent fast ADV re-scheduling from re-triggering */
+		hdr = HDR_LLL2ULL(ftr->param);
+		hdr->disabled_cb = NULL;
+	}
+
 	switch (lll->role) {
 #if defined(CONFIG_BT_CENTRAL)
 	case 0:
@@ -7868,14 +7877,24 @@ uint8_t ull_dle_update_eff(struct ll_conn *conn)
 	uint8_t dle_changed = 0;
 
 	const uint16_t eff_tx_octets =
-		MIN(conn->lll.dle.local.max_tx_octets, conn->lll.dle.remote.max_rx_octets);
+		MAX(MIN(conn->lll.dle.local.max_tx_octets, conn->lll.dle.remote.max_rx_octets),
+		    PDU_DC_PAYLOAD_SIZE_MIN);
 	const uint16_t eff_rx_octets =
-		MIN(conn->lll.dle.local.max_rx_octets, conn->lll.dle.remote.max_tx_octets);
+		MAX(MIN(conn->lll.dle.local.max_rx_octets, conn->lll.dle.remote.max_tx_octets),
+		    PDU_DC_PAYLOAD_SIZE_MIN);
+
 #if defined(CONFIG_BT_CTLR_PHY)
+	unsigned int min_eff_tx_time = (conn->lll.phy_tx == PHY_CODED) ?
+			PDU_DC_PAYLOAD_TIME_MIN_CODED : PDU_DC_PAYLOAD_TIME_MIN;
+	unsigned int min_eff_rx_time = (conn->lll.phy_rx == PHY_CODED) ?
+			PDU_DC_PAYLOAD_TIME_MIN_CODED : PDU_DC_PAYLOAD_TIME_MIN;
+
 	const uint16_t eff_tx_time =
-		MIN(conn->lll.dle.local.max_tx_time, conn->lll.dle.remote.max_rx_time);
+		MAX(MIN(conn->lll.dle.local.max_tx_time, conn->lll.dle.remote.max_rx_time),
+		    min_eff_tx_time);
 	const uint16_t eff_rx_time =
-		MIN(conn->lll.dle.local.max_rx_time, conn->lll.dle.remote.max_tx_time);
+		MAX(MIN(conn->lll.dle.local.max_rx_time, conn->lll.dle.remote.max_tx_time),
+		    min_eff_rx_time);
 
 	if (eff_tx_time != conn->lll.dle.eff.max_tx_time) {
 		conn->lll.dle.eff.max_tx_time = eff_tx_time;

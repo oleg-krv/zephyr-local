@@ -16,7 +16,7 @@ specifying the signature of a callback:
 
 * The first parameter should be a pointer to the object most closely
   associated with the callback.  In the case of device drivers this
-  would be ``struct device *dev``.  For library functions it may be a
+  would be ``const struct device *dev``.  For library functions it may be a
   pointer to another object that was referenced when the callback was
   provided.
 
@@ -71,8 +71,8 @@ Conditional Data and APIs
 APIs and libraries may provide features that are expensive in RAM or
 code size but are optional in the sense that some applications can be
 implemented without them.  Examples of such feature include
-:kconfig:`capturing a timestamp <CONFIG_CAN_RX_TIMESTAMP>` or
-:kconfig:`providing an alternative interface <CONFIG_SPI_ASYNC>`.  The
+:kconfig:option:`capturing a timestamp <CONFIG_CAN_RX_TIMESTAMP>` or
+:kconfig:option:`providing an alternative interface <CONFIG_SPI_ASYNC>`.  The
 developer in coordination with the community must determine whether
 enabling the features is to be controllable through a Kconfig option.
 
@@ -118,5 +118,5 @@ not implemented or optional:
 
 - When an API is implemented, but the particular combination of options
   requested in the call cannot be satisfied by the implementation the call shall
-  return -ENOTSUP. (For example, a request for a level-triggered GPIO interrupt on
+  return ``-ENOTSUP``. (For example, a request for a level-triggered GPIO interrupt on
   hardware that supports only edge-triggered interrupts)

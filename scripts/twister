@@ -539,7 +539,7 @@ structure in the main Zephyr tree: boards/<arch>/<board_name>/""")
     parser.add_argument(
         "-j", "--jobs", type=int,
         help="Number of jobs for building, defaults to number of CPU threads, "
-             "overcommited by factor 2 when --build-only.")
+             "overcommitted by factor 2 when --build-only.")
 
     parser.add_argument(
         "--json-report", action="store_true",
@@ -569,12 +569,18 @@ structure in the main Zephyr tree: boards/<arch>/<board_name>/""")
 
     parser.add_argument(
         "-N", "--ninja", action="store_true",
-        help="Use the Ninja generator with CMake.")
+        help="Use the Ninja generator with CMake.",
+        required="--short-build-path" in sys.argv)
 
     parser.add_argument(
         "-n", "--no-clean", action="store_true",
         help="Re-use the outdir before building. Will result in "
              "faster compilation since builds will be incremental.")
+
+    parser.add_argument(
+        "--no-skipped-report", action="store_true",
+        help="""Do not report skipped test cases in junit output. [Experimental]
+        """)
 
     parser.add_argument(
         "-O", "--outdir",
@@ -680,9 +686,23 @@ structure in the main Zephyr tree: boards/<arch>/<board_name>/""")
         help="Retry failing tests after specified period of time.")
 
     parser.add_argument(
+        "--retry-build-errors", action="store_true",
+        help="Retry build errors as well.")
+
+    parser.add_argument(
         "-S", "--enable-slow", action="store_true",
         help="Execute time-consuming test cases that have been marked "
              "as 'slow' in testcase.yaml. Normally these are only built.")
+
+    parser.add_argument(
+        "--short-build-path",
+        action="store_true",
+        help="Create shorter build directory paths based on symbolic links. "
+             "The shortened build path will be used by CMake for generating "
+             "the build system and executing the build. Use this option if "
+             "you experience build failures related to path length, for "
+             "example on Windows OS. This option can be used only with "
+             "'--ninja' argument (to use Ninja build generator).")
 
     parser.add_argument(
         "--show-footprint", action="store_true",
@@ -862,6 +882,10 @@ def main():
         logger.error("west-flash requires device-testing to be enabled")
         sys.exit(1)
 
+    if options.enable_valgrind and not shutil.which("valgrind"):
+        logger.error("valgrind enabled but valgrind executable not found")
+        sys.exit(1)
+
     if options.coverage:
         options.enable_coverage = True
 
@@ -902,6 +926,7 @@ def main():
     suite.cmake_only = options.cmake_only
     suite.cleanup = options.runtime_artifact_cleanup
     suite.test_only = options.test_only
+    suite.retry_build_errors = options.retry_build_errors
     suite.enable_slow = options.enable_slow
     suite.device_testing = options.device_testing
     suite.fixtures = options.fixture
@@ -978,6 +1003,11 @@ def main():
                 logger.error("""When --device-testing is used with
                              --device-serial or --device-serial-pty,
                              only one platform is allowed""")
+
+    # the fixtures given by twister command explicitly should be assigned to each DUTs
+    if suite.fixtures:
+        for d in suite.duts:
+            d.fixtures.extend(suite.fixtures)
 
     if suite.load_errors:
         sys.exit(1)
@@ -1091,7 +1121,7 @@ def main():
         suite.selected_platforms = set(p.platform.name for p in suite.instances.values())
     elif options.test_only:
         # Get list of connected hardware and filter tests to only be run on connected hardware
-        # in cases where no platform was specified when runn the tests.
+        # in cases where no platform was specified when running the tests.
         # If the platform does not exist in the hardware map, just skip it.
         connected_list = []
         if not options.platform:
@@ -1236,6 +1266,9 @@ def main():
         logger.info("Completed in %d seconds" % (duration))
         return
 
+    if options.short_build_path:
+        suite.create_build_dir_links()
+
     retries = options.retry_failed + 1
     completed = 0
 
@@ -1247,7 +1280,7 @@ def main():
     pipeline = manager.LifoQueue()
     done_queue = manager.LifoQueue()
 
-    suite.update_counting(results, initial=True)
+    suite.update_counting(results)
     suite.start_time = start_time
 
     while True:
@@ -1257,7 +1290,11 @@ def main():
             logger.info("%d Iteration:" % (completed))
             time.sleep(options.retry_interval)  # waiting for the system to settle down
             results.done = results.total - results.failed
-            results.failed = results.error
+            if options.retry_build_errors:
+                results.failed = 0
+                results.error = 0
+            else:
+                results.failed = results.error
 
         results = suite.execute(pipeline, done_queue, results)
 
@@ -1277,8 +1314,9 @@ def main():
         retries = retries - 1
         # There are cases where failed == error (only build failures),
         # we do not try build failures.
-        if retries == 0 or results.failed == results.error:
+        if retries == 0 or (results.failed == results.error and not options.retry_build_errors):
             break
+
 
     # figure out which report to use for size comparison
     if options.compare_report:
@@ -1295,7 +1333,8 @@ def main():
                             options.last_metrics)
 
     suite.duration = time.time() - start_time
-    suite.update_counting(results)
+
+    results.summary()
 
     suite.summary(results, options.disable_unrecognized_section_test)
 
@@ -1340,11 +1379,9 @@ def main():
                        options.release,
                        options.only_failed,
                        options.platform_reports,
-                       options.json_report
+                       options.json_report,
+                       not options.no_skipped_report
                        )
-
-    # FIXME: remove later
-    #logger.info(f"failed: {results.failed}, cases: {results.cases}, skipped configurations: {results.skipped_configs}, skipped_cases: {results.skipped_cases}, skipped(runtime): {results.skipped_runtime}, passed: {results.passed}, total: {results.total}, done: {results.done}")
 
     logger.info("Run completed")
     if results.failed or (suite.warnings and options.warnings_as_errors):

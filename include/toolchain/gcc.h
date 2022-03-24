@@ -14,6 +14,22 @@
  * Macros to abstract compiler capabilities for GCC toolchain.
  */
 
+#define GCC_VERSION \
+	((__GNUC__ * 10000) + (__GNUC_MINOR__ * 100) + __GNUC_PATCHLEVEL__)
+
+/* GCC supports #pragma diagnostics since 4.6.0 */
+#if !defined(TOOLCHAIN_HAS_PRAGMA_DIAG) && (GCC_VERSION >= 40600)
+#define TOOLCHAIN_HAS_PRAGMA_DIAG 1
+#endif
+
+#if !defined(TOOLCHAIN_HAS_C_GENERIC) && (GCC_VERSION >= 40900)
+#define TOOLCHAIN_HAS_C_GENERIC 1
+#endif
+
+#if !defined(TOOLCHAIN_HAS_C_AUTO_TYPE) && (GCC_VERSION >= 40900)
+#define TOOLCHAIN_HAS_C_AUTO_TYPE 1
+#endif
+
 /*
  * Older versions of GCC do not define __BYTE_ORDER__, so it must be manually
  * detected and defined using arch-specific definitions.
@@ -421,7 +437,7 @@ do {                                                                    \
  * and toolchain, may restrict the range of values permitted
  * for assignment to the named symbol.
  *
- * For example, on x86, "value" is interpreated as signed
+ * For example, on x86, "value" is interpreted as signed
  * 32-bit integer. Passing in an unsigned 32-bit integer
  * with MSB set would result in a negative integer.
  * Moreover, GCC would error out if an integer larger
@@ -575,10 +591,18 @@ do {                                                                    \
 		1UL << (63U - __builtin_clzl(x) + 1U) : \
 		1UL << (63U - __builtin_clzl(x)))
 #else
-#define Z_POW2_CEIL(x) ((1UL << (31U - __builtin_clzl(x))) < x ?  \
-		1UL << (31U - __builtin_clzl(x) + 1U) : \
-		1UL << (31U - __builtin_clzl(x)))
+#define Z_POW2_CEIL(x) ((1UL << (31U - __builtin_clz(x))) < x ?  \
+		1UL << (31U - __builtin_clz(x) + 1U) : \
+		1UL << (31U - __builtin_clz(x)))
 #endif
+
+/**
+ * @brief Check whether or not a value is a power of 2
+ *
+ * @param x The value to check
+ * @return true if x is a power of 2, false otherwise
+ */
+#define Z_IS_POW2(x) (((x) != 0) && (((x) & ((x)-1)) == 0))
 
 #endif /* !_LINKER */
 #endif /* ZEPHYR_INCLUDE_TOOLCHAIN_GCC_H_ */

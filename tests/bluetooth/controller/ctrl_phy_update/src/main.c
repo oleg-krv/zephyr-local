@@ -103,7 +103,7 @@ static bool is_instant_reached(struct ll_conn *conn, uint16_t instant)
  * +-----+                +-------+              +-----+
  *    |                       |                     |
  */
-void test_phy_update_mas_loc(void)
+void test_phy_update_central_loc(void)
 {
 	uint8_t err;
 	struct node_tx *tx;
@@ -165,7 +165,7 @@ void test_phy_update_mas_loc(void)
 	/* TX Ack */
 	event_tx_ack(&conn, tx);
 
-	/* Check that data tx is no lonnger paused */
+	/* Check that data tx is no longer paused */
 	zassert_equal(conn.tx_q.pause_data, 0U, "Data tx is paused");
 
 	/* Done */
@@ -215,11 +215,11 @@ void test_phy_update_mas_loc(void)
 	CHECK_CURRENT_PHY_STATE(conn, PHY_2M, PREFER_S8_CODING, PHY_2M);
 	CHECK_PREF_PHY_STATE(conn, PHY_2M, PHY_2M);
 
-	zassert_equal(ctx_buffers_free(), CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM,
+	zassert_equal(ctx_buffers_free(), test_ctx_buffers_cnt(),
 				  "Free CTX buffers %d", ctx_buffers_free());
 }
 
-void test_phy_update_mas_loc_unsupp_feat(void)
+void test_phy_update_central_loc_unsupp_feat(void)
 {
 	uint8_t err;
 	struct node_tx *tx;
@@ -266,11 +266,11 @@ void test_phy_update_mas_loc_unsupp_feat(void)
 	/* Release Ntf */
 	ull_cp_release_ntf(ntf);
 
-	zassert_equal(ctx_buffers_free(), CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM,
+	zassert_equal(ctx_buffers_free(), test_ctx_buffers_cnt(),
 				  "Free CTX buffers %d", ctx_buffers_free());
 }
 
-void test_phy_update_mas_rem(void)
+void test_phy_update_central_rem(void)
 {
 	struct node_tx *tx;
 	struct node_rx_pdu *ntf;
@@ -365,11 +365,11 @@ void test_phy_update_mas_rem(void)
 	CHECK_CURRENT_PHY_STATE(conn, PHY_1M, PREFER_S8_CODING, PHY_2M);
 	CHECK_PREF_PHY_STATE(conn, PHY_1M | PHY_2M | PHY_CODED, PHY_1M | PHY_2M | PHY_CODED);
 
-	zassert_equal(ctx_buffers_free(), CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM,
+	zassert_equal(ctx_buffers_free(), test_ctx_buffers_cnt(),
 				  "Free CTX buffers %d", ctx_buffers_free());
 }
 
-void test_phy_update_sla_loc(void)
+void test_phy_update_periph_loc(void)
 {
 	uint8_t err;
 	struct node_tx *tx;
@@ -459,11 +459,11 @@ void test_phy_update_sla_loc(void)
 	CHECK_CURRENT_PHY_STATE(conn, PHY_2M, PREFER_S8_CODING, PHY_2M);
 	CHECK_PREF_PHY_STATE(conn, PHY_2M, PHY_2M);
 
-	zassert_equal(ctx_buffers_free(), CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM,
+	zassert_equal(ctx_buffers_free(), test_ctx_buffers_cnt(),
 				  "Free CTX buffers %d", ctx_buffers_free());
 }
 
-void test_phy_update_sla_rem(void)
+void test_phy_update_periph_rem(void)
 {
 	struct node_tx *tx;
 	struct node_rx_pdu *ntf;
@@ -563,11 +563,11 @@ void test_phy_update_sla_rem(void)
 	CHECK_CURRENT_PHY_STATE(conn, PHY_2M, PREFER_S8_CODING, PHY_1M);
 	CHECK_PREF_PHY_STATE(conn, PHY_1M | PHY_2M | PHY_CODED, PHY_1M | PHY_2M | PHY_CODED);
 
-	zassert_equal(ctx_buffers_free(), CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM,
+	zassert_equal(ctx_buffers_free(), test_ctx_buffers_cnt(),
 				  "Free CTX buffers %d", ctx_buffers_free());
 }
 
-void test_phy_update_mas_loc_collision(void)
+void test_phy_update_central_loc_collision(void)
 {
 	uint8_t err;
 	struct node_tx *tx;
@@ -734,18 +734,18 @@ void test_phy_update_mas_loc_collision(void)
 	/* Release Ntf */
 	ull_cp_release_ntf(ntf);
 
-	zassert_equal(ctx_buffers_free(), CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM,
+	zassert_equal(ctx_buffers_free(), test_ctx_buffers_cnt(),
 				  "Free CTX buffers %d", ctx_buffers_free());
 }
 
-void test_phy_update_mas_rem_collision(void)
+void test_phy_update_central_rem_collision(void)
 {
 	uint8_t err;
 	struct node_tx *tx;
 	struct node_rx_pdu *ntf;
 	struct pdu_data *pdu;
-	struct pdu_data_llctrl_phy_req req_slave = { .rx_phys = PHY_1M, .tx_phys = PHY_2M };
-	struct pdu_data_llctrl_phy_req req_master = { .rx_phys = PHY_2M, .tx_phys = PHY_2M };
+	struct pdu_data_llctrl_phy_req req_peripheral = { .rx_phys = PHY_1M, .tx_phys = PHY_2M };
+	struct pdu_data_llctrl_phy_req req_central = { .rx_phys = PHY_2M, .tx_phys = PHY_2M };
 	struct pdu_data_llctrl_phy_req rsp = { .rx_phys = PHY_1M | PHY_2M,
 					       .tx_phys = PHY_1M | PHY_2M };
 	struct pdu_data_llctrl_phy_upd_ind ind_1 = { .instant = 7,
@@ -778,7 +778,7 @@ void test_phy_update_mas_rem_collision(void)
 	event_prepare(&conn);
 
 	/* Rx */
-	lt_tx(LL_PHY_REQ, &conn, &req_slave);
+	lt_tx(LL_PHY_REQ, &conn, &req_peripheral);
 
 	/* Done */
 	event_done(&conn);
@@ -832,7 +832,7 @@ void test_phy_update_mas_rem_collision(void)
 	event_prepare(&conn);
 
 	/* Tx Queue should have one LL Control PDU */
-	lt_rx(LL_PHY_REQ, &conn, &tx, &req_master);
+	lt_rx(LL_PHY_REQ, &conn, &tx, &req_central);
 	lt_rx_q_is_empty(&conn);
 
 	/* Rx */
@@ -907,17 +907,17 @@ void test_phy_update_mas_rem_collision(void)
 	/* Release Ntf */
 	ull_cp_release_ntf(ntf);
 
-	zassert_equal(ctx_buffers_free(), CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM,
+	zassert_equal(ctx_buffers_free(), test_ctx_buffers_cnt(),
 				  "Free CTX buffers %d", ctx_buffers_free());
 }
 
-void test_phy_update_sla_loc_collision(void)
+void test_phy_update_periph_loc_collision(void)
 {
 	uint8_t err;
 	struct node_tx *tx;
 	struct node_rx_pdu *ntf;
-	struct pdu_data_llctrl_phy_req req_master = { .rx_phys = PHY_1M, .tx_phys = PHY_2M };
-	struct pdu_data_llctrl_phy_req req_slave = { .rx_phys = PHY_2M, .tx_phys = PHY_2M };
+	struct pdu_data_llctrl_phy_req req_central = { .rx_phys = PHY_1M, .tx_phys = PHY_2M };
+	struct pdu_data_llctrl_phy_req req_peripheral = { .rx_phys = PHY_2M, .tx_phys = PHY_2M };
 	struct pdu_data_llctrl_phy_req rsp = { .rx_phys = PHY_2M, .tx_phys = PHY_2M };
 	struct pdu_data_llctrl_phy_upd_ind ind = { .instant = 7,
 						   .c_to_p_phy = PHY_2M,
@@ -951,11 +951,11 @@ void test_phy_update_sla_loc_collision(void)
 	event_prepare(&conn);
 
 	/* Tx Queue should have one LL Control PDU */
-	lt_rx(LL_PHY_REQ, &conn, &tx, &req_slave);
+	lt_rx(LL_PHY_REQ, &conn, &tx, &req_peripheral);
 	lt_rx_q_is_empty(&conn);
 
 	/* Rx */
-	lt_tx(LL_PHY_REQ, &conn, &req_master);
+	lt_tx(LL_PHY_REQ, &conn, &req_central);
 
 	/* TX Ack */
 	event_tx_ack(&conn, tx);
@@ -1036,7 +1036,7 @@ void test_phy_update_sla_loc_collision(void)
 	/* Release Ntf */
 	ull_cp_release_ntf(ntf);
 
-	zassert_equal(ctx_buffers_free(), CONFIG_BT_CTLR_LLCP_PROC_CTX_BUF_NUM,
+	zassert_equal(ctx_buffers_free(), test_ctx_buffers_cnt(),
 				  "Free CTX buffers %d", ctx_buffers_free());
 }
 
@@ -1044,17 +1044,17 @@ void test_main(void)
 {
 	ztest_test_suite(
 		phy,
-		ztest_unit_test_setup_teardown(test_phy_update_mas_loc, setup, unit_test_noop),
-		ztest_unit_test_setup_teardown(test_phy_update_mas_loc_unsupp_feat, setup,
+		ztest_unit_test_setup_teardown(test_phy_update_central_loc, setup, unit_test_noop),
+		ztest_unit_test_setup_teardown(test_phy_update_central_loc_unsupp_feat, setup,
 					       unit_test_noop),
-		ztest_unit_test_setup_teardown(test_phy_update_mas_rem, setup, unit_test_noop),
-		ztest_unit_test_setup_teardown(test_phy_update_sla_loc, setup, unit_test_noop),
-		ztest_unit_test_setup_teardown(test_phy_update_sla_rem, setup, unit_test_noop),
-		ztest_unit_test_setup_teardown(test_phy_update_mas_loc_collision, setup,
+		ztest_unit_test_setup_teardown(test_phy_update_central_rem, setup, unit_test_noop),
+		ztest_unit_test_setup_teardown(test_phy_update_periph_loc, setup, unit_test_noop),
+		ztest_unit_test_setup_teardown(test_phy_update_periph_rem, setup, unit_test_noop),
+		ztest_unit_test_setup_teardown(test_phy_update_central_loc_collision, setup,
 					       unit_test_noop),
-		ztest_unit_test_setup_teardown(test_phy_update_mas_rem_collision, setup,
+		ztest_unit_test_setup_teardown(test_phy_update_central_rem_collision, setup,
 					       unit_test_noop),
-		ztest_unit_test_setup_teardown(test_phy_update_sla_loc_collision, setup,
+		ztest_unit_test_setup_teardown(test_phy_update_periph_loc_collision, setup,
 					       unit_test_noop));
 
 	ztest_run_test_suite(phy);

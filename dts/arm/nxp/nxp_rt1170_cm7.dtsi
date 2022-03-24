@@ -14,7 +14,7 @@
 	 * ITCM & DTCM are available only to the M7 core. EDMA interrupts are connected
 	 * to the M7 core alone, hence this EDMA controller has been designated M7 only.
 	 * GPIO 6 is available to both M4 and M7 cores, however the GPIO interrupt is
-	 * only accesssible to the M7.
+	 * only accessible to the M7.
 	 *
 	 * Refer to Chapter 3 of the Reference Manual
 	 */
@@ -29,13 +29,13 @@
 			#size-cells = <1>;
 
 			itcm: itcm@0 {
-				compatible = "nxp,imx-itcm";
+				compatible = "zephyr,memory-region", "nxp,imx-itcm";
 				reg = <0x00000000 DT_SIZE_K(256)>;
 				zephyr,memory-region = "ITCM";
 			};
 
 			dtcm: dtcm@20000000 {
-				compatible = "nxp,imx-dtcm";
+				compatible = "zephyr,memory-region", "nxp,imx-dtcm";
 				reg = <0x20000000 DT_SIZE_K(256)>;
 				zephyr,memory-region = "DTCM";
 			};

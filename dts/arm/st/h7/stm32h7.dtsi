@@ -759,6 +759,8 @@
 			status = "disabled";
 			label = "ADC_3";
 			#io-channel-cells = <1>;
+			has-temp-channel;
+			has-vref-channel;
 		};
 
 		dac1: dac@40007400 {
@@ -871,7 +873,7 @@
 		};
 
 		backup_sram: memory@38800000 {
-			compatible = "st,stm32-backup-sram";
+			compatible = "zephyr,memory-region", "st,stm32-backup-sram";
 			reg = <0x38800000 DT_SIZE_K(4)>;
 			clocks = <&rcc STM32_CLOCK_BUS_AHB4 0x10000000>;
 			label = "BACKUP_SRAM";

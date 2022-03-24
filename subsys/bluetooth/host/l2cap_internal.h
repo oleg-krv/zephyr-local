@@ -55,7 +55,7 @@ struct bt_l2cap_conn_req {
 	uint16_t scid;
 } __packed;
 
-/* command statuses in reposnse */
+/* command statuses in response */
 #define BT_L2CAP_CS_NO_INFO             0x0000
 #define BT_L2CAP_CS_AUTHEN_PEND         0x0001
 
@@ -360,3 +360,13 @@ void l2cap_br_encrypt_change(struct bt_conn *conn, uint8_t hci_status);
 
 /* Handle received data */
 void bt_l2cap_br_recv(struct bt_conn *conn, struct net_buf *buf);
+
+struct bt_l2cap_ecred_cb {
+	void (*ecred_conn_rsp)(struct bt_conn *conn, uint16_t result, uint8_t attempted,
+			       uint8_t succeeded);
+	void (*ecred_conn_req)(struct bt_conn *conn, uint16_t result, uint8_t attempted,
+			       uint8_t succeeded);
+};
+
+/* Register callbacks for Enhanced Credit based Flow Control */
+void bt_l2cap_register_ecred_cb(const struct bt_l2cap_ecred_cb *cb);

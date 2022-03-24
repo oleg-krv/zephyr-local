@@ -135,7 +135,7 @@ static bool get_vtd(void)
 #define DRV_COMPAT_BAK DT_DRV_COMPAT
 #undef DT_DRV_COMPAT
 #define DT_DRV_COMPAT intel_vt_d
-	vtd = device_get_binding(DT_INST_LABEL(0));
+	vtd = DEVICE_DT_GET_OR_NULL(DT_DRV_INST(0));
 #undef DT_DRV_COMPAT
 #define DT_DRV_COMPAT DRV_COMPAT_BAK
 #undef DRV_COMPAT_BAK
@@ -545,4 +545,4 @@ static void IoApicRedUpdateLo(unsigned int irq,
 PM_DEVICE_DEFINE(ioapic, ioapic_pm_action);
 
 DEVICE_DEFINE(ioapic, "ioapic", ioapic_init, PM_DEVICE_GET(ioapic), NULL, NULL,
-	      PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, NULL);
+	      PRE_KERNEL_1, CONFIG_INTC_INIT_PRIORITY, NULL);

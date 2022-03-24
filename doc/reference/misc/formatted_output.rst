@@ -25,18 +25,18 @@ use of ``s*printf()`` C libraries in Zephyr can be converted to
 Several Kconfig options control the set of features that are enabled,
 allowing some control over features and memory usage:
 
-* :kconfig:`CONFIG_CBPRINTF_FULL_INTEGRAL`
-  or :kconfig:`CONFIG_CBPRINTF_REDUCED_INTEGRAL`
-* :kconfig:`CONFIG_CBPRINTF_FP_SUPPORT`
-* :kconfig:`CONFIG_CBPRINTF_FP_A_SUPPORT`
-* :kconfig:`CONFIG_CBPRINTF_FP_ALWAYS_A`
-* :kconfig:`CONFIG_CBPRINTF_N_SPECIFIER`
+* :kconfig:option:`CONFIG_CBPRINTF_FULL_INTEGRAL`
+  or :kconfig:option:`CONFIG_CBPRINTF_REDUCED_INTEGRAL`
+* :kconfig:option:`CONFIG_CBPRINTF_FP_SUPPORT`
+* :kconfig:option:`CONFIG_CBPRINTF_FP_A_SUPPORT`
+* :kconfig:option:`CONFIG_CBPRINTF_FP_ALWAYS_A`
+* :kconfig:option:`CONFIG_CBPRINTF_N_SPECIFIER`
 
-:kconfig:`CONFIG_CBPRINTF_LIBC_SUBSTS` can be used to provide functions
+:kconfig:option:`CONFIG_CBPRINTF_LIBC_SUBSTS` can be used to provide functions
 that behave like standard libc functions but use the selected cbprintf
 formatter rather than pulling in another formatter from libc.
 
-In addition :kconfig:`CONFIG_CBPRINTF_NANO` can be used to revert back to
+In addition :kconfig:option:`CONFIG_CBPRINTF_NANO` can be used to revert back to
 the very space-optimized but limited formatter used for :c:func:`printk`
 before this capability was added.
 
@@ -49,14 +49,30 @@ Typically, strings are formatted synchronously when a function from ``printf``
 family is called. However, there are cases when it is beneficial that formatting
 is deferred. In that case, a state (format string and arguments) must be captured.
 Such state forms a self-contained package which contains format string and
-arguments. Additionally, package contains copies of all strings which are
-part of a format string (format string or any ``%s`` argument) and are identifed
-as the one located in the read write memory. Package primary content resembles
-va_list stack frame thus standard formatting functions are used to process a
-package. Since package contains data which is processed as va_list frame,
-strict alignment must be maintained. Due to required padding, size of the
-package depends on alignment. When package is copied, it should be copied to a
-memory block with the same alignment as origin.
+arguments. Additionally, package may contain copies of strings which are
+part of a format string (format string or any ``%s`` argument). Package primary
+content resembles va_list stack frame thus standard formatting functions are
+used to process a package. Since package contains data which is processed as
+va_list frame, strict alignment must be maintained. Due to required padding,
+size of the package depends on alignment. When package is copied, it should be
+copied to a memory block with the same alignment as origin.
+
+Package can have following variants:
+
+* **Self-contained** - non read-only strings appended to the package. String can be
+  formatted from such package as long as there is access to read-only string
+  locations. Package may contain information where read-only strings are located
+  within the package. That information can be used to convert packet to fully
+  self-contained package.
+* **Fully self-contained** - all strings are appended to the package. String can be
+  formatted from such package without any external data.
+* **Transient**- only arguments are stored. Package contain information
+  where pointers to non read-only strings are located within the package. Optionally,
+  it may contain read-only string location information. String can be formatted
+  from such package as long as non read-only strings are still valid and read-only
+  strings are accessible. Alternatively, package can be converted to **self-contained**
+  package or **fully self-contained** if information about read-only string
+  locations is present in the package.
 
 Package can be created using two methods:
 
@@ -76,8 +92,19 @@ Package can be created using two methods:
 
 Several Kconfig options control behavior of the packaging:
 
-* :kconfig:`CONFIG_CBPRINTF_PACKAGE_LONGDOUBLE`
-* :kconfig:`CONFIG_CBPRINTF_STATIC_PACKAGE_CHECK_ALIGNMENT`
+* :kconfig:option:`CONFIG_CBPRINTF_PACKAGE_LONGDOUBLE`
+* :kconfig:option:`CONFIG_CBPRINTF_STATIC_PACKAGE_CHECK_ALIGNMENT`
+
+Cbprintf package conversion
+===========================
+
+It is possible to convert package to a variant which contains more information, e.g
+**transient** package can be converted to **self-contained**. Conversion to
+**fully self-contained** package is possible if :c:macro:`CBPRINTF_PACKAGE_ADD_RO_STR_POS`
+flag was used when package was created.
+
+:c:func:`cbprintf_package_copy` is used to calculate space needed for the new
+package and to copy and convert a package.
 
 Cbprintf package format
 =======================
@@ -95,7 +122,11 @@ formatting since address changes whenever package is copied.
 +------------------+-------------------------------------------------------------------------+
 | Header           | 1 byte: Argument list size including header and *fmt* (in 32 bit words) |
 |                  +-------------------------------------------------------------------------+
-| | sizeof(void \*)| 1 byte: Number of appended strings                                      |
+| sizeof(void \*)  | 1 byte: Number of strings appended to the package                       |
+|                  +-------------------------------------------------------------------------+
+|                  | 1 byte: Number of read-only string argument locations                   |
+|                  +-------------------------------------------------------------------------+
+|                  | 1 byte: Number of transient string argument locations                   |
 |                  +-------------------------------------------------------------------------+
 |                  | platform specific padding to sizeof(void \*)                            |
 +------------------+-------------------------------------------------------------------------+
@@ -111,17 +142,21 @@ formatting since address changes whenever package is copied.
 |                  +-------------------------------------------------------------------------+
 |                  | ...                                                                     |
 +------------------+-------------------------------------------------------------------------+
+| String location  | Indexes of words within the package where read-only strings are located |
+| information      +-------------------------------------------------------------------------+
+| (optional)       | Indexes of words within the package where transient strings are located |
++------------------+-------------------------------------------------------------------------+
 | Appended         | 1 byte: Index within the package to the location of associated argument |
-|                  +-------------------------------------------------------------------------+
-| strings          | Null terminated string                                                  |
+| strings          +-------------------------------------------------------------------------+
+| (optional)       | Null terminated string                                                  |
 |                  +-------------------------------------------------------------------------+
 |                  | ...                                                                     |
 +------------------+-------------------------------------------------------------------------+
 
 .. warning::
 
-  If :kconfig:`CONFIG_MINIMAL_LIBC` is selected in combination with
-  :kconfig:`CONFIG_CBPRINTF_NANO` formatting with C standard library
+  If :kconfig:option:`CONFIG_MINIMAL_LIBC` is selected in combination with
+  :kconfig:option:`CONFIG_CBPRINTF_NANO` formatting with C standard library
   functions like ``printf`` or ``snprintf`` is limited.  Among other
   things the ``%n`` specifier, most format flags, precision control, and
   floating point are not supported.

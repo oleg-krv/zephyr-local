@@ -20,7 +20,7 @@
 
 #define DT_DRV_COMPAT	zephyr_ipc_openamp_static_vrings
 
-#define WQ_PRIORITY	(0)
+#define WQ_PRIORITY		K_HIGHEST_APPLICATION_THREAD_PRIO
 #define WQ_STACK_SIZE	CONFIG_IPC_SERVICE_BACKEND_RPMSG_WQ_STACK_SIZE
 
 #define STATE_READY	(0)
@@ -271,9 +271,6 @@ static int mbox_init(const struct device *instance)
 	struct backend_data_t *data = instance->data;
 	int err;
 
-	k_work_queue_start(&mbox_wq, mbox_stack, K_KERNEL_STACK_SIZEOF(mbox_stack),
-			   WQ_PRIORITY, NULL);
-
 	k_work_init(&data->mbox_work, mbox_callback_process);
 
 	err = mbox_register_callback(&conf->mbox_rx, mbox_callback, data);
@@ -355,14 +352,9 @@ static int register_ept(const struct device *instance, void **token,
 	struct ipc_rpmsg_instance *rpmsg_inst;
 	struct ipc_rpmsg_ept *rpmsg_ept;
 
-	/* Instance is still being initialized */
-	if (data->state == STATE_BUSY) {
+	/* Instance is not ready */
+	if (atomic_get(&data->state) != STATE_INITED) {
 		return -EBUSY;
-	}
-
-	/* Instance is not initialized */
-	if (data->state == STATE_READY) {
-		return -EINVAL;
 	}
 
 	/* Empty name is not valid */
@@ -390,14 +382,9 @@ static int send(const struct device *instance, void *token,
 	struct backend_data_t *data = instance->data;
 	struct ipc_rpmsg_ept *rpmsg_ept;
 
-	/* Instance is still being initialized */
-	if (data->state == STATE_BUSY) {
+	/* Instance is not ready */
+	if (atomic_get(&data->state) != STATE_INITED) {
 		return -EBUSY;
-	}
-
-	/* Instance is not initialized */
-	if (data->state == STATE_READY) {
-		return -EINVAL;
 	}
 
 	/* Empty message is not allowed */
@@ -471,11 +458,18 @@ static int backend_init(const struct device *instance)
 {
 	const struct backend_config_t *conf = instance->config;
 	struct backend_data_t *data = instance->data;
+	static bool wq_started;
 
 	data->role = conf->role;
 
 	k_mutex_init(&data->rpmsg_inst.mtx);
 	atomic_set(&data->state, STATE_READY);
+
+	if (!wq_started) {
+		k_work_queue_start(&mbox_wq, mbox_stack, K_KERNEL_STACK_SIZEOF(mbox_stack),
+				   WQ_PRIORITY, NULL);
+		wq_started = true;
+	}
 
 	return 0;
 }

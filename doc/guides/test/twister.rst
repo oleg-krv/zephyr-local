@@ -168,18 +168,18 @@ The name of each testcase needs to be unique in the context of the overall
 testsuite and has to follow basic rules:
 
 #. The format of the test identifier shall be a string without any spaces or
-   special characters (allowed characters: alphanumric and [\_=]) consisting of
-   multiple sections delimited with a dot (.).
+   special characters (allowed characters: alphanumeric and [\_=]) consisting
+   of multiple sections delimited with a dot (.).
 
 #. Each test identifier shall start with a section followed by a subsection
    separated by a dot. For example, a test that covers semaphores in the kernel
-   shall start with ``kernel.sempahore``.
+   shall start with ``kernel.semaphore``.
 
 #. All test identifiers within a testcase.yaml file need to be unique. For
    example a testcase.yaml file covering semaphores in the kernel can have:
 
    * ``kernel.semaphore``: For general semaphore tests
-   * ``kernel.semaphore.stress``: Stress testng semaphores in the kernel.
+   * ``kernel.semaphore.stress``: Stress testing semaphores in the kernel.
 
 #. Depending on the nature of the test, an identifier can consist of at least
    two sections:
@@ -369,10 +369,13 @@ harness_config: <harness configuration options>
 
         Only one fixture can be defined per testcase.
 
-    pytest_root: <pytest dirctory> (default pytest)
-        Specify a pytest directory which need to excute when test case begin to running,
+    pytest_root: <pytest directory> (default pytest)
+        Specify a pytest directory which need to execute when test case begin to running,
         default pytest directory name is pytest, after pytest finished, twister will
         check if this case pass or fail according the pytest report.
+
+    pytest_args: <list of arguments> (default empty)
+        Specify a list of additional arguments to pass to ``pytest``.
 
     The following is an example yaml file with a few harness_config options.
 
@@ -617,6 +620,11 @@ and these tests will be executed on the boards that provide this fixture.
 
 .. figure:: fixtures.svg
    :figclass: align-center
+
+Fixtures can also be provided via twister command option ``--fixture``, this option
+can be used multiple times and all given fixtures will be appended as a list. And the
+given fixtures will be assigned to all boards, this means that all boards set by
+current twister command can run those testcases which request the same fixtures.
 
 Notes
 +++++

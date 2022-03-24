@@ -52,11 +52,17 @@ hardware features:
      - N/A
      - :dtcompatible:`arm,v6m-nvic`
    * - UART
-     - :kconfig:`CONFIG_SERIAL`
+     - :kconfig:option:`CONFIG_SERIAL`
      - :dtcompatible:`rpi,pico-uart`
    * - GPIO
-     - :kconfig:`CONFIG_GPIO`
+     - :kconfig:option:`CONFIG_GPIO`
      - :dtcompatible:`rpi,pico-gpio`
+   * - I2C
+     - :kconfig:option:`CONFIG_I2C`
+     - :dtcompatible:`snps,designware-i2c`
+   * - HWINFO
+     - :kconfig:option:`CONFIG_HWINFO`
+     - N/A
 
 Programming and Debugging
 *************************

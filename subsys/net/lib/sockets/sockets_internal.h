@@ -51,6 +51,7 @@ static inline bool net_socket_is_tls(void *obj)
 
 struct socket_op_vtable {
 	struct fd_op_vtable fd_vtable;
+	int (*shutdown)(void *obj, int how);
 	int (*bind)(void *obj, const struct sockaddr *addr, socklen_t addrlen);
 	int (*connect)(void *obj, const struct sockaddr *addr,
 		       socklen_t addrlen);
@@ -65,6 +66,8 @@ struct socket_op_vtable {
 	int (*setsockopt)(void *obj, int level, int optname,
 			  const void *optval, socklen_t optlen);
 	ssize_t (*sendmsg)(void *obj, const struct msghdr *msg, int flags);
+	int (*getpeername)(void *obj, struct sockaddr *addr,
+			   socklen_t *addrlen);
 	int (*getsockname)(void *obj, struct sockaddr *addr,
 			   socklen_t *addrlen);
 };

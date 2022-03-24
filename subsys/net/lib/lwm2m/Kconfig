@@ -17,15 +17,31 @@ module-dep = LOG
 module-str = Log level for LWM2M library
 source "subsys/net/Kconfig.template.log_config.net"
 
+choice
+	prompt "LwM2M protocol version"
+	default LWM2M_VERSION_1_0
+	help
+	  Select which version of the LwM2M protocol is used
+
+config LWM2M_VERSION_1_0
+	bool "LwM2M version 1.0"
+
+config LWM2M_VERSION_1_1
+	bool "LwM2M version 1.1 [EXPERIMENTAL]"
+	select EXPERIMENTAL
+
+endchoice
+
 config LWM2M_DTLS_SUPPORT
-	bool "Enable DTLS support in the LwM2M client"
+	bool "DTLS support in the LwM2M client"
 	select TLS_CREDENTIALS
 	select NET_SOCKETS_SOCKOPT_TLS
 	select NET_SOCKETS_ENABLE_DTLS
 
 choice
 	prompt "LwM2M Security object version"
-	default LWM2M_SECURITY_OBJECT_VERSION_1_0
+	default LWM2M_SECURITY_OBJECT_VERSION_1_0 if LWM2M_VERSION_1_0
+	default LWM2M_SECURITY_OBJECT_VERSION_1_1 if LWM2M_VERSION_1_1
 	help
 	  Select which version of the security object should be used.
 
@@ -40,7 +56,8 @@ endchoice
 
 choice
 	prompt "LwM2M Server object version"
-	default LWM2M_SERVER_OBJECT_VERSION_1_0
+	default LWM2M_SERVER_OBJECT_VERSION_1_0 if LWM2M_VERSION_1_0
+	default LWM2M_SERVER_OBJECT_VERSION_1_1 if LWM2M_VERSION_1_1
 	help
 	  Select which version of the Server object should be used.
 
@@ -54,7 +71,7 @@ config LWM2M_SERVER_OBJECT_VERSION_1_1
 endchoice
 
 config LWM2M_DNS_SUPPORT
-	bool "Enable DNS support in the LWM2M client"
+	bool "DNS support in the LWM2M client"
 	default y if DNS_RESOLVER
 
 config LWM2M_ENGINE_STACK_SIZE
@@ -151,7 +168,7 @@ config LWM2M_SECONDS_TO_UPDATE_EARLY
 	  higher, in order to allow the response to arrive before timeout.
 
 config LWM2M_QUEUE_MODE_ENABLED
-	bool "Enable Queue Mode UDP binding"
+	bool "Queue Mode UDP binding"
 	help
 	  Set the transport binding to UDP with Queue Mode (UQ).
 
@@ -173,7 +190,7 @@ config LWM2M_RD_CLIENT_SUPPORT
 	  LWM2M servers (including bootstrap server support)
 
 config LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP
-	bool "Enable bootstrap support"
+	bool "Bootstrap support"
 	help
 	  Enabling this setting allows the RD client to support bootstrap mode.
 
@@ -182,7 +199,7 @@ config LWM2M_RD_CLIENT_ENDPOINT_NAME_MAX_LENGTH
 	depends on LWM2M_RD_CLIENT_SUPPORT
 	default 33
 	help
-	  Default: room for 32 hexadeciaml digits (UUID) + NULL
+	  Default: room for 32 hexadecimal digits (UUID) + NULL
 
 config LWM2M_RD_CLIENT_MAX_RETRIES
 	int "Specify maximum number of registration retries"
@@ -273,7 +290,8 @@ config LWM2M_CONN_MON_OBJ_SUPPORT
 
 choice
 	prompt "LwM2M Connectivity Monitor object version"
-	default LWM2M_CONNMON_OBJECT_VERSION_1_0
+	default LWM2M_CONNMON_OBJECT_VERSION_1_0 if LWM2M_VERSION_1_0
+	default LWM2M_CONNMON_OBJECT_VERSION_1_2 if LWM2M_VERSION_1_1
 	depends on LWM2M_CONN_MON_OBJ_SUPPORT
 	help
 	  Select Which version of the Connectivity Monitor object should be used.
@@ -315,7 +333,7 @@ config LWM2M_FIRMWARE_UPDATE_OBJ_SUPPORT_MULTIPLE
 	depends on LWM2M_FIRMWARE_UPDATE_OBJ_SUPPORT
 	select EXPERIMENTAL
 	help
-	  Support multiple instances of LWM2M Firwmare Update Object (ID 5)
+	  Support multiple instances of LWM2M Firmware Update Object (ID 5)
 
 config LWM2M_FIRMWARE_UPDATE_OBJ_INSTANCE_COUNT
 	int "Maximum # of LWM2M Firmware update object instances"
@@ -339,6 +357,11 @@ config LWM2M_SWMGMT_OBJ_SUPPORT
 	bool "Software management object support"
 	help
 	  Include support for LWM2M Software Management Object (ID 9)
+
+config LWM2M_PORTFOLIO_OBJ_SUPPORT
+	bool "LwM2M Portfolio object ID support for Conformance test"
+	help
+	  Include support for LWM2M Portfolio Object (ID 16).
 
 config LWM2M_SWMGMT_MAX_INSTANCE_COUNT
 	int "Maximum # of object instances"
@@ -385,6 +408,19 @@ config LWM2M_RW_JSON_SUPPORT
 	help
 	  Include support for writing JSON data
 
+
+config LWM2M_RW_SENML_JSON_SUPPORT
+	bool "SENML JSON data format"
+	depends on BASE64
+	help
+	  Include support for write / parse SENML JSON data
+
+config LWM2M_COMPOSITE_PATH_LIST_SIZE
+	int "Maximum # of composite read and send operation URL path"
+	default 6
+	help
+	  Define path list size for Composite Read and send operation.
+
 config LWM2M_DEVICE_PWRSRC_MAX
 	int "Maximum # of device power source records"
 	default 5
@@ -423,7 +459,7 @@ config LWM2M_LOCATION_OBJ_SUPPORT
 	  Include support for LWM2M Location Object (ID 6)
 
 config LWM2M_GATEWAY_OBJ_SUPPORT
-	bool "Enable LwM2M Gateway Object (25) [EXPERIMENTAL]"
+	bool "LwM2M Gateway Object (25) [EXPERIMENTAL]"
 
 if LWM2M_GATEWAY_OBJ_SUPPORT
 
